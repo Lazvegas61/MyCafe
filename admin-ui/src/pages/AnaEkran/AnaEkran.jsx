@@ -48,32 +48,32 @@ export default function AnaEkran() {
       <div className="middle-panels">
 
         {/* Açık Adisyonlar */}
-<div className="panel-box">
-  <div className="panel-header">
-    <span>Açık Adisyonlar</span>
-  </div>
+        <div className="panel-box">
+          <div className="panel-header">
+            <span>Açık Adisyonlar</span>
+            <span className="panel-small">Toplam: 3 dk</span>
+          </div>
 
-  <div className="panel-list">
-    <div className="panel-item">
-      <span>🍽 Masa 1</span>
-      <span>35s 5dk</span>
-      <span>860,00</span>
-    </div>
+          <div className="panel-list">
+            <div className="panel-item">
+              <span>🍽 Masa 1</span>
+              <span>35s 5dk</span>
+              <span>860,00</span>
+            </div>
 
-    <div className="panel-item">
-      <span>🍽 Masa 2</span>
-      <span>2s 40dk</span>
-      <span>200,00</span>
-    </div>
+            <div className="panel-item">
+              <span>🍽 Masa 2</span>
+              <span>2s 40dk</span>
+              <span>200,00</span>
+            </div>
 
-    <div className="panel-item">
-      <span>🎱 Bilardo</span>
-      <span>30dk</span>
-      <span>275,00</span>
-    </div>
-  </div>
-</div>
-
+            <div className="panel-item">
+              <span>🎱 Bilardo</span>
+              <span>30dk</span>
+              <span>275,00</span>
+            </div>
+          </div>
+        </div>
 
         {/* Kritik Stok */}
         <div className="panel-box">

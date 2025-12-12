@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------
-   📌 App.jsx — MyCafe (FULL FINAL – ANA SAYFA DÜZELTİLDİ)
+   📌 App.jsx — MyCafe (FULL FINAL – IMPORT DÜZELTMELERİ)
 ------------------------------------------------------------ */
 
 import React from "react";
@@ -96,12 +96,13 @@ function autoFixCategoryAndProducts() {
 autoFixCategoryAndProducts();
 
 /* ------------------------------------------------------------
-   📌 SAYFA IMPORTLARI
+   📌 SAYFA IMPORTLARI — DÜZELTİLDİ
 ------------------------------------------------------------ */
 
 // ANA SAYFALAR
 import Login from "./pages/Login.jsx";
-import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
+// ANA EKRAN IMPORT'U DÜZELTİLDİ
+import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx"; // BU DOĞRU OLMALI
 import Masalar from "./pages/Masalar/Masalar.jsx";
 import Adisyon from "./pages/Adisyon/Adisyon.jsx";
 import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx";
@@ -387,6 +388,19 @@ export default function App() {
             element={
               <Layout>
                 <Bilardo />
+              </Layout>
+            }
+          />
+
+          {/* 404 - SAYFA BULUNAMADI */}
+          <Route
+            path="*"
+            element={
+              <Layout>
+                <div style={{ padding: "50px", textAlign: "center" }}>
+                  <h1>404 - Sayfa Bulunamadı</h1>
+                  <p>Ana sayfaya yönlendiriliyorsunuz...</p>
+                </div>
               </Layout>
             }
           />

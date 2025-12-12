@@ -1,6 +1,5 @@
 /* ----------------------------------------------------------------
    PREMIUM PLUS GOLD — GÜNLÜK ÖZET DASHBOARD — SADE TASARIM
-   + RESPONSIVE UYUMU (MASTER KRİTER 2.2)
 -----------------------------------------------------------------*/
 
 .ana-wrapper {
@@ -148,54 +147,4 @@
   font-size: 20px;
   font-weight: 800;
   color: #f8e2b6;
-}
-
-/* ===============================================
-   RESPONSIVE KURALLAR (MASTER KRİTER 2.2)
-=============================================== */
-
-/* 1200px altı: 4'lü kartları 2'li yap ve başlığı küçült */
-@media (max-width: 1200px) {
-  .title-3d {
-    font-size: 48px;
-  }
-  .summary-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .report-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* 900px altı: Orta panelleri tek sütun yap (açık adisyonlar ve stok) */
-@media (max-width: 900px) {
-  .middle-panels {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* 600px altı: Tüm kartları tek sütun yap */
-@media (max-width: 600px) {
-  .ana-wrapper {
-    padding: 20px 25px;
-  }
-  .top-bar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .title-3d {
-    font-size: 36px;
-    margin-bottom: 10px;
-  }
-  .clock-box {
-    font-size: 24px;
-    padding: 8px 16px;
-  }
-  .summary-cards,
-  .report-row {
-    grid-template-columns: 1fr;
-  }
-  .sum-value {
-    font-size: 28px;
-  }
 }

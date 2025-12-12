@@ -1,5 +1,5 @@
 // 📁 src/services/syncService.js
-// SENKRONİZASYON SERVİSİ - Tüm veri işlemleri burada
+// SENKRONİZASYON SERVİSİ - MASA BOSALT FONKSİYONU DÜZELTİLDİ
 
 // LocalStorage key'leri
 const KEYS = {
@@ -114,7 +114,7 @@ export const syncService = {
         ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
         ayirToplam: ayirToplam,
         toplamTutar: Number(toplamTutar).toFixed(2),
-        acilisZamani: acilisZamani || masalar[masaIdx].acilisZamani, // AÇILIŞ ZAMANI KORU
+        acilisZamani: acilisZamani || masalar[masaIdx].acilisZamani,
         durum: toplamTutar > 0 ? "DOLU" : "BOŞ",
         renk: toplamTutar > 0 ? "kırmızı" : "gri",
         guncellemeZamani: new Date().toISOString()
@@ -132,6 +132,9 @@ export const syncService = {
         masa: guncelMasa
       });
       
+      // 7. Storage event tetikle
+      window.dispatchEvent(new Event('storage'));
+      
       return true;
     } catch (error) {
       console.error('❌ SYNC: Masa güncelleme hatası', error);
@@ -139,21 +142,43 @@ export const syncService = {
     }
   },
 
-  // MASAYI TEMİZLE (KAPAT)
+  // MASAYI TEMİZLE (KAPAT) - DÜZELTİLDİ!
   masaBosalt: (masaNum) => {
+    console.log('🧹 SYNC: Masa temizleniyor', masaNum);
+    
     try {
       let masalar = okuJSON(KEYS.MASALAR);
-      const masaNoNum = Number(masaNum.replace("MASA ", ""));
+      
+      // Masa numarasını parse et (farklı formatları destekle)
+      let masaNoNum;
+      
+      if (typeof masaNum === 'string') {
+        if (masaNum.startsWith("MASA ")) {
+          masaNoNum = Number(masaNum.replace("MASA ", ""));
+        } else if (masaNum.startsWith("MASA")) {
+          masaNoNum = Number(masaNum.replace("MASA", ""));
+        } else {
+          masaNoNum = Number(masaNum);
+        }
+      } else {
+        masaNoNum = Number(masaNum);
+      }
+      
+      console.log('🔍 Aranan masa no:', masaNoNum);
+      console.log('📋 Mevcut masalar:', masalar);
+      
       const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
 
       if (masaIdx !== -1) {
+        console.log('✅ Masa bulundu, indeks:', masaIdx);
+        
         const bosMasa = {
           ...masalar[masaIdx],
           adisyonId: null,
           ayirId: null,
           ayirToplam: null,
-          toplamTutar: null,
-          acilisZamani: null, // AÇILIŞ ZAMANI SIFIRLA
+          toplamTutar: "0.00",
+          acilisZamani: null,
           durum: "BOŞ",
           renk: "gri",
           musteriAdi: null,
@@ -164,15 +189,21 @@ export const syncService = {
         masalar[masaIdx] = bosMasa;
         yazJSON(KEYS.MASALAR, masalar);
         
+        // Event yayınla - BU ÇOK ÖNEMLİ!
         syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
           masaNo: masaNoNum,
           masa: bosMasa
         });
         
-        console.log('🧹 SYNC: Masa temizlendi', masaNoNum);
+        // Storage event tetikle
+        window.dispatchEvent(new Event('storage'));
+        
+        console.log('✅ SYNC: Masa temizlendi', bosMasa);
         return true;
+      } else {
+        console.error('❌ SYNC: Masa bulunamadı', masaNoNum);
+        return false;
       }
-      return false;
     } catch (error) {
       console.error('❌ SYNC: Masa temizleme hatası', error);
       return false;
@@ -191,7 +222,7 @@ export const syncService = {
           ...masalar[masaIdx],
           musteriAdi: musteriAdi,
           kisiSayisi: kisiSayisi,
-          acilisZamani: new Date().toISOString(), // YENİ AÇILIŞ ZAMANI
+          acilisZamani: new Date().toISOString(),
           guncellemeZamani: new Date().toISOString()
         };
         
@@ -202,6 +233,8 @@ export const syncService = {
           masaNo: masaNoNum,
           masa: acikMasa
         });
+        
+        window.dispatchEvent(new Event('storage'));
         
         console.log('🚪 SYNC: Masa açıldı', masaNoNum);
         return true;
@@ -238,6 +271,8 @@ export const syncService = {
         adisyon: adisyonData
       });
       
+      window.dispatchEvent(new Event('storage'));
+      
       console.log('✅ SYNC: Adisyon güncellendi', adisyonData.id);
       return adisyonData;
     } catch (error) {
@@ -271,11 +306,43 @@ export const syncService = {
       // Masa açılış zamanını güncelle
       syncService.masaAc(masaNo, musteriAdi, null);
       
+      window.dispatchEvent(new Event('storage'));
+      
       console.log('📄 SYNC: Yeni adisyon oluşturuldu', yeniAdisyon.id);
       return yeniAdisyon;
     } catch (error) {
       console.error('❌ SYNC: Yeni adisyon hatası', error);
       return null;
+    }
+  },
+
+  // ADİSYONU KAPAT VE MASAYI TEMİZLE (YENİ FONKSİYON)
+  kapatAdisyonVeMasayiTemizle: (adisyonId, masaNum) => {
+    try {
+      console.log('🔄 SYNC: Adisyon kapatılıyor ve masa temizleniyor', { adisyonId, masaNum });
+      
+      // 1. Adisyonu kapat
+      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
+      const adisyonIdx = adisyonlar.findIndex(a => a.id === adisyonId);
+      
+      if (adisyonIdx !== -1) {
+        adisyonlar[adisyonIdx] = {
+          ...adisyonlar[adisyonIdx],
+          kapali: true,
+          kapanisZamani: new Date().toISOString(),
+          durum: "KAPALI"
+        };
+        yazJSON(KEYS.ADISYONLAR, adisyonlar);
+        console.log('✅ Adisyon kapatıldı:', adisyonId);
+      }
+      
+      // 2. Masayı temizle
+      const success = syncService.masaBosalt(masaNum);
+      
+      return success;
+    } catch (error) {
+      console.error('❌ SYNC: Adisyon kapatma ve masa temizleme hatası', error);
+      return false;
     }
   },
 
@@ -315,6 +382,9 @@ export const syncService = {
     
     // Window event (mevcut sisteme uyumluluk)
     window.dispatchEvent(new CustomEvent(event.toLowerCase(), { detail: data }));
+    
+    // Storage event (tüm tab'lar için)
+    window.dispatchEvent(new Event('storage'));
     
     // BroadcastChannel (multi-tab sync)
     try {
@@ -363,7 +433,7 @@ export const syncService = {
         masalar[index] = {
           ...masa,
           toplamTutar: Number(toplamTutar).toFixed(2),
-          acilisZamani: acilisZamani, // AÇILIŞ ZAMANI KORU
+          acilisZamani: acilisZamani,
           durum: toplamTutar > 0 ? "DOLU" : "BOŞ",
           renk: toplamTutar > 0 ? "kırmızı" : "gri",
           guncellemeZamani: new Date().toISOString()
@@ -371,68 +441,14 @@ export const syncService = {
       });
       
       yazJSON(KEYS.MASALAR, masalar);
+      window.dispatchEvent(new Event('storage'));
+      
       console.log('✅ SYNC: Tüm masalar senkronize edildi');
       
       return masalar;
     } catch (error) {
       console.error('❌ SYNC: Senkronizasyon hatası', error);
       return [];
-    }
-  },
-
-  // =============== SİSTEM SAĞLIĞI ===============
-  sistemSaglikKontrol: () => {
-    console.log('🏥 SYNC: Sistem sağlık kontrolü başlatılıyor...');
-    
-    const results = {
-      masalar: { count: 0, acilisZamaniEksik: [] },
-      adisyonlar: { count: 0, acilisZamaniEksik: [] },
-      senkronizasyon: { errors: [] }
-    };
-    
-    try {
-      // Masaları kontrol et
-      const masalar = okuJSON(KEYS.MASALAR);
-      results.masalar.count = masalar.length;
-      
-      // Açılış zamanı eksik masalar
-      results.masalar.acilisZamaniEksik = masalar
-        .filter(m => m.durum === 'DOLU' && !m.acilisZamani)
-        .map(m => `Masa ${m.no}`);
-      
-      // Adisyonları kontrol et
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
-      results.adisyonlar.count = adisyonlar.length;
-      
-      // Açılış zamanı eksik adisyonlar
-      results.adisyonlar.acilisZamaniEksik = adisyonlar
-        .filter(a => !a.kapali && !a.acilisZamani)
-        .map(a => `Adisyon ${a.id} - ${a.masaNo}`);
-      
-      // Boş adisyonları temizle
-      const bosAdisyonlar = adisyonlar.filter(a => 
-        (!a.kalemler || a.kalemler.length === 0) && 
-        (!a.odemeler || a.odemeler.length === 0) &&
-        !a.kapali
-      );
-      
-      if (bosAdisyonlar.length > 0) {
-        results.senkronizasyon.errors.push(`${bosAdisyonlar.length} boş adisyon bulundu`);
-      }
-      
-      // Açılış zamanı eksik olanları otomatik düzelt
-      if (results.masalar.acilisZamaniEksik.length > 0) {
-        results.senkronizasyon.errors.push(
-          `${results.masalar.acilisZamaniEksik.length} masa için açılış zamanı eksik`
-        );
-      }
-      
-      console.log('✅ SYNC: Sistem sağlık kontrolü tamamlandı', results);
-      return results;
-      
-    } catch (error) {
-      console.error('❌ SYNC: Sistem sağlık kontrolü hatası', error);
-      return { error: error.message };
     }
   },
 

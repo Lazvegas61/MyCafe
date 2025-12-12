@@ -1,20 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Adisyon.css";
-import syncService, { SYNC_EVENTS } from "../../services/syncService";
 
-// LocalStorage key'leri - ESKİ KONSTANTLAR SİLİNDİ
-// const MASA_KEY = "mc_masalar";     // syncService.oku('mc_masalar')
-// const ADISYON_KEY = "mc_adisyonlar"; // syncService.oku('mc_adisyonlar')
-// const URUN_KEY = "mc_urunler";      // syncService.oku('mc_urunler')
-// const MUSTERI_KEY = "mc_musteriler"; // syncService.oku('mc_musteriler')
-// const BORC_KEY = "mc_borclar";      // syncService.oku('mc_borclar')
+// LocalStorage key'leri
+const MASA_KEY = "mc_masalar";
+const ADISYON_KEY = "mc_adisyonlar";
+const URUN_KEY = "mc_urunler";
+const MUSTERI_KEY = "mc_musteriler";
+const BORC_KEY = "mc_borclar";
 
 export default function Adisyon() {
   // --------------------------------------------------
   // GENEL STATE
   // --------------------------------------------------
   const [masaNo, setMasaNo] = useState("MASA 1");
-  const [adisyon, setAdisyon] = useState(null);
+  const [adisyon, setAdisyon] = useState(null); // YENİ ADİSYON
   const [gecenSure, setGecenSure] = useState("00:00");
   const [indirimInput, setIndirimInput] = useState("");
   const [indirim, setIndirim] = useState(0);
@@ -23,17 +22,15 @@ export default function Adisyon() {
   const [aktifOdemeTipi, setAktifOdemeTipi] = useState("NAKIT");
   const [odemeInput, setOdemeInput] = useState("");
   const [kapanisMesaji, setKapanisMesaji] = useState("");
-  const [islemMesaji, setIslemMesaji] = useState("");
 
   // MENÜ
   const [urunler, setUrunler] = useState([]);
   const [aktifKategori, setAktifKategori] = useState("");
   const [seciliUrun, setSeciliUrun] = useState(null);
   const [adetPanelAcik, setAdetPanelAcik] = useState(false);
-  const [seciliOdemeAdisyonlari, setSeciliOdemeAdisyonlari] = useState([]);
   const [adet, setAdet] = useState(1);
 
-  // SİPARİŞ YEMEK
+  // SİPARİŞ YEMEK alanı
   const [siparisYemekFiyat, setSiparisYemekFiyat] = useState("");
   const [siparisYemekNot, setSiparisYemekNot] = useState("");
 
@@ -43,34 +40,53 @@ export default function Adisyon() {
   const [yeniMusteriAdSoyad, setYeniMusteriAdSoyad] = useState("");
   const [yeniMusteriTelefon, setYeniMusteriTelefon] = useState("");
   const [yeniMusteriNot, setYeniMusteriNot] = useState("");
-
   const [borcTutarInput, setBorcTutarInput] = useState("");
   const [hesabaYazModu, setHesabaYazModu] = useState(false);
+  const [hesabaYazSonrasiMasaDon, setHesabaYazSonrasiMasaDon] = useState(false);
+
+  // ÖDEME SÖZÜ POPUP
   const [odemeSozuPopup, setOdemeSozuPopup] = useState(null);
-
-  // HESABI AYIR (SPLIT BILL)
-  const [splitAdisyon, setSplitAdisyon] = useState(null);
-  const [aktifAdisyon, setAktifAdisyon] = useState("ANA");
+  
+  // --------------------------------------------------
+  // HESABI AYIR (SPLIT BILL) STATE'LERİ
+  // --------------------------------------------------
+  const [splitAdisyon, setSplitAdisyon] = useState(null); // ESKİ ADİSYON (KİLİTLİ)
 
   // --------------------------------------------------
-  // YARDIMCI HOOK'LAR
+  // LOCALSTORAGE YARDIMCI FONKSİYONLARI
   // --------------------------------------------------
-  useEffect(() => {
-    if (islemMesaji) {
-      const timer = setTimeout(() => setIslemMesaji(""), 5000);
-      return () => clearTimeout(timer);
+  const okuJSON = (key, defaultValue) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return defaultValue;
+      return JSON.parse(raw);
+    } catch {
+      return defaultValue;
     }
-  }, [islemMesaji]);
+  };
 
-  // ESKİ LOCALSTORAGE FONKSİYONLARI SİLİNDİ
-  // --------------------------------------------------
-  // LOCALSTORAGE YARDIMCI FONKSİYONLARI - SİLİNDİ
-  // --------------------------------------------------
-  // const okuJSON = (key, defaultValue) => { ... } - SİLİNDİ
-  // const yazJSON = (key, value) => { ... } - SİLİNDİ
-  // const guncelMasaLocal = () => { ... } - SİLİNDİ
-  // const masaBosaltLocal = () => { ... } - SİLİNDİ
-  // const guncelAdisyonLocal = () => { ... } - SİLİNDİ
+  const yazJSON = (key, value) => {
+    localStorage.setItem(key, JSON.stringify(value));
+  };
+  
+  // MASA BİLGİSİNİ GÜNCELLEYEN FONKSİYON
+  const guncelMasaLocal = (masaNum, anaAdisyonId, splitAdisyonObj) => {
+    let masalar = okuJSON(MASA_KEY, []);
+    const masaNoNum = Number(masaNum.replace("MASA ", ""));
+    const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
+
+    if (masaIdx !== -1) {
+      masalar[masaIdx] = {
+        ...masalar[masaIdx],
+        adisyonId: anaAdisyonId, // Yeni adisyon ID'si
+        ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
+        ayirToplam: splitAdisyonObj ? 
+          Number(splitAdisyonObj.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0)).toFixed(2) 
+          : null,
+      };
+      yazJSON(MASA_KEY, masalar);
+    }
+  };
 
   const odemeTipiLabel = (tip) => {
     switch (tip) {
@@ -97,244 +113,168 @@ export default function Adisyon() {
   // URL'DEN MASA NUMARASINI AL
   // --------------------------------------------------
   useEffect(() => {
-    const path = window.location.pathname;
+    const path = window.location.pathname; // /adisyon/1
     const parts = path.split("/");
     const masaId = parts[2] || "1";
     const masaLabel = `MASA ${masaId}`;
     setMasaNo(masaLabel);
-    console.log("📍 Masa No ayarlandı:", masaLabel);
   }, []);
 
   // --------------------------------------------------
-  // ADİSYON YÜKLE - syncService İLE
+  // ADİSYON YÜKLE (Yeni ve Eski)
   // --------------------------------------------------
   useEffect(() => {
     if (!masaNo) return;
-    
-    console.log("🔄 Adisyon yükleniyor, masaNo:", masaNo);
-    
-    const adisyonlar = syncService.oku('mc_adisyonlar');
-    
-    // DEBUG: Tüm adisyonları logla
-    console.log("📋 Tüm adisyonlar:", adisyonlar.map(a => ({
-      id: a.id,
-      masaNo: a.masaNo,
-      isSplit: a.isSplit,
-      kapali: a.kapali,
-      kalemSayisi: a.kalemler?.length || 0
-    })));
-    
-    // 1. Split adisyon kontrolü
-    const acikSplitAdisyon = adisyonlar.find(
+    const adisyonlar = okuJSON(ADISYON_KEY, []);
+
+    // 1. Aktif Yeni Adisyonu Bul/Oluştur
+    let yeniAdisyon = adisyonlar.find(
+      (a) => a.masaNo === masaNo && !a.kapali && !a.isSplit
+    );
+
+    if (!yeniAdisyon) {
+      yeniAdisyon = {
+        id: Date.now().toString(),
+        masaNo,
+        acilisZamani: new Date().toISOString(),
+        kapanisZamani: null,
+        kalemler: [],
+        odemeler: [],
+        indirim: 0,
+        hesabaYazKayitlari: [],
+        kapali: false,
+        isSplit: false, // Yeni adisyon
+        parentAdisyonId: null,
+        durum: "AÇIK",
+      };
+      adisyonlar.push(yeniAdisyon);
+      yazJSON(ADISYON_KEY, adisyonlar);
+    }
+    setAdisyon(yeniAdisyon);
+
+    // 2. Eski (Split) Adisyonu Bul
+    const eskiAdisyon = adisyonlar.find(
       (a) => a.masaNo === masaNo && !a.kapali && a.isSplit
     );
-    
-    let parentAnaAdisyon = null;
-    if (acikSplitAdisyon) {
-      parentAnaAdisyon = adisyonlar.find(
-        (a) => a.id === acikSplitAdisyon.parentAdisyonId && !a.kapali
-      );
-    }
-    
-    // 2. Boş split'i kapat
-    if (acikSplitAdisyon && (!parentAnaAdisyon || (parentAnaAdisyon.kalemler || []).length === 0)) {
-      const guncelAdisyonlar = adisyonlar.map(a => {
-        if (a.id === acikSplitAdisyon.id) {
-          return {
-            ...a,
-            kapali: true,
-            kapanisZamani: new Date().toISOString(),
-            durum: "KAPALI"
-          };
-        }
-        return a;
-      });
-      
-      syncService.yaz('mc_adisyonlar', guncelAdisyonlar);
-      
-      let aktifAna = guncelAdisyonlar.find(
-        (a) => a.masaNo === masaNo && !a.kapali && !a.isSplit
-      );
-      
-      if (!aktifAna) {
-        aktifAna = {
-          id: Date.now().toString(),
-          masaNo,
-          acilisZamani: new Date().toISOString(),
-          kapanisZamani: null,
-          kalemler: [],
-          odemeler: [],
-          indirim: 0,
-          hesabaYazKayitlari: [],
-          kapali: false,
-          isSplit: false,
-          parentAdisyonId: null,
-          durum: "AÇIK",
-        };
-        guncelAdisyonlar.push(aktifAna);
-        syncService.yaz('mc_adisyonlar', guncelAdisyonlar);
-      }
-      
-      setAdisyon(aktifAna);
-      setSplitAdisyon(null);
-      setAktifAdisyon("ANA");
-      setSeciliOdemeAdisyonlari(["ANA"]);
-      
-      // MASALARI GÜNCELLE - syncService İLE
-      syncService.guncelMasa(masaNo, aktifAna.id, null);
-      
-    } else {
-      // 3. Ana Adisyonu Bul/Oluştur
-      let aktifAna = adisyonlar.find(
-        (a) => a.masaNo === masaNo && !a.kapali && !a.isSplit
-      );
-
-      if (!aktifAna) {
-        aktifAna = {
-          id: Date.now().toString(),
-          masaNo,
-          acilisZamani: new Date().toISOString(),
-          kapanisZamani: null,
-          kalemler: [],
-          odemeler: [],
-          indirim: 0,
-          hesabaYazKayitlari: [],
-          kapali: false,
-          isSplit: false,
-          parentAdisyonId: null,
-          durum: "AÇIK",
-        };
-        adisyonlar.push(aktifAna);
-        syncService.yaz('mc_adisyonlar', adisyonlar);
-      }
-      setAdisyon(aktifAna);
-
-      // 4. Split Adisyonu Bul
-      let aktifSplit = null;
-      if (acikSplitAdisyon && parentAnaAdisyon) {
-        aktifSplit = {
-          ...acikSplitAdisyon,
-          kalemler: acikSplitAdisyon.kalemler || [],
-          odemeler: acikSplitAdisyon.odemeler || []
-        };
-      }
-      
-      setSplitAdisyon(aktifSplit || null);
-      
-      // Aktif adisyonu ayarla
-      if (aktifSplit) {
-        setAktifAdisyon("SPLIT");
-        setSeciliOdemeAdisyonlari(["SPLIT"]);
-      } else {
-        setAktifAdisyon("ANA");
-        setSeciliOdemeAdisyonlari(["ANA"]);
-      }
-      
-      // MASALARI GÜNCELLE (İLK YÜKLEMEDE) - syncService İLE
-      syncService.guncelMasa(masaNo, aktifAna.id, aktifSplit);
-    }
+    setSplitAdisyon(eskiAdisyon || null);
   }, [masaNo]);
 
   // --------------------------------------------------
-  // GEÇEN SÜRE HESAPLA - syncService İLE
+  // GEÇEN SÜRE HESAPLA (YENİ adisyon üzerinden)
   // --------------------------------------------------
   useEffect(() => {
-    if (!masaNo) return;
-    
-    // syncService ile geçen süreyi hesapla
-    const hesaplaSure = () => {
-      const sure = syncService.hesaplaGecenSure(masaNo);
-      setGecenSure(sure);
+    if (!adisyon || !adisyon.acilisZamani) return;
+
+    const hesapla = () => {
+      const acilis = new Date(adisyon.acilisZamani);
+      const simdi = new Date();
+      const diffMs = simdi - acilis;
+      const dakika = Math.floor(diffMs / 60000);
+      const saat = Math.floor(dakika / 60);
+      const kalanDakika = dakika % 60;
+      const sSaat = String(saat).padStart(2, "0");
+      const sDakika = String(kalanDakika).padStart(2, "0");
+      setGecenSure(`${sSaat}:${sDakika}`);
     };
-    
-    hesaplaSure();
-    const timer = setInterval(hesaplaSure, 60000);
-    
+
+    hesapla();
+    const timer = setInterval(hesapla, 60000);
     return () => clearInterval(timer);
-  }, [masaNo]);
-
-  // MASA BİLGİLERİNİ DİNLE
-  useEffect(() => {
-    const handleMasaGuncellendi = (eventData) => {
-      if (eventData.masaNo === Number(masaNo.replace("MASA ", ""))) {
-        console.log("🔄 Masa güncellendi, geçen süre yeniden hesaplanıyor...");
-        const sure = syncService.hesaplaGecenSure(masaNo);
-        setGecenSure(sure);
-      }
-    };
-    
-    syncService.on(SYNC_EVENTS.MASA_GUNCELLENDI, handleMasaGuncellendi);
-    
-    return () => {
-      syncService.off(SYNC_EVENTS.MASA_GUNCELLENDI, handleMasaGuncellendi);
-    };
-  }, [masaNo]);
+  }, [adisyon?.acilisZamani]);
 
   // --------------------------------------------------
-  // MÜŞTERİ / BORÇ VERİLERİNİ YÜKLE - syncService İLE
+  // MÜŞTERİ / BORÇ VERİLERİNİ YÜKLE
   // --------------------------------------------------
   useEffect(() => {
-    const mList = syncService.oku('mc_musteriler');
+    const mList = okuJSON(MUSTERI_KEY, []);
     setMusteriler(Array.isArray(mList) ? mList : []);
   }, []);
 
   // --------------------------------------------------
-  // ADİSYON TOPLAM ve KALAN HESABI
+  // ÖDEME SÖZÜ POPUP KONTROLÜ
   // --------------------------------------------------
   useEffect(() => {
-    const adisyonListesi = [];
-    if (seciliOdemeAdisyonlari.includes("ANA") && adisyon && !adisyon.kapali) {
-        adisyonListesi.push({...adisyon, tip: "ANA"});
+    const borclar = okuJSON(BORC_KEY, []);
+    if (!Array.isArray(borclar) || borclar.length === 0) return;
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    const bekleyen = borclar.find(
+      (b) =>
+        b.odemeSozu &&
+        !b.hatirlatildi &&
+        b.odemeSozu <= todayStr
+    );
+
+    if (bekleyen) {
+      const musteri = (okuJSON(MUSTERI_KEY, []) || []).find(
+        (m) => m.id === bekleyen.musteriId
+      );
+      setOdemeSozuPopup({
+        borcId: bekleyen.id,
+        musteriAd: musteri ? musteri.adSoyad : "Müşteri",
+        odemeSozu: bekleyen.odemeSozu,
+      });
     }
-    if (seciliOdemeAdisyonlari.includes("SPLIT") && splitAdisyon && !splitAdisyon.kapali) {
-        adisyonListesi.push({...splitAdisyon, tip: "SPLIT"});
+  }, []);
+
+  const odemeSozuPopupKapat = () => {
+    if (!odemeSozuPopup) return;
+    const borclar = okuJSON(BORC_KEY, []);
+    const idx = borclar.findIndex((b) => b.id === odemeSozuPopup.borcId);
+    if (idx !== -1) {
+      borclar[idx].hatirlatildi = true;
+      yazJSON(BORC_KEY, borclar);
     }
+    setOdemeSozuPopup(null);
+  };
 
-    let toplamTutar = 0;
-    let odemelerToplam = 0;
-    let indirimMiktari = 0;
+  const odemeSozuPopupDetayaGit = () => {
+    odemeSozuPopupKapat();
+    window.location.href = "/raporlar/musteri-borc";
+  };
 
-    adisyonListesi.forEach(a => {
-        const satirToplam = (a.kalemler || []).reduce(
-            (sum, k) => sum + (Number(k.toplam) || 0),
-            0
-        );
-        const odemelerTutar = (a.odemeler || []).reduce(
-            (sum, o) => sum + (Number(o.tutar) || 0),
-            0
-        );
-
-        toplamTutar += satirToplam;
-        odemelerToplam += odemelerTutar;
-
-        if (a.tip === "ANA") {
-            indirimMiktari += (indirim || 0);
-        }
-    });
-
-    setToplam(toplamTutar);
-    
-    const kalanTutar = Math.max(
-      toplamTutar - indirimMiktari - odemelerToplam,
+  // --------------------------------------------------
+  // ADİSYON TOPLAM ve KALAN HESABI - GÜNCELLENDİ
+  // --------------------------------------------------
+  useEffect(() => {
+    // 1. YENİ adisyon toplamları
+    const yeniSatirToplam = (adisyon?.kalemler || []).reduce(
+      (sum, k) => sum + (Number(k.toplam) || 0),
       0
     );
-    setKalan(kalanTutar);
-  }, [adisyon, splitAdisyon, indirim, seciliOdemeAdisyonlari]);
-  
-  // İndirim değişikliğini ANA adisyona kaydet
-  useEffect(() => {
-    if(aktifAdisyon !== 'ANA' || !adisyon) return;
-    const guncel = { ...adisyon, indirim: indirim };
-    // ESKİ: guncelAdisyonLocal(guncel);
-    // YENİ:
-    syncService.guncelAdisyon(guncel);
-  }, [indirim, adisyon, aktifAdisyon]);
+    const yeniOdemelerToplam = (adisyon?.odemeler || []).reduce(
+      (sum, o) => sum + (Number(o.tutar) || 0),
+      0
+    );
+    const yeniIndirim = indirim || 0;
+    const yeniKalan = Math.max(yeniSatirToplam - yeniIndirim - yeniOdemelerToplam, 0);
+
+    // 2. ESKİ adisyon toplamları (SADECE SATIR TOPLAMI)
+    const eskiSatirToplam = (splitAdisyon?.kalemler || []).reduce(
+      (sum, k) => sum + (Number(k.toplam) || 0),
+      0
+    );
+
+    // 3. TOPLAM değerler (YENİ + ESKİ)
+    const toplamSatir = yeniSatirToplam + eskiSatirToplam;
+    const toplamOdemeler = yeniOdemelerToplam; // Sadece yeni adisyondaki ödemeler
+    const toplamKalan = Math.max(toplamSatir - yeniIndirim - toplamOdemeler, 0);
+
+    // ANA panelde gösterilecek toplam
+    setToplam(toplamSatir);
+    setKalan(toplamKalan);
+  }, [adisyon, splitAdisyon, indirim]);
 
   // --------------------------------------------------
-  // MENÜ ÜRÜNLERİNİ YÜKLE - syncService İLE
+  // MENÜ ÜRÜNLERİNİ YÜKLE
   // --------------------------------------------------
   useEffect(() => {
-    const list = syncService.oku('mc_urunler');
+    const list = okuJSON(URUN_KEY, []);
 
     const fixed = (Array.isArray(list) ? list : []).map(u => ({
       ...u,
@@ -377,41 +317,23 @@ export default function Adisyon() {
   }, [urunler, aktifKategori]);
 
   // --------------------------------------------------
-  // ADİSYONA ÜRÜN EKLEME - syncService İLE
+  // ADİSYONA ÜRÜN EKLEME (SADECE YENİ ADİSYONA)
   // --------------------------------------------------
-  const uruneTiklandi = (urun) => {
-    // Hangi adisyona ekleneceğini belirle
-    let targetAdisyon = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-    let setTargetAdisyon = aktifAdisyon === "ANA" ? setAdisyon : setSplitAdisyon;
-    
-    // Eğer targetAdisyon null ise ve split modundaysak, split adisyonu oluştur
-    if (!targetAdisyon && aktifAdisyon === "SPLIT") {
-      console.log("⚠️ Split adisyon yok, yeni oluşturuluyor...");
-      const yeniSplitAdisyon = {
-        id: Date.now().toString(),
-        masaNo,
-        acilisZamani: new Date().toISOString(),
-        kapanisZamani: null,
-        kalemler: [],
-        odemeler: [],
-        indirim: 0,
-        hesabaYazKayitlari: [],
-        kapali: false,
-        isSplit: true,
-        parentAdisyonId: adisyon ? adisyon.id : null,
-        durum: "AÇIK",
-      };
-      setSplitAdisyon(yeniSplitAdisyon);
-      targetAdisyon = yeniSplitAdisyon;
-      setTargetAdisyon = setSplitAdisyon;
-      
-      // LocalStorage'a kaydet - syncService İLE
-      syncService.guncelAdisyon(yeniSplitAdisyon);
+  const guncelAdisyonLocal = (yeniAdisyon) => {
+    const adisyonlar = okuJSON(ADISYON_KEY, []);
+    const idx = adisyonlar.findIndex((a) => a.id === yeniAdisyon.id);
+    if (idx === -1) {
+      adisyonlar.push(yeniAdisyon);
+    } else {
+      adisyonlar[idx] = yeniAdisyon;
     }
-    
-    if (!targetAdisyon) {
-      console.error("❌ Hedef adisyon bulunamadı:", { aktifAdisyon, adisyon, splitAdisyon });
-      setIslemMesaji("⚠️ Ürün eklemek için önce bir adisyon seçiniz.");
+    yazJSON(ADISYON_KEY, adisyonlar);
+  };
+
+  const uruneTiklandi = (urun) => {
+    // Sadece YENİ adisyona ürün ekleyebiliriz
+    if (!adisyon) {
+      alert("Adisyon bulunamadı.");
       return;
     }
 
@@ -424,7 +346,7 @@ export default function Adisyon() {
       return;
     }
 
-    const mevcutKalemler = [...(targetAdisyon.kalemler || [])];
+    const mevcutKalemler = [...(adisyon.kalemler || [])];
     const index = mevcutKalemler.findIndex(
       (k) =>
         k.urunId === urun.id &&
@@ -448,27 +370,13 @@ export default function Adisyon() {
       mevcutKalemler[index] = kalem;
     }
 
-    const guncel = { ...targetAdisyon, kalemler: mevcutKalemler };
-    setTargetAdisyon(guncel);
-    
-    // ESKİ: guncelAdisyonLocal(guncel);
-    // YENİ:
-    syncService.guncelAdisyon(guncel);
-    
-    console.log(`🛒 Ürün ${aktifAdisyon} adisyona eklendi, masa otomatik güncellenecek...`);
+    const guncel = { ...adisyon, kalemler: mevcutKalemler };
+    setAdisyon(guncel);
+    guncelAdisyonLocal(guncel);
   };
 
   const adetPanelEkle = () => {
-    if (!seciliUrun) return;
-    
-    // Hangi adisyona ekleneceğini belirle
-    let targetAdisyon = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-    let setTargetAdisyon = aktifAdisyon === "ANA" ? setAdisyon : setSplitAdisyon;
-    
-    if (!targetAdisyon) {
-      console.error("❌ Hedef adisyon bulunamadı");
-      return;
-    }
+    if (!seciliUrun || !adisyon) return;
 
     const f = Number(siparisYemekFiyat);
     if (!f || f <= 0) {
@@ -487,47 +395,35 @@ export default function Adisyon() {
     };
 
     const guncel = {
-      ...targetAdisyon,
-      kalemler: [...(targetAdisyon.kalemler || []), yeniKalem],
+      ...adisyon,
+      kalemler: [...(adisyon.kalemler || []), yeniKalem],
     };
-    setTargetAdisyon(guncel);
-    
-    // ESKİ: guncelAdisyonLocal(guncel);
-    // YENİ:
-    syncService.guncelAdisyon(guncel);
+    setAdisyon(guncel);
+    guncelAdisyonLocal(guncel);
 
     setAdetPanelAcik(false);
     setSeciliUrun(null);
   };
 
   // --------------------------------------------------
-  // SATIR SİLME ve ADET ARTIR/AZALT - syncService İLE
+  // SATIR SİLME ve ADET ARTIR/AZALT (SADECE YENİ ADİSYON)
   // --------------------------------------------------
   const satirSil = (kalemId) => {
-    const targetAdisyon = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-    const setTargetAdisyon = aktifAdisyon === "ANA" ? setAdisyon : setSplitAdisyon;
-    
-    if (!targetAdisyon) return;
-    if (!window.confirm(`Bu satırı ${aktifAdisyon === "ANA" ? "ANA" : "AYRILAN"} adisyondan silmek istediğinize emin misiniz?`)) return;
+    if (!adisyon) return;
+    if (!window.confirm("Bu satırı silmek istediğinize emin misiniz?")) return;
 
-    const yeniKalemler = (targetAdisyon.kalemler || []).filter(
+    const yeniKalemler = (adisyon.kalemler || []).filter(
       (k) => k.id !== kalemId
     );
-    const guncel = { ...targetAdisyon, kalemler: yeniKalemler };
-    setTargetAdisyon(guncel);
-    
-    // ESKİ: guncelAdisyonLocal(guncel);
-    // YENİ:
-    syncService.guncelAdisyon(guncel);
+    const guncel = { ...adisyon, kalemler: yeniKalemler };
+    setAdisyon(guncel);
+    guncelAdisyonLocal(guncel);
   };
 
   const adetArtir = (kalemId) => {
-    const targetAdisyon = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-    const setTargetAdisyon = aktifAdisyon === "ANA" ? setAdisyon : setSplitAdisyon;
+    if (!adisyon) return;
     
-    if (!targetAdisyon) return;
-    
-    const yeniKalemler = (targetAdisyon.kalemler || []).map((k) => {
+    const yeniKalemler = (adisyon.kalemler || []).map((k) => {
       if (k.id !== kalemId) return k;
       const yeniAdet = Number(k.adet || 0) + 1;
       return {
@@ -536,22 +432,16 @@ export default function Adisyon() {
         toplam: yeniAdet * Number(k.birimFiyat || 0),
       };
     });
-    const guncelAdisyon = { ...targetAdisyon, kalemler: yeniKalemler };
+    const guncel = { ...adisyon, kalemler: yeniKalemler };
     
-    setTargetAdisyon(guncelAdisyon);
-    
-    // ESKİ: guncelAdisyonLocal(guncelAdisyon);
-    // YENİ:
-    syncService.guncelAdisyon(guncelAdisyon);
+    setAdisyon(guncel);
+    guncelAdisyonLocal(guncel);
   };
 
   const adetAzalt = (kalemId) => {
-    const targetAdisyon = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-    const setTargetAdisyon = aktifAdisyon === "ANA" ? setAdisyon : setSplitAdisyon;
-    
-    if (!targetAdisyon) return;
+    if (!adisyon) return;
 
-    const mevcutKalemler = targetAdisyon.kalemler || [];
+    const mevcutKalemler = adisyon.kalemler || [];
     const yeniKalemler = mevcutKalemler
       .map((k) => {
         if (k.id !== kalemId) return k;
@@ -567,77 +457,74 @@ export default function Adisyon() {
       })
       .filter(Boolean);
 
-    const guncelAdisyon = { ...targetAdisyon, kalemler: yeniKalemler };
-    setTargetAdisyon(guncelAdisyon);
-    
-    // ESKİ: guncelAdisyonLocal(guncelAdisyon);
-    // YENİ:
-    syncService.guncelAdisyon(guncelAdisyon);
+    const guncel = { ...adisyon, kalemler: yeniKalemler };
+    setAdisyon(guncel);
+    guncelAdisyonLocal(guncel);
   };
 
   // --------------------------------------------------
-  // İNDİRİM
+  // İNDİRİM - DÜZELTİLDİ (SADECE YENİ ADİSYON)
   // --------------------------------------------------
   const indirimEnter = (e) => {
     if (e.key !== "Enter") return;
-    if(aktifAdisyon !== "ANA") {
-        alert("İndirim sadece ANA adisyona uygulanabilir.");
-        return;
-    }
+    
     const val = Number(indirimInput);
     if (isNaN(val) || val < 0) {
       alert("Geçerli bir indirim tutarı giriniz.");
       return;
     }
+    
+    // İndirim sadece YENİ adisyona uygulanır
+    const guncel = { ...adisyon, indirim: val };
+    setAdisyon(guncel);
     setIndirim(val);
+    guncelAdisyonLocal(guncel);
+    
+    setIndirimInput(""); // Input'u temizle
   };
 
   // --------------------------------------------------
-  // ÖDEME SİLME - syncService İLE
+  // ÖDEME SİLME (SADECE YENİ ADİSYON)
   // --------------------------------------------------
   const odemeSil = (odemeId) => {
-    const targetAdisyon = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-    const setTargetAdisyon = aktifAdisyon === "ANA" ? setAdisyon : setSplitAdisyon;
-    
-    if (!targetAdisyon) return;
+    if (!adisyon) return;
     if (!window.confirm("Bu ödemeyi silmek istediğinize emin misiniz?")) return;
 
-    const yeniOdemeler = (targetAdisyon.odemeler || []).filter((o) => o.id !== odemeId);
+    const yeniOdemeler = (adisyon.odemeler || []).filter((o) => o.id !== odemeId);
     const yeniAdisyon = {
-      ...targetAdisyon,
+      ...adisyon,
       odemeler: yeniOdemeler,
     };
 
-    setTargetAdisyon(yeniAdisyon);
-    
-    // ESKİ: guncelAdisyonLocal(yeniAdisyon);
-    // YENİ:
-    syncService.guncelAdisyon(yeniAdisyon);
+    setAdisyon(yeniAdisyon);
+    guncelAdisyonLocal(yeniAdisyon);
   };
   
   // --------------------------------------------------
-  // İNDİRİM SIFIRLAMA
+  // İNDİRİM SIFIRLAMA - DÜZELTİLDİ
   // --------------------------------------------------
- const indirimSifirla = () => {
-    if(!seciliOdemeAdisyonlari.includes("ANA")) return;
+  const indirimSifirla = () => {
+    const guncel = { ...adisyon, indirim: 0 };
+    setAdisyon(guncel);
     setIndirim(0);
     setIndirimInput("");
+    guncelAdisyonLocal(guncel);
   };
 
   // --------------------------------------------------
-  // HESABA YAZ ÖZETİ - syncService İLE
+  // HESABA YAZ ÖZETİ (Secili müşteri için)
   // --------------------------------------------------
   const mevcutBorcOzet = useMemo(() => {
     if (!seciliMusteriId) return { toplamBorc: 0, toplamOdeme: 0, kalan: 0 };
-    const borclar = syncService.oku('mc_borclar');
+    const borclar = okuJSON(BORC_KEY, []);
     const musteriBorclari = borclar.filter((b) => b.musteriId === seciliMusteriId);
     
     const toplamBorc = musteriBorclari.reduce((sum, b) => 
-        sum + b.hareketler.filter(h => h.tip === "BORÇ EKLENDİ").reduce((s, h) => s + (h.tutar || 0), 0)
+      sum + b.hareketler.filter(h => h.tip === "BORÇ EKLENDİ").reduce((s, h) => s + (h.tutar || 0), 0)
     , 0);
     
     const toplamOdeme = musteriBorclari.reduce((sum, b) => 
-        sum + b.hareketler.filter(h => h.tip === "ÖDEME ALINDI").reduce((s, h) => s + (h.tutar || 0), 0)
+      sum + b.hareketler.filter(h => h.tip === "ÖDEME ALINDI").reduce((s, h) => s + (h.tutar || 0), 0)
     , 0);
 
     return {
@@ -648,127 +535,55 @@ export default function Adisyon() {
   }, [seciliMusteriId, hesabaYazModu, borcTutarInput]);
 
   // --------------------------------------------------
-  // ÖDEME EKLEME - syncService İLE
+  // ÖDEME EKLEME - GÜNCELLENDİ (SADECE YENİ ADİSYON)
   // --------------------------------------------------
-const odemeEkle = () => {
-    if (seciliOdemeAdisyonlari.length === 0) {
-        setIslemMesaji("⚠️ Lütfen ödeme yapmak istediğiniz adisyonu/adisyonları seçiniz.");
-        return;
-    }
-      
+  const odemeEkle = () => {
+    // Ödeme her zaman YENİ adisyona eklenir
+    if (!adisyon) return;
+
+    // Hesaba Yaz için
     if (aktifOdemeTipi === "HESABA_YAZ") {
-        if (seciliOdemeAdisyonlari.length !== 1) {
-            setIslemMesaji("⚠️ Hesaba Yaz işlemi için tek bir adisyon seçimi yapınız (ANA veya AYRILAN).");
-            return;
-        }
-        setHesabaYazModu(true);
-        setBorcTutarInput(String(kalan || 0));
-        return;
-    }
-
-    let odemeTutar = Number(odemeInput);
-    if (!odemeTutar || odemeTutar <= 0) {
-      odemeTutar = kalan;
-    }
-
-    if (odemeTutar <= 0) {
-      setIslemMesaji("⚠️ Ödeme yapılacak tutar yok.");
+      setHesabaYazModu(true);
+      setBorcTutarInput(String(kalan || 0));
       return;
     }
-    
-    let kalanOdeme = odemeTutar;
-    
-    const odemeHedefleri = [];
-    if (seciliOdemeAdisyonlari.includes("ANA") && adisyon) {
-        odemeHedefleri.push({ tip: "ANA", adisyon: adisyon, setAdisyon: setAdisyon });
+
+    let tutar = Number(odemeInput);
+    if (!tutar || tutar <= 0) {
+      // Ödeme input boşsa, kalan tutarın tamamını öde
+      tutar = kalan;
     }
-    if (seciliOdemeAdisyonlari.includes("SPLIT") && splitAdisyon) {
-        odemeHedefleri.push({ tip: "SPLIT", adisyon: splitAdisyon, setAdisyon: setSplitAdisyon });
+
+    if (tutar <= 0) {
+      alert("Ödeme yapılacak tutar yok.");
+      return;
     }
-    
-    const hesaplaAdisyonKalan = (adisyonData, tip) => {
-        const satirToplam = (adisyonData.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-        const odemelerToplam = (adisyonData.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
-        const indirimMiktari = tip === "ANA" ? (indirim || 0) : 0;
-        return Math.max(satirToplam - indirimMiktari - odemelerToplam, 0);
+
+    const yeniOdeme = {
+      id: Date.now().toString(),
+      tip: aktifOdemeTipi,
+      tutar,
     };
-    
-    odemeHedefleri.forEach(h => {
-        h.kalan = hesaplaAdisyonKalan(h.adisyon, h.tip);
-    });
-    
-    const odemeBekleyenHedefler = odemeHedefleri.filter(h => h.kalan > 0);
-    const toplamSeciliKalan = odemeBekleyenHedefler.reduce((sum, h) => sum + h.kalan, 0);
-    
-    odemeBekleyenHedefler.forEach((h, index) => {
-        if (kalanOdeme <= 0) return;
 
-        let uygulanacakTutar;
-        
-        if (odemeTutar >= toplamSeciliKalan) {
-             uygulanacakTutar = h.kalan;
-        } else {
-             const oransalPay = h.kalan / toplamSeciliKalan;
-             uygulanacakTutar = odemeTutar * oransalPay;
-        }
-        
-        if (index === odemeBekleyenHedefler.length - 1) {
-             uygulanacakTutar = kalanOdeme; 
-        } else {
-             uygulanacakTutar = Math.min(h.kalan, uygulanacakTutar);
-        }
-        
-        if (uygulanacakTutar <= 0) return;
-        
-        const yeniOdeme = {
-          id: Date.now().toString() + h.tip + Math.random().toFixed(4),
-          tip: aktifOdemeTipi,
-          tutar: uygulanacakTutar,
-          isSplit: h.tip === "SPLIT",
-        };
+    const yeniAdisyon = {
+      ...adisyon,
+      odemeler: [...(adisyon.odemeler || []), yeniOdeme],
+    };
 
-        const yeniAdisyon = {
-          ...h.adisyon,
-          odemeler: [...(h.adisyon.odemeler || []), yeniOdeme],
-        };
-        
-        h.setAdisyon(yeniAdisyon);
-        
-        // ESKİ: guncelAdisyonLocal(yeniAdisyon);
-        // YENİ:
-        syncService.guncelAdisyon(yeniAdisyon);
-        
-        kalanOdeme -= uygulanacakTutar;
-    });
-    
-    if (kalanOdeme > 0.01) {
-        setIslemMesaji(`💵 Para üstü: ${kalanOdeme.toFixed(2)} TL.`);
-    } else {
-        setIslemMesaji(`✅ Ödeme başarıyla eklendi. Kalan: ${kalan.toFixed(2)} TL`);
-    }
-
+    setAdisyon(yeniAdisyon);
+    guncelAdisyonLocal(yeniAdisyon);
     setOdemeInput("");
   };
 
   // --------------------------------------------------
-  // HESABA YAZ KAYDET - syncService İLE
+  // HESABA YAZ KAYDET (SADECE YENİ ADİSYON)
   // --------------------------------------------------
-const hesabaYazKaydet = () => {
-    if (seciliOdemeAdisyonlari.length !== 1) {
-        setIslemMesaji("⚠️ HESABA YAZ kaydı için tek bir adisyon seçilmelidir. Lütfen tekrar deneyiniz.");
-        setHesabaYazModu(false);
-        return;
-    }
-    
-    const seciliTip = seciliOdemeAdisyonlari[0];
-    const targetAdisyon = seciliTip === "ANA" ? adisyon : splitAdisyon;
-    const setTargetAdisyon = seciliTip === "ANA" ? setAdisyon : setSplitAdisyon;
-    
-    if (!targetAdisyon) return;
+  const hesabaYazKaydet = () => {
+    if (!adisyon) return;
 
     let borcTutar = Number(borcTutarInput);
     if (!borcTutar || borcTutar <= 0) {
-      setIslemMesaji("⚠️ Borç tutarı giriniz.");
+      alert("Borç tutarı giriniz.");
       return;
     }
 
@@ -777,7 +592,7 @@ const hesabaYazKaydet = () => {
 
     if (!musteriId) {
       if (!yeniMusteriAdSoyad) {
-        setIslemMesaji("⚠️ Yeni müşteri için Ad Soyad giriniz.");
+        alert("Yeni müşteri için Ad Soyad giriniz.");
         return;
       }
       const yeniId = Date.now().toString();
@@ -791,15 +606,15 @@ const hesabaYazKaydet = () => {
       musteriId = yeniId;
     }
 
-    const borclar = syncService.oku('mc_borclar');
+    const borclar = okuJSON(BORC_KEY, []);
     const yeniBorc = {
       id: Date.now().toString(),
       musteriId,
       masaNo,
-      adisyonId: targetAdisyon.id,
+      adisyonId: adisyon.id, // Yeni adisyon ID'si
       tutar: borcTutar,
-      acilisZamani: targetAdisyon.acilisZamani,
-      kapanisZamani: targetAdisyon.kapanisZamani,
+      acilisZamani: adisyon.acilisZamani,
+      kapanisZamani: adisyon.kapanisZamani,
       odemeSozu: null,
       hatirlatildi: false,
       hareketler: [
@@ -807,278 +622,218 @@ const hesabaYazKaydet = () => {
           tip: "BORÇ EKLENDİ",
           tutar: borcTutar,
           tarih: new Date().toISOString(),
-          aciklama: `Hesaba Yaz - ${masaNo} (${seciliTip})`,
+          aciklama: `Hesaba Yaz - ${masaNo}`,
         },
       ],
     };
     borclar.push(yeniBorc);
-    syncService.yaz('mc_borclar', borclar);
+    yazJSON(BORC_KEY, borclar);
 
     const yeniOdeme = {
       id: `hy_${Date.now().toString()}`,
       tip: "HESABA_YAZ",
       tutar: borcTutar,
-      isSplit: seciliTip === "SPLIT",
     };
 
     const guncelAdisyon = {
-      ...targetAdisyon,
+      ...adisyon,
       hesabaYazKayitlari: [
-        ...(targetAdisyon.hesabaYazKayitlari || []),
+        ...(adisyon.hesabaYazKayitlari || []),
         { borcId: yeniBorc.id, musteriId },
       ],
-      odemeler: [...(targetAdisyon.odemeler || []), yeniOdeme],
+      odemeler: [...(adisyon.odemeler || []), yeniOdeme],
     };
-    setTargetAdisyon(guncelAdisyon);
-    
-    // ESKİ: guncelAdisyonLocal(guncelAdisyon);
-    // YENİ:
-    syncService.guncelAdisyon(guncelAdisyon);
+    setAdisyon(guncelAdisyon);
+    guncelAdisyonLocal(guncelAdisyon);
 
-    syncService.yaz('mc_musteriler', guncelMusteriler);
+    yazJSON(MUSTERI_KEY, guncelMusteriler);
     setMusteriler(guncelMusteriler);
     
-    setIslemMesaji(`📝 Borç başarıyla kaydedildi: ${borcTutar.toFixed(2)} TL (${seciliTip}).`);
+    alert("Borç kaydedildi. (Hesaba Yaz) – Adisyon kapatılmadı.");
     setHesabaYazModu(false);
+    setHesabaYazSonrasiMasaDon(true);
   };
 
   // --------------------------------------------------
-  // HESABI AYIR (Split) - syncService İLE
+  // HESABI AYIR (YENİ MANTIK - ESKİ ADİSYON KİLİTLİ)
   // --------------------------------------------------
- const hesabiAyir = () => {
+  const hesabiAyir = () => {
+    // Eğer adisyon boşsa, hiçbir şey yapma
     if (!adisyon || (adisyon.kalemler || []).length === 0) {
-        setIslemMesaji("⚠️ Adisyon üzerinde ürün olmadan ayırma işlemi başlatılamaz.");
-        return;
-    }
-    if(splitAdisyon) {
-        setIslemMesaji("⚠️ Masa üzerinde zaten ayırılmış bir adisyon var. Lütfen önce onu kapatın.");
-        return;
+      alert("Adisyonda ürün yok!");
+      return;
     }
     
-    // MEVCUT ürünleri al
-    const mevcutKalemler = [...(adisyon.kalemler || [])];
-    
-    console.log("✂️ Split yapılıyor...", {
-      orijinalKalemSayisi: mevcutKalemler.length,
-      masaNo: masaNo,
-      anaAdisyonId: adisyon.id
-    });
-    
-    // YENİ split adisyon oluştur
-    const yeniSplitAdisyon = {
-        id: Date.now().toString(),
-        masaNo: masaNo,
-        acilisZamani: new Date().toISOString(),
-        kapanisZamani: null,
-        kalemler: mevcutKalemler.map(k => ({ 
-            ...k, 
-            id: `${k.id}_split_${Date.now()}`,
-        })), 
-        odemeler: [],
-        indirim: 0,
-        hesabaYazKayitlari: [],
-        kapali: false,
-        isSplit: true,
-        parentAdisyonId: adisyon.id,
-        durum: "AÇIK",
+    // Eğer zaten eski adisyon varsa, uyarı ver
+    if (splitAdisyon) {
+      alert("Bu masa için zaten bir eski adisyon mevcut!");
+      return;
+    }
+
+    // Mevcut adisyonu ESKİ adisyon olarak kaydet (KİLİTLİ)
+    const eskiAdisyon = {
+      ...adisyon,
+      id: adisyon.id,
+      isSplit: true, // Artık ESKİ adisyon
+      durum: "KİLİTLİ",
     };
-    
-    // Ana adisyonu temizle (sadece kalemler)
-    const guncelAnaAdisyon = { 
-        ...adisyon, 
-        kalemler: [],
-    }; 
-    
-    // ÖNCE STATE'İ GÜNCELLE
-    setAdisyon(guncelAnaAdisyon);
-    setSplitAdisyon(yeniSplitAdisyon);
 
-    // SONRA LOCALSTORAGE'İ GÜNCELLE - syncService İLE
-    let adisyonlar = syncService.oku('mc_adisyonlar');
+    // YENİ bir adisyon oluştur
+    const yeniAdisyon = {
+      id: Date.now().toString(),
+      masaNo: adisyon.masaNo,
+      acilisZamani: new Date().toISOString(),
+      kapanisZamani: null,
+      kalemler: [], // Boş başlar
+      odemeler: [], // Ödeme geçmişi sıfırlanır
+      indirim: 0,
+      hesabaYazKayitlari: [],
+      kapali: false,
+      isSplit: false, // Yeni adisyon
+      parentAdisyonId: eskiAdisyon.id, // Eski adisyonun ID'sini referans alır
+      durum: "AÇIK",
+    };
+
+    // 1. Eski adisyonu split olarak kaydet
+    setSplitAdisyon(eskiAdisyon);
     
-    // 1. Ana adisyonu güncelle
-    const anaIdx = adisyonlar.findIndex(a => a.id === adisyon.id);
-    if(anaIdx !== -1) {
-        adisyonlar[anaIdx] = guncelAnaAdisyon;
+    // 2. Yeni adisyonu aktif adisyon olarak ayarla
+    setAdisyon(yeniAdisyon);
+    setIndirim(0); // Yeni adisyon için indirimi sıfırla
+    setIndirimInput("");
+
+    // 3. LocalStorage'ı güncelle
+    let adisyonlar = okuJSON(ADISYON_KEY, []);
+    
+    // Eski adisyonu güncelle
+    const eskiIdx = adisyonlar.findIndex(a => a.id === eskiAdisyon.id);
+    if (eskiIdx !== -1) {
+      adisyonlar[eskiIdx] = eskiAdisyon;
     }
     
-    // 2. Split adisyonu ekle
-    adisyonlar.push(yeniSplitAdisyon);
-    syncService.yaz('mc_adisyonlar', adisyonlar);
-    
-    console.log("📦 Adisyonlar güncellendi:", {
-      anaAdisyon: guncelAnaAdisyon,
-      splitAdisyon: yeniSplitAdisyon,
-      toplamAdisyonSayisi: adisyonlar.length
-    });
-    
-    // 3. MASALARI GÜNCELLE - syncService İLE
-    console.log("🔄 Split yapıldı, masa güncelleniyor...");
-    console.log("📊 Güncelleme verileri:", {
-        masaNo: masaNo,
-        anaAdisyonId: guncelAnaAdisyon.id,
-        splitAdisyon: yeniSplitAdisyon,
-        anaKalemSayisi: guncelAnaAdisyon.kalemler?.length || 0,
-        splitKalemSayisi: yeniSplitAdisyon.kalemler?.length || 0
-    });
-    
-    const guncellemeSonucu = syncService.guncelMasa(masaNo, guncelAnaAdisyon.id, yeniSplitAdisyon);
-    
-    if (guncellemeSonucu) {
-        console.log("✅ Masa başarıyla güncellendi");
-    } else {
-        console.error("❌ Masa güncellemesi başarısız");
-    }
+    // Yeni adisyonu ekle
+    adisyonlar.push(yeniAdisyon);
+    yazJSON(ADISYON_KEY, adisyonlar);
 
-    // UI STATE'İNİ GÜNCELLE
-    setAktifAdisyon("SPLIT");
-    setSeciliOdemeAdisyonlari(["SPLIT"]);
-    setIslemMesaji("✅ Hesap başarıyla ayrıldı. Tüm ürünler yeni fişe aktarıldı.");
-    
-    // DEBUG: State'leri kontrol et
-    setTimeout(() => {
-        console.log("🔍 Split sonrası state kontrolü:", {
-            adisyon: adisyon,
-            splitAdisyon: splitAdisyon,
-            aktifAdisyon: aktifAdisyon,
-            localStorageAdisyonlar: syncService.oku('mc_adisyonlar').length,
-            localStorageMasalar: syncService.oku('mc_masalar')
-        });
-    }, 100);
+    // 4. Masa kaydını güncelle
+    guncelMasaLocal(masaNo, yeniAdisyon.id, eskiAdisyon);
+
+    alert(`Hesap ayrıldı!\n\nEski adisyon kilitleyip sadece toplam görüntülenecek.\nYeni adisyon oluşturuldu.`);
   };
 
-  // --------------------------------------------------
-  // ADİSYON KAPAT - syncService İLE
-  // --------------------------------------------------
+// Adisyon.jsx - MASAYI KAPAT BUTONU DÜZELTİLDİ
+// ... önceki import'lar ve kodlar aynı ...
+
+// --------------------------------------------------
+// ADİSYON KAPAT - GÜNCELLENDİ (SYNC SERVICE EKLENDİ)
+// --------------------------------------------------
 const adisyonKapat = () => {
-    if (seciliOdemeAdisyonlari.length === 0) {
-        setIslemMesaji("⚠️ Lütfen kapatmak istediğiniz adisyonu/adisyonları seçiniz.");
-        return;
-    }
+  // Kalan tutar kontrolü (YENİ + ESKİ toplamı)
+  if (kalan > 0.01) {
+    alert("Kalan tutar ödenmeden adisyon kapatılamaz.");
+    return;
+  }
 
-    const yenidenHesaplaKalan = () => {
-        let toplamKalan = 0;
-        
-        if (seciliOdemeAdisyonlari.includes("ANA") && adisyon && !adisyon.kapali) {
-            const anaToplam = (adisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-            const anaOdemeler = (adisyon.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
-            toplamKalan += Math.max(anaToplam - (indirim || 0) - anaOdemeler, 0);
-        }
-        
-        if (seciliOdemeAdisyonlari.includes("SPLIT") && splitAdisyon && !splitAdisyon.kapali) {
-            const splitToplam = (splitAdisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-            const splitOdemeler = (splitAdisyon.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
-            toplamKalan += Math.max(splitToplam - splitOdemeler, 0);
-        }
-        
-        return toplamKalan;
-    };
+  console.log('🔴 MASAYI KAPAT tıklandı - masaNo:', masaNo, 'adisyonId:', adisyon?.id);
 
-    const gercekKalan = yenidenHesaplaKalan();
-
-    if (gercekKalan > 0.1) { 
-        setIslemMesaji(`⚠️ Kalan tutar ödenmeden adisyon(lar) kapatılamaz. (Kalan: ${gercekKalan.toFixed(2)} TL)`);
-        return;
-    }
+  // 1. Masa numarasını doğru al (sadece numarayı al)
+  const masaNum = masaNo.replace("MASA ", "").trim();
+  
+  // 2. syncService'ten masaBosalt fonksiyonunu çağır
+  if (typeof window.syncService !== 'undefined') {
+    console.log('🔄 syncService.masaBosalt çağrılıyor:', `MASA ${masaNum}`);
+    const success = window.syncService.masaBosalt(`MASA ${masaNum}`);
     
-    const adisyonlarKapatilacak = [];
-    if (seciliOdemeAdisyonlari.includes("ANA") && adisyon && !adisyon.kapali) {
-        adisyonlarKapatilacak.push({ data: adisyon, tip: "ANA" });
-    }
-    if (seciliOdemeAdisyonlari.includes("SPLIT") && splitAdisyon && !splitAdisyon.kapali) {
-        adisyonlarKapatilacak.push({ data: splitAdisyon, tip: "SPLIT" });
-    }
-    
-    if (adisyonlarKapatilacak.length === 0) {
-        setIslemMesaji("⚠️ Kapatılacak açık adisyon bulunamadı.");
-        return;
-    }
-
-    const onayMesaji = adisyonlarKapatilacak.length === 2 
-        ? "ANA ve AYRILAN adisyonları kapatmak istediğinize emin misiniz?"
-        : adisyonlarKapatilacak[0].tip === "ANA"
-        ? "ANA adisyonu kapatmak istediğinize emin misiniz?"
-        : "AYRILAN adisyonu kapatmak istediğinize emin misiniz?";
-    
-    if (!window.confirm(onayMesaji)) {
-        return;
-    }
-
-    const adisyonlar = syncService.oku('mc_adisyonlar');
-    let isSplitKapatildi = false;
-    let isAnaKapatildi = false;
-
-    adisyonlarKapatilacak.forEach(aktifAdisyonObj => {
-        const targetAdisyon = aktifAdisyonObj.data;
-        const tip = aktifAdisyonObj.tip;
-
-        const idx = adisyonlar.findIndex((a) => a.id === targetAdisyon.id);
-
-        if (idx !== -1) {
-          const guncelAdisyon = {
-            ...targetAdisyon,
-            kapali: true,
-            kapanisZamani: new Date().toISOString(),
-            durum: "KAPALI"
-          };
-          adisyonlar[idx] = guncelAdisyon;
-          
-          if (tip === "ANA") {
-              isAnaKapatildi = true;
-          } else if (tip === "SPLIT") {
-              isSplitKapatildi = true;
-          }
-        }
-    });
-
-    syncService.yaz('mc_adisyonlar', adisyonlar);
-
-    if (isSplitKapatildi) {
-        setSplitAdisyon(null); 
-    }
-    
-    if (isAnaKapatildi) {
-        // ESKİ: masaBosaltLocal(masaNo);
-        // YENİ:
-        syncService.masaBosalt(masaNo);
-        setAdisyon(null);
+    if (success) {
+      console.log('✅ syncService: Masa başarıyla temizlendi');
     } else {
-        // ESKİ: guncelMasaLocal(masaNo, adisyon ? adisyon.id : null, isSplitKapatildi ? null : splitAdisyon);
-        // YENİ:
-        syncService.guncelMasa(masaNo, adisyon ? adisyon.id : null, isSplitKapatildi ? null : splitAdisyon);
+      console.error('❌ syncService: Masa temizlenemedi');
+      alert('Masa temizlenirken bir hata oluştu!');
+      return;
     }
+  } else {
+    console.error('❌ syncService bulunamadı');
+    // Fallback: eski yöntemle devam et
+    const masalar = okuJSON(MASA_KEY, []);
+    const masaNoNum = Number(masaNum);
+    const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
     
-    // Event'leri tetikle
-    syncService.emitEvent(SYNC_EVENTS.ADİSYON_GUNCELLENDI, {});
-    syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-        masaNo: Number(masaNo.replace("MASA ", ""))
-    });
-    
-    setIslemMesaji(`✅ Adisyon(lar) başarıyla kapatıldı. Masalara yönlendiriliyorsunuz...`);
-    
-    setTimeout(() => {
-        const query = new URLSearchParams().toString();
-        
-        if (isBilardoMasa(masaNo)) {
-          window.location.href = query ? `/bilardo?${query}` : "/bilardo";
-        } else {
-          window.location.href = query ? `/masalar?${query}` : "/masalar";
-        }
-    }, 1000);
+    if (masaIdx !== -1) {
+      masalar[masaIdx] = {
+        ...masalar[masaIdx],
+        adisyonId: null,
+        ayirId: null,
+        ayirToplam: null,
+        toplamTutar: "0.00",
+        acilisZamani: null,
+        durum: "BOŞ",
+        renk: "gri",
+        musteriAdi: null,
+        kisiSayisi: null,
+        guncellemeZamani: new Date().toISOString()
+      };
+      yazJSON(MASA_KEY, masalar);
+      window.dispatchEvent(new Event('storage'));
+    }
+  }
+
+  const adisyonlar = okuJSON(ADISYON_KEY, []);
+
+  // 3. YENİ adisyonu kapat
+  if (adisyon) {
+    const yeniIdx = adisyonlar.findIndex((a) => a.id === adisyon.id);
+    if (yeniIdx !== -1) {
+      const guncelYeniAdisyon = {
+        ...adisyon,
+        kapali: true,
+        kapanisZamani: new Date().toISOString(),
+        durum: "KAPALI",
+      };
+      adisyonlar[yeniIdx] = guncelYeniAdisyon;
+      setAdisyon(guncelYeniAdisyon);
+    }
+  }
+
+  // 4. ESKİ adisyonu kapat (varsa)
+  if (splitAdisyon) {
+    const eskiIdx = adisyonlar.findIndex((a) => a.id === splitAdisyon.id);
+    if (eskiIdx !== -1) {
+      const guncelEskiAdisyon = {
+        ...splitAdisyon,
+        kapali: true,
+        kapanisZamani: new Date().toISOString(),
+        durum: "KAPALI",
+      };
+      adisyonlar[eskiIdx] = guncelEskiAdisyon;
+      setSplitAdisyon(guncelEskiAdisyon);
+    }
+  }
+
+  yazJSON(ADISYON_KEY, adisyonlar);
+
+  // 5. Masa kaydını temizle (syncService zaten yaptı)
+  setKapanisMesaji(
+    `✅ Masa başarıyla kapatıldı! ${splitAdisyon ? "(Eski adisyon da kapatıldı)" : ""} Masalar sayfasına yönlendiriliyorsunuz...`
+  );
+  
+  // 6. Kısa gecikme ve yönlendirme
+  setTimeout(() => {
+    console.log('🔄 Masalar sayfasına yönlendiriliyor...');
+    masayaDon();
+  }, 1500);
 };
 
   // --------------------------------------------------
   // MASAYA DÖN
   // --------------------------------------------------
   const masayaDon = () => {
-    const isRedirectingAfterClosure = !!kapanisMesaji;
-    
-    if (isRedirectingAfterClosure) {
-        setKapanisMesaji("");
+    const params = new URLSearchParams();
+    if (hesabaYazSonrasiMasaDon) {
+      params.append("highlight", masaNo);
+      setHesabaYazSonrasiMasaDon(false);
     }
 
-    const query = new URLSearchParams().toString();
-    
+    const query = params.toString();
     if (isBilardoMasa(masaNo)) {
       window.location.href = query ? `/bilardo?${query}` : "/bilardo";
     } else {
@@ -1087,142 +842,234 @@ const adisyonKapat = () => {
   };
 
   // --------------------------------------------------
-  // HESAPLAMALAR
+  // RENDER
   // --------------------------------------------------
-  const hesaplaAdisyonTutari = (adisyonData) => {
-    if (!adisyonData) return 0;
-    return (adisyonData.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-  };
+  if (!adisyon) {
+    return <div>Adisyon yükleniyor...</div>;
+  }
 
-  const hesaplaAdisyonKalan = (adisyonData, tip) => {
-    if (!adisyonData) return 0;
-    const satirToplam = hesaplaAdisyonTutari(adisyonData);
-    const odemelerToplam = (adisyonData.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
-    const indirimMiktari = tip === "ANA" ? (indirim || 0) : 0;
-    return Math.max(satirToplam - indirimMiktari - odemelerToplam, 0);
-  };
-
-  // Ana ve Ayrı hesap tutarları
-  const anaHesapToplam = useMemo(() => hesaplaAdisyonTutari(adisyon), [adisyon]);
-  const ayriHesapToplam = useMemo(() => hesaplaAdisyonTutari(splitAdisyon), [splitAdisyon]);
-  const anaHesapKalan = useMemo(() => hesaplaAdisyonKalan(adisyon, "ANA"), [adisyon, indirim]);
-  const ayriHesapKalan = useMemo(() => hesaplaAdisyonKalan(splitAdisyon, "SPLIT"), [splitAdisyon]);
-
-  // --------------------------------------------------
-  // RENDER - GÜNCELLENMİŞ: AKTİF ADİSYON GÖSTERGESİ EKLENDİ
-  // --------------------------------------------------
-  const aktifAdisyonData = aktifAdisyon === "ANA" ? adisyon : splitAdisyon;
-  const kalanTotal = kalan;
+  // YENİ adisyon ve ESKİ adisyon toplamları
+  const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+  const eskiToplam = (splitAdisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+  const toplamTutar = yeniToplam + eskiToplam;
   
-  const toggleOdemeAdisyonSecimi = (tip) => {
-      setSeciliOdemeAdisyonlari(prev => {
-          if (prev.includes(tip)) {
-              return prev.filter(t => t !== tip);
-          } else {
-              return [...prev, tip];
-          }
-      });
-  };
-  
-  const setAktifAdisyonGoster = (tip) => {
-    if(tip === 'ANA' && adisyon && !adisyon.kapali) {
-        setAktifAdisyon('ANA');
-    } else if (tip === 'SPLIT' && splitAdisyon && !splitAdisyon.kapali) {
-        setAktifAdisyon('SPLIT');
-    }
-  };
-
-  // DEBUG: Masa güncellemesini izle
-  useEffect(() => {
-    console.log("🔍 DEBUG: Masa No:", masaNo);
-    console.log("🔍 DEBUG: Adisyon:", adisyon);
-    console.log("🔍 DEBUG: Split Adisyon:", splitAdisyon);
-    
-    // Sayfa yüklendiğinde masa güncelle
-    if (adisyon && adisyon.id) {
-      console.log("🔄 Sayfa yüklendi, masa güncelleniyor...");
-      syncService.guncelMasa(masaNo, adisyon.id, splitAdisyon);
-    }
-  }, [masaNo, adisyon?.id, splitAdisyon?.id]);
-
-  // MASA GEÇEN SÜRE GÖSTERİMİ
-  useEffect(() => {
-    if (masaNo) {
-      const sure = syncService.hesaplaGecenSure(masaNo);
-      setGecenSure(sure);
-    }
-  }, [masaNo]);
+  // Yapılan ödemeler toplamı (SADECE YENİ ADİSYONDAN)
+  const yapilanOdemeler = (adisyon?.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
 
   return (
-    <div className="adisyon-container">
-      {/* SÜTUN 1: SOL PANEL – ÖDEMELER & KONTROLLER */}
-      <div className="sol-panel">
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        background: "#f5e7d0",
+        color: "#4b2e05",
+        padding: "12px",
+        boxSizing: "border-box",
+        gap: "12px",
+      }}
+    >
+      {/* SÜTUN 1: SOL PANEL – ÖDEMELER */}
+      <div
+        style={{
+          flex: "0 0 23%",
+          background: "#fdf4e4",
+          borderRadius: "12px",
+          padding: "12px",
+          boxSizing: "border-box",
+          boxShadow: "0 0 14px rgba(0,0,0,0.1)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
         <div>
-          {/* GEÇEN SÜRE GÖSTERGESİ */}
-          <div className="gecen-sure-gostergesi">
-            <div className="gecen-sure-label">GEÇEN SÜRE</div>
-            <div className="gecen-sure-deger">{gecenSure}</div>
+          <div
+            style={{
+              fontWeight: "bold",
+              fontSize: "22px",
+              marginBottom: "10px",
+              textAlign: "center",
+              letterSpacing: "1px",
+            }}
+          >
+            ÖDEMELER
+          </div>
+          
+          {/* ÖDEME LİSTESİ (SADECE YENİ ADİSYON) */}
+          <div
+            style={{
+              minHeight: "100px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              border: "1px solid #ecd3a5",
+              borderRadius: "8px",
+              padding: "8px",
+              marginBottom: "10px",
+              background: "#fff",
+            }}
+          >
+            {(adisyon.odemeler || []).length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "#a0a0a0",
+                  padding: "10px",
+                }}
+              >
+                Henüz ödeme yok.
+              </div>
+            ) : (
+              (adisyon.odemeler || []).map((o) => (
+                <div
+                  key={o.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "1px dashed #f4e0c2",
+                    padding: "4px 0",
+                  }}
+                >
+                  <span style={{ fontSize: "14px", fontWeight: "600" }}>
+                    {odemeTipiLabel(o.tip)}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <span style={{ fontSize: "15px", fontWeight: "bold" }}>
+                      {Number(o.tutar || 0).toFixed(2)} TL
+                    </span>
+                    <button
+                      onClick={() => odemeSil(o.id)}
+                      style={{
+                        marginLeft: "8px",
+                        padding: "0 4px",
+                        border: "none",
+                        background: "transparent",
+                        color: "red",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* TOPLAM / KALAN ALANI */}
-          <div className="odeme-kontrol">
-            <div className="odeme-kontrol-title">
-              ÖDEME KONTROL
+          <div
+            style={{
+              marginTop: "10px",
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#e8d8c3",
+              border: "1px solid #bfa37d",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "4px",
+              }}
+            >
+              <span style={{ fontWeight: "500" }}>YENİ Adisyon:</span>
+              <span style={{ fontWeight: "bold" }}>
+                {yeniToplam.toFixed(2)} TL
+              </span>
             </div>
             
-            {/* ADİSYON SEÇİMİ (ÖDEME İÇİN) */}
-            <div className="adisyon-secim">
-              <button
-                onClick={() => toggleOdemeAdisyonSecimi("ANA")}
-                onDoubleClick={() => setAktifAdisyonGoster("ANA")}
-                className={`adisyon-secim-btn ${seciliOdemeAdisyonlari.includes("ANA") ? "secili" : ""}`}
-                disabled={!adisyon || adisyon.kapali}
+            {/* ESKİ ADİSYON SATIRI - KOYU MAVİ */}
+            {splitAdisyon && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "4px",
+                }}
               >
-                {seciliOdemeAdisyonlari.includes("ANA") ? "✔️ ANA HESAP" : "ANA HESAP"}
-              </button>
-              
-              {splitAdisyon && !splitAdisyon.kapali && (
-                <button
-                  onClick={() => toggleOdemeAdisyonSecimi("SPLIT")}
-                  onDoubleClick={() => setAktifAdisyonGoster("SPLIT")}
-                  className={`adisyon-secim-btn ${seciliOdemeAdisyonlari.includes("SPLIT") ? "secili" : ""}`}
-                  disabled={!splitAdisyon || splitAdisyon.kapali}
-                >
-                  {seciliOdemeAdisyonlari.includes("SPLIT") ? "✔️ AYRI HESAP" : "AYRI HESAP"}
-                </button>
-              )}
-            </div>
-
-            {/* AKTİF ADİSYON GÖSTERGESİ */}
-            <div className="aktif-adisyon-gostergesi">
-              <div className="aktif-label">AKTİF FİŞ:</div>
-              <div className={`aktif-deger ${aktifAdisyon === "ANA" ? "ana-aktif" : "split-aktif"}`}>
-                {aktifAdisyon === "ANA" ? "ANA HESAP" : "AYRI HESAP"}
-              </div>
-            </div>
-
-            <div className="hesap-bilgi">
-              <span className="hesap-label">Ana Hesap:</span>
-              <span className="hesap-tutar">{anaHesapToplam.toFixed(2)} TL</span>
-            </div>
-            {splitAdisyon && !splitAdisyon.kapali && (
-              <div className="hesap-bilgi">
-                <span className="hesap-label">Ayrı Hesap:</span>
-                <span className="hesap-tutar">{ayriHesapToplam.toFixed(2)} TL</span>
+                <span style={{ fontWeight: "500" }}>ESKİ Adisyon:</span>
+                <span style={{ fontWeight: "bold", color: "#1a5fb4" }}>
+                  {eskiToplam.toFixed(2)} TL
+                </span>
               </div>
             )}
-            <div className="toplam-bilgi">
-              <span className="toplam-label">Toplam Tutar:</span>
-              <span className="toplam-tutar">{toplam.toFixed(2)} TL</span>
+            
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "4px",
+                color: "red",
+              }}
+            >
+              <span style={{ fontWeight: "500" }}>İndirim:</span>
+              <span style={{ fontWeight: "bold" }}>
+                -{indirim.toFixed(2)} TL
+              </span>
             </div>
-            <div className="kalan-bilgi">
-              <span className="kalan-label">KALAN (SEÇİLİ)</span>
-              <span className="kalan-tutar">{kalanTotal.toFixed(2)} TL</span>
+            
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "4px",
+              }}
+            >
+              <span style={{ fontWeight: "500" }}>Ödenen:</span>
+              <span style={{ fontWeight: "bold", color: "green" }}>
+                {yapilanOdemeler.toFixed(2)} TL
+              </span>
+            </div>
+            
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "4px",
+                borderTop: "1px solid #bfa37d",
+                paddingTop: "6px",
+                marginTop: "6px",
+              }}
+            >
+              <span style={{ fontWeight: "bold" }}>TOPLAM:</span>
+              <span style={{ fontWeight: "bold", fontSize: "16px" }}>
+                {toplamTutar.toFixed(2)} TL
+              </span>
+            </div>
+            
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                borderTop: "1px solid #bfa37d",
+                paddingTop: "6px",
+                marginTop: "6px",
+              }}
+            >
+              <span
+                style={{ fontWeight: "bold", fontSize: "18px", color: "darkred" }}
+              >
+                KALAN
+              </span>
+              <span
+                style={{ fontWeight: "bold", fontSize: "18px", color: "darkred" }}
+              >
+                {kalan.toFixed(2)} TL
+              </span>
             </div>
           </div>
 
           {/* ÖDEME TİPİ SEÇİMİ */}
-          <div className="odeme-tipi-secim">
+          <div
+            style={{
+              marginTop: "14px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px",
+            }}
+          >
             {[
               { tip: "NAKIT", etiket: "Nakit" },
               { tip: "KART", etiket: "K.Kartı" },
@@ -1232,7 +1079,18 @@ const adisyonKapat = () => {
               <button
                 key={o.tip}
                 onClick={() => setAktifOdemeTipi(o.tip)}
-                className={`odeme-tipi-btn ${aktifOdemeTipi === o.tip ? "aktif" : ""}`}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "20px",
+                  border:
+                    aktifOdemeTipi === o.tip
+                      ? "2px solid #c57f3e"
+                      : "1px solid #bfa37d",
+                  background: aktifOdemeTipi === o.tip ? "#f7d9a8" : "#ffffff",
+                  cursor: "pointer",
+                  fontSize: "15px",
+                  fontWeight: "500",
+                }}
               >
                 {o.etiket}
               </button>
@@ -1242,7 +1100,7 @@ const adisyonKapat = () => {
           {/* ÖDEME TUTARI */}
           {aktifOdemeTipi !== "HESABA_YAZ" && (
             <>
-              <div className="odeme-tutar-input">
+              <div style={{ marginTop: "10px" }}>
                 <label>Tutar</label>
                 <input
                   type="number"
@@ -1251,14 +1109,31 @@ const adisyonKapat = () => {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") odemeEkle();
                   }}
-                  placeholder={kalanTotal.toFixed(2)}
-                  className="tutar-input"
+                  placeholder={kalan.toFixed(2)}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #bfa37d",
+                    marginTop: "4px",
+                    fontSize: "15px",
+                  }}
                 />
               </div>
               <button
                 onClick={odemeEkle}
-                disabled={seciliOdemeAdisyonlari.length === 0}
-                className={`odeme-ekle-btn ${seciliOdemeAdisyonlari.length > 0 ? "aktif" : "pasif"}`}
+                style={{
+                  marginTop: "10px",
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "10px",
+                  border: "none",
+                  background: "#4b2e05",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                }}
               >
                 ÖDEME EKLE
               </button>
@@ -1266,81 +1141,209 @@ const adisyonKapat = () => {
           )}
 
           {/* İNDİRİM */}
-          <div className="indirim-alani">
+          <div style={{ marginTop: "14px" }}>
             <label>İndirim (Enter ile uygula)</label>
-            <div className="indirim-input-group">
+            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
               <input
                 type="number"
                 value={indirimInput}
                 onChange={(e) => setIndirimInput(e.target.value)}
                 onKeyDown={indirimEnter}
-                disabled={!seciliOdemeAdisyonlari.includes("ANA")}
-                className={`indirim-input ${!seciliOdemeAdisyonlari.includes("ANA") ? "pasif" : ""}`}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid #bfa37d",
+                  fontSize: "15px",
+                  background: "#fff",
+                }}
               />
-              {seciliOdemeAdisyonlari.includes("ANA") && (
-                <button
-                  onClick={indirimSifirla}
-                  className="indirim-sifirla-btn"
-                >
-                  Sıfırla
-                </button>
-              )}
+              <button
+                onClick={indirimSifirla}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #bfa37d",
+                  background: "#fdf4e4",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                Sıfırla
+              </button>
             </div>
           </div>
         </div>
 
         {/* ALT BUTONLAR */}
-        <div className="alt-butonlar">
-          <button
-            onClick={hesabiAyir}
-            disabled={!adisyon || (adisyon.kalemler || []).length === 0 || !!splitAdisyon}
-            className={`hesap-ayir-btn ${!adisyon || (adisyon.kalemler || []).length === 0 || !!splitAdisyon ? "pasif" : "aktif"}`}
-          >
-            HESABI AYIR ✂️ (Tümünü)
-          </button>
+        <div style={{ borderTop: "1px solid #ecd3a5", paddingTop: "12px" }}>
+          {/* HESABI AYIR - Sadece ESKİ adisyon YOKSA ve YENİ adisyonda ürün varsa göster */}
+          {!splitAdisyon && adisyon && adisyon.kalemler && adisyon.kalemler.length > 0 && (
+            <button
+              onClick={hesabiAyir}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "10px",
+                border: "none",
+                background: "#ffeedd",
+                color: "#c57f3e",
+                cursor: "pointer",
+                fontSize: "16px",
+                fontWeight: "bold",
+                marginBottom: "8px",
+              }}
+            >
+              HESABI AYIR ✂️
+            </button>
+          )}
 
+          {/* ÖDEME YAP / ADİSYON KAPAT */}
           <button
             onClick={adisyonKapat}
-            className={`kapat-btn ${seciliOdemeAdisyonlari.length > 0 ? "aktif" : "pasif"}`}
-            disabled={seciliOdemeAdisyonlari.length === 0}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "10px",
+              border: "none",
+              background: kalan === 0 ? "#27ae60" : "#95a5a6",
+              color: "#fff",
+              cursor: kalan === 0 ? "pointer" : "not-allowed",
+              fontSize: "16px",
+              fontWeight: "bold",
+              marginBottom: "8px",
+            }}
+            disabled={kalan !== 0}
           >
-            {seciliOdemeAdisyonlari.length === 2 ? "FİŞLERİ KAPAT" : 
-             (seciliOdemeAdisyonlari.includes("ANA") ? "MASAYI KAPAT" : 
-             (seciliOdemeAdisyonlari.includes("SPLIT") ? "AYRI FİŞİ KAPAT" : "KAPAT"))}
+            MASAYI KAPAT
           </button>
+          
+          {kapanisMesaji && (
+            <div
+              style={{
+                marginBottom: "8px",
+                padding: "8px",
+                borderRadius: "8px",
+                background: "#e8f8f1",
+                color: "#1e8449",
+                fontSize: "14px",
+                textAlign: "center",
+              }}
+            >
+              {kapanisMesaji}
+            </div>
+          )}
 
+          {/* MASAYA DÖN */}
           <button
             onClick={masayaDon}
-            className="masaya-don-btn"
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "10px",
+              border: "1px solid #bfa37d",
+              background: "#fdf4e4",
+              cursor: "pointer",
+              fontSize: "15px",
+            }}
           >
             MASAYA DÖN
           </button>
         </div>
       </div>
 
-      {/* SÜTUN 2: ORTA PANEL – ADİSYON / HESABA YAZ */}
-      <div className="orta-panel">
-        <div className="masa-title">
-          {masaNo} - ADİSYON
-          <span className="aktif-adisyon-badge">
-            {aktifAdisyon === "ANA" ? "ANA HESAP" : "AYRI HESAP"}
-          </span>
+      {/* SÜTUN 2: ORTA PANEL – ADİSYON GÖSTERİMİ */}
+      <div
+        style={{
+          flex: 1.2, 
+          background: "#fff7e6",
+          borderRadius: "12px",
+          padding: "12px",
+          boxSizing: "border-box",
+          boxShadow: "0 0 14px rgba(0,0,0,0.1)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            fontWeight: "bold",
+            fontSize: "32px",
+            marginBottom: "12px",
+            textAlign: "center",
+            letterSpacing: "1px",
+            borderBottom: "2px solid #ecd3a5",
+            paddingBottom: "8px",
+            color: "#4b2e05",
+          }}
+        >
+          MASA
         </div>
 
+        {/* ESKİ ADİSYON GÖSTERİMİ - Sadece splitAdisyon VARKEN göster */}
+        {splitAdisyon && (
+          <div
+            style={{
+              marginBottom: "15px",
+              padding: "10px",
+              background: "#f0f0f0",
+              borderRadius: "8px",
+              border: "2px solid #ccc",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: "18px",
+                marginBottom: "8px",
+                color: "#1a5fb4", // KOYU MAVİ
+                textAlign: "center",
+              }}
+            >
+              ESKİ ADİSYON (TOPLAM: {eskiToplam.toFixed(2)} TL)
+            </div>
+          </div>
+        )}
+
+        {/* YENİ ADİSYON GÖSTERİMİ */}
         {hesabaYazModu ? (
-          <div className="hesaba-yaz-modu">
-            <div className="hesaba-yaz-title">
+          // HESABA YAZ MODU
+          <div style={{ flex: 1, padding: "12px", boxSizing: "border-box" }}>
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: "24px",
+                marginBottom: "20px",
+                textAlign: "center",
+                color: "#4b2e05",
+              }}
+            >
               HESABA YAZ (VERESİYE)
             </div>
 
-            <div className="hesaba-yaz-grid">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+              }}
+            >
+              {/* Sol: Müşteri bilgileri */}
               <div>
-                <div className="musteri-secim">
-                  <div className="musteri-label">Mevcut Müşteri</div>
+                <div style={{ marginBottom: "15px" }}>
+                  <div style={{ fontWeight: "500", marginBottom: "4px" }}>
+                    Mevcut Müşteri
+                  </div>
                   <select
                     value={seciliMusteriId || ""}
                     onChange={(e) => setSeciliMusteriId(e.target.value || null)}
-                    className="musteri-select"
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #bfa37d",
+                      marginTop: "4px",
+                    }}
                   >
                     <option value="">Seçiniz</option>
                     {musteriler.map((m) => (
@@ -1351,59 +1354,127 @@ const adisyonKapat = () => {
                   </select>
                 </div>
 
-                <div className="yeni-musteri">
-                  <div className="musteri-label">Yeni Müşteri</div>
+                <div style={{ marginBottom: "8px" }}>
+                  <div style={{ fontWeight: "500", marginBottom: "4px" }}>
+                    Yeni Müşteri
+                  </div>
                   <input
                     type="text"
                     placeholder="Ad Soyad"
                     value={yeniMusteriAdSoyad}
                     onChange={(e) => setYeniMusteriAdSoyad(e.target.value)}
-                    className="musteri-input"
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #bfa37d",
+                      marginBottom: "6px",
+                    }}
                   />
                   <input
                     type="text"
                     placeholder="Telefon"
                     value={yeniMusteriTelefon}
                     onChange={(e) => setYeniMusteriTelefon(e.target.value)}
-                    className="musteri-input"
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #bfa37d",
+                      marginBottom: "6px",
+                    }}
                   />
                   <input
                     type="text"
                     placeholder="Not"
                     value={yeniMusteriNot}
                     onChange={(e) => setYeniMusteriNot(e.target.value)}
-                    className="musteri-input"
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #bfa37d",
+                    }}
                   />
                 </div>
               </div>
 
+              {/* Sağ: Borç özeti ve tutar */}
               <div>
-                <div className="borc-tutar">
+                <div style={{ marginBottom: "8px" }}>
                   <label>Borç Tutarı</label>
                   <input
                     type="number"
                     value={borcTutarInput}
                     onChange={(e) => setBorcTutarInput(e.target.value)}
-                    className="borc-input"
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: "1px solid #bfa37d",
+                      marginTop: "4px",
+                      fontSize: "15px",
+                    }}
                   />
                 </div>
 
                 {seciliMusteriId && (
-                  <div className="mevcut-borc">
-                    <div className="borc-baslik">
+                  <div
+                    style={{
+                      marginTop: "15px",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      background: "#e8d8c3",
+                      border: "1px solid #bfa37d",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        marginBottom: "6px",
+                        textAlign: "center",
+                      }}
+                    >
                       Mevcut Borç Özeti
                     </div>
-                    <div className="borc-satir">
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "14px",
+                      }}
+                    >
                       <span>Toplam Borç:</span>
                       <b>{mevcutBorcOzet.toplamBorc.toFixed(2)} TL</b>
                     </div>
-                    <div className="borc-satir">
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "14px",
+                        marginBottom: "4px",
+                      }}
+                    >
                       <span>Toplam Ödeme:</span>
                       <b>{mevcutBorcOzet.toplamOdeme.toFixed(2)} TL</b>
                     </div>
-                    <div className="net-borc">
-                      <span>Net Borç:</span>
-                      <span className={`${mevcutBorcOzet.kalan > 0 ? "borclu" : "borcsuz"}`}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderTop: "1px solid #bfa37d",
+                        paddingTop: "6px",
+                        marginTop: "6px",
+                      }}
+                    >
+                      <span style={{ fontWeight: "bold" }}>Net Borç:</span>
+                      <span
+                        style={{
+                          fontWeight: "bold",
+                          color:
+                            mevcutBorcOzet.kalan > 0 ? "darkred" : "darkgreen",
+                        }}
+                      >
                         {mevcutBorcOzet.kalan.toFixed(2)} TL
                       </span>
                     </div>
@@ -1413,13 +1484,39 @@ const adisyonKapat = () => {
                 <button
                   onClick={hesabaYazKaydet}
                   disabled={!seciliMusteriId && !yeniMusteriAdSoyad}
-                  className={`borc-kaydet-btn ${!seciliMusteriId && !yeniMusteriAdSoyad ? "pasif" : "aktif"}`}
+                  style={{
+                    marginTop: "20px",
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background:
+                      !seciliMusteriId && !yeniMusteriAdSoyad
+                        ? "#95a5a6"
+                        : "#2980b9",
+                    color: "#fff",
+                    cursor:
+                      !seciliMusteriId && !yeniMusteriAdSoyad
+                        ? "not-allowed"
+                        : "pointer",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                  }}
                 >
                   BORCU KAYDET
                 </button>
                 <button
                   onClick={() => setHesabaYazModu(false)}
-                  className="iptal-btn"
+                  style={{
+                    marginTop: "10px",
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    border: "1px solid #bfa37d",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                  }}
                 >
                   İPTAL
                 </button>
@@ -1427,149 +1524,243 @@ const adisyonKapat = () => {
             </div>
           </div>
         ) : (
-          <div className="adisyon-icerik">
-            <div className="kalemler-tablosu">
-              <table className="siparis-tablosu">
-                <thead>
-                  <tr>
-                    <th className="urun-ad-th">Ürün Adı</th>
-                    <th className="adet-th">Adet</th>
-                    <th className="tutar-th">Tutar</th>
-                    <th className="islem-th">İşlem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {((aktifAdisyonData?.kalemler) || []).map((k) => (
-                    <tr key={k.id} className="kalem-satir">
-                      <td className="urun-ad-td">
-                        {k.urunAd}
-                        {k.not && k.urunAd === "SİPARİŞ YEMEK" && (
-                          <div className="urun-not">
-                            Not: {k.not}
-                          </div>
-                        )}
-                        <span className="birim-fiyat">
-                          ({Number(k.birimFiyat || 0).toFixed(2)} TL)
-                        </span>
-                      </td>
-                      <td className="adet-td">
-                        <div className="adet-kontrol">
-                          <button
-                            onClick={() => adetAzalt(k.id)}
-                            className="adet-azalt-btn"
-                          >
-                            -
-                          </button>
-                          <span>{k.adet}</span>
-                          <button
-                            onClick={() => adetArtir(k.id)}
-                            className="adet-artir-btn"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td className="tutar-td">
-                        {Number(k.toplam || 0).toFixed(2)}
-                      </td>
-                      <td className="islem-td">
+          // YENİ ADİSYON İÇERİĞİ - SİYAH RENK
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: "18px",
+                marginBottom: "10px",
+                color: "#000000", // SİYAH
+              }}
+            >
+              ADİSYON
+            </div>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                borderRadius: "8px",
+                overflow: "hidden",
+              }}
+            >
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "left",
+                      color: "#000",
+                    }}
+                  >
+                    Ürün Adı
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "center",
+                      color: "#000",
+                    }}
+                  >
+                    Adet
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "right",
+                      color: "#000",
+                    }}
+                  >
+                    Birim
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "right",
+                      color: "#000",
+                    }}
+                  >
+                    Toplam
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(adisyon.kalemler || []).map((k) => (
+                  <tr key={k.id}>
+                    <td
+                      style={{
+                        padding: "6px 8px",
+                        borderBottom: "1px solid #f4e0c2",
+                        color: "#000",
+                      }}
+                    >
+                      {k.urunAd}
+                    </td>
+                    <td
+                      style={{
+                        padding: "6px 8px",
+                        borderBottom: "1px solid #f4e0c2",
+                        textAlign: "center",
+                        color: "#000",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                        }}
+                      >
                         <button
-                          onClick={() => satirSil(k.id)}
-                          className="sil-btn"
+                          onClick={() => adetAzalt(k.id)}
+                          style={{
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "1px solid #d0b48c",
+                            background: "#fbe9e7",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            lineHeight: "1",
+                          }}
                         >
-                          Sil
+                          -
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {((aktifAdisyonData?.kalemler) || []).length === 0 && (
-                <div className="bos-kalem">
-                  {aktifAdisyon === "ANA"
-                    ? "Adisyon üzerinde ürün bulunmamaktadır."
-                    : "Ayrılan adisyon üzerinde ürün bulunmamaktadır. Ana adisyona geçiniz."}
-                </div>
-              )}
-            </div>
-            
-            <div className="odeme-hareketleri">
-                <div className="odeme-hareketleri-title">
-                    ÖDEME HAREKETLERİ
-                </div>
-                <div className="odeme-listesi">
-                    {indirim > 0 && aktifAdisyon === "ANA" && (
-                      <div className="indirim-kalem">
-                        <span className="indirim-label">
-                          İNDİRİM
-                        </span>
-                        <div className="indirim-deger">
-                          <span className="indirim-tutar">
-                            -{indirim.toFixed(2)} TL
-                          </span>
-                        </div>
+                        <span>{k.adet}</span>
+                        <button
+                          onClick={() => adetArtir(k.id)}
+                          style={{
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "1px solid #d0b48c",
+                            background: "#e8f5e9",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            lineHeight: "1",
+                          }}
+                        >
+                          +
+                        </button>
                       </div>
-                    )}
-                    {((aktifAdisyonData?.odemeler) || []).length === 0 ? (
-                        <div className="bos-odeme">
-                            Henüz ödeme hareketi yok.
-                        </div>
-                    ) : (
-                        ((aktifAdisyonData?.odemeler) || []).map((o) => (
-                            <div
-                                key={o.id}
-                                className="odeme-kalem"
-                            >
-                                <span className="odeme-tipi">
-                                    {odemeTipiLabel(o.tip)}
-                                </span>
-                                <div className="odeme-islem">
-                                    <span className="odeme-tutar">
-                                        {Number(o.tutar || 0).toFixed(2)} TL
-                                    </span>
-                                    <button
-                                        onClick={() => odemeSil(o.id)}
-                                        className="odeme-sil-btn"
-                                    >
-                                        🗑️
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
+                    </td>
+                    <td
+                      style={{
+                        padding: "6px 8px",
+                        borderBottom: "1px solid #f4e0c2",
+                        textAlign: "right",
+                        color: "#000",
+                      }}
+                    >
+                      {Number(k.birimFiyat || 0).toFixed(2)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "6px 8px",
+                        borderBottom: "1px solid #f4e0c2",
+                        textAlign: "right",
+                        color: "#000",
+                      }}
+                    >
+                      <b>{Number(k.toplam || 0).toFixed(2)}</b>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {adisyon.kalemler.length === 0 && (
+              <div
+                style={{ textAlign: "center", color: "#888", padding: "20px" }}
+              >
+                Yeni adisyon üzerinde ürün bulunmamaktadır.
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* SÜTUN 3: SAĞ 1 PANEL – MENÜ */}
-      <div className="urun-panel">
-        <div className="urun-panel-title">
+      <div
+        style={{
+          flex: 1,
+          background: "#fff7e6",
+          borderRadius: "12px",
+          padding: "12px",
+          boxSizing: "border-box",
+          boxShadow: "0 0 14px rgba(0,0,0,0.1)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            fontWeight: "bold",
+            fontSize: "24px",
+            marginBottom: "12px",
+            textAlign: "center",
+            letterSpacing: "1px",
+            borderBottom: "2px solid #ecd3a5",
+            paddingBottom: "8px",
+          }}
+        >
           MENÜ (Ürünler)
-          <div className="urun-panel-bilgi">
-            Aktif Fiş: <span className={`aktif-bilgi ${aktifAdisyon === "ANA" ? "ana-bilgi" : "split-bilgi"}`}>
-              {aktifAdisyon === "ANA" ? "ANA" : "AYRI"}
-            </span>
-          </div>
         </div>
         
-        <div className="urun-listesi">
+        {/* ÜRÜN LİSTESİ */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            borderRadius: "8px",
+            border: "1px solid #ecd3a5",
+            padding: "8px",
+            background: "#fffdf7",
+          }}
+        >
           {filtreliUrunler.length === 0 ? (
-            <div className="bos-urun">Bu kategoride ürün yok.</div>
+            <div style={{ fontSize: "14px" }}>Bu kategoride ürün yok.</div>
           ) : (
-            <div className="urun-grid">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(100px, 1fr))",
+                gap: "8px",
+              }}
+            >
               {filtreliUrunler.map((u) => (
                 <button
                   key={u.id}
                   onClick={() => uruneTiklandi(u)}
-                  className={`urun-btn aktif`}
-                  title={u.ad}
+                  style={{
+                    padding: "10px 6px",
+                    borderRadius: "8px",
+                    border: "1px solid #d0b48c",
+                    background: "#ffeaa7",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                    height: "60px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: "2px",
+                  }}
                 >
-                  <div className="urun-adi">
-                    {u.ad}
-                  </div>
-                  <span className="urun-fiyat">
+                  <span style={{ lineHeight: "1.2" }}>{u.ad}</span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: "normal",
+                      color: "#4b2e05",
+                    }}
+                  >
                     {u.satis ? u.satis.toFixed(2) : "0.00"} TL
                   </span>
                 </button>
@@ -1577,59 +1768,113 @@ const adisyonKapat = () => {
             </div>
           )}
         </div>
+        
+        {/* ÜRÜN ADET PANELİ */}
         {adetPanelAcik && (
-          <div className="adet-panel">
-            <div className="adet-panel-baslik">
+          <div
+            style={{
+              position: "absolute",
+              bottom: "12px",
+              right: "24%",
+              width: "250px",
+              background: "#fff",
+              border: "1px solid #bfa37d",
+              borderRadius: "10px",
+              padding: "15px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              zIndex: 100,
+            }}
+          >
+            <div style={{ fontWeight: "bold", marginBottom: "8px" }}>
               {seciliUrun.ad}
-              <div className="adet-panel-bilgi">
-                Fiş: {aktifAdisyon === "ANA" ? "ANA" : "AYRI"}
-              </div>
             </div>
             {seciliUrun.id === "siparis-yemek" && (
               <>
-                <div className="adet-input-group">
+                <div style={{ marginBottom: "8px" }}>
                   <label>Fiyat (TL)</label>
                   <input
                     type="number"
                     value={siparisYemekFiyat}
                     onChange={(e) => setSiparisYemekFiyat(e.target.value)}
-                    className="adet-input"
+                    style={{
+                      width: "100%",
+                      padding: "6px",
+                      borderRadius: "6px",
+                      border: "1px solid #bfa37d",
+                      marginTop: "4px",
+                    }}
                   />
                 </div>
-                <div className="adet-input-group">
+                <div style={{ marginBottom: "8px" }}>
                   <label>Not</label>
                   <input
                     type="text"
                     value={siparisYemekNot}
                     onChange={(e) => setSiparisYemekNot(e.target.value)}
                     placeholder="Ekstra not"
-                    className="adet-input"
+                    style={{
+                      width: "100%",
+                      padding: "6px",
+                      borderRadius: "6px",
+                      border: "1px solid #bfa37d",
+                      marginTop: "4px",
+                    }}
                   />
                 </div>
               </>
             )}
-            <div className="adet-kontrol-grup">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "12px",
+              }}
+            >
               <label>Adet</label>
-              <div className="adet-dugme-grup">
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
                 <button
                   onClick={() => setAdet(Math.max(1, adet - 1))}
-                  className="adet-dugme"
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #d0b48c",
+                    background: "#fbe9e7",
+                    cursor: "pointer",
+                  }}
                 >
                   -
                 </button>
-                <span className="adet-deger">{adet}</span>
+                <span style={{ fontWeight: "bold" }}>{adet}</span>
                 <button
                   onClick={() => setAdet(adet + 1)}
-                  className="adet-dugme"
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid #d0b48c",
+                    background: "#e8f5e9",
+                    cursor: "pointer",
+                  }}
                 >
                   +
                 </button>
               </div>
             </div>
-            <div className="adet-panel-butonlar">
+            <div style={{ display: "flex", gap: "4px" }}>
               <button
                 onClick={adetPanelEkle}
-                className="adet-ekle-btn"
+                style={{
+                  flex: 1,
+                  padding: "6px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "#4b2e05",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
               >
                 EKLE
               </button>
@@ -1638,7 +1883,14 @@ const adisyonKapat = () => {
                   setAdetPanelAcik(false);
                   setSeciliUrun(null);
                 }}
-                className="adet-iptal-btn"
+                style={{
+                  padding: "6px",
+                  borderRadius: "6px",
+                  border: "1px solid #bfa37d",
+                  background: "#fff",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
               >
                 İPTAL
               </button>
@@ -1648,29 +1900,151 @@ const adisyonKapat = () => {
       </div>
 
       {/* SÜTUN 4: SAĞ 2 PANEL – KATEGORİLER */}
-      <div className="kategori-panel">
-        <div className="kategori-panel-title">
+      <div
+        style={{
+          flex: 0.8,
+          background: "#fff7e6",
+          borderRadius: "12px",
+          padding: "12px",
+          boxSizing: "border-box",
+          boxShadow: "0 0 14px rgba(0,0,0,0.1)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            fontWeight: "bold",
+            fontSize: "24px",
+            marginBottom: "12px",
+            textAlign: "center",
+            letterSpacing: "1px",
+            borderBottom: "2px solid #ecd3a5",
+            paddingBottom: "8px",
+          }}
+        >
           KATEGORİLER
         </div>
-        <div className="kategori-grid">
+        
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "8px",
+            padding: "5px",
+            border: "1px solid #ecd3a5",
+            borderRadius: "8px",
+            background: "#fffdf7",
+            alignContent: "start",
+          }}
+        >
           {kategoriler.map((kat) => (
             <button
               key={kat}
               onClick={() => setAktifKategori(kat)}
-              className={`kategori-btn ${aktifKategori === kat ? "aktif" : ""}`}
-              title={kat}
+              style={{
+                padding: "15px 5px",
+                borderRadius: "8px",
+                border:
+                  aktifKategori === kat
+                    ? "2px solid #c57f3e"
+                    : "1px solid #bfa37d",
+                background:
+                  aktifKategori === kat ? "#f7d9a8" : "rgba(255,255,255,0.9)",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "bold",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                textAlign: "center",
+                minHeight: "80px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                wordBreak: "break-word",
+                lineHeight: "1.2",
+              }}
             >
-              <div className="kategori-adi">
-                {kat}
-              </div>
+              {kat}
             </button>
           ))}
         </div>
       </div>
-      
-      {islemMesaji && (
-        <div className={`islem-mesaji ${islemMesaji.includes("⚠️") ? "hata" : "basari"}`}>
-          {islemMesaji}
+
+      {/* ÖDEME SÖZÜ POPUP */}
+      {odemeSozuPopup && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff7e6",
+              padding: "20px",
+              borderRadius: "10px",
+              boxShadow: "0 4px 15px rgba(0,0,0,0.2)",
+              width: "300px",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: "18px",
+                marginBottom: "8px",
+                textAlign: "center",
+              }}
+            >
+              MÜŞTERİ BORCU HATIRLATMA
+            </div>
+            <div style={{ fontSize: "14px", marginBottom: "12px" }}>
+              {odemeSozuPopup.musteriAd} için ödeme sözü tarihi geldi:{" "}
+              <b>{odemeSozuPopup.odemeSozu}</b>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "8px",
+              }}
+            >
+              <button
+                onClick={odemeSozuPopupKapat}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid #bfa37d",
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                TAMAM
+              </button>
+              <button
+                onClick={odemeSozuPopupDetayaGit}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#4b2e05",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                BORÇ DETAYINA GİT
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
