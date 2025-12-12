@@ -1,0 +1,100 @@
+/* ------------------------------------------------------------
+   📌 StokHareketRaporu.css — Premium Plus Tema
+------------------------------------------------------------- */
+
+.stok-page {
+  padding: 30px;
+  background: #d9c8a6;
+  min-height: 100vh;
+}
+
+.stok-title {
+  text-align: center;
+  font-size: 40px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #4a3014;
+  text-shadow: 2px 2px 6px #f7e7c5;
+}
+
+/* EXPORT BUTTONS */
+
+.stok-export {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.stok-btn {
+  padding: 10px 20px;
+  background: #4a3216;
+  color: white;
+  border-radius: 10px;
+  font-size: 18px;
+  border: none;
+  cursor: pointer;
+}
+
+.stok-btn:hover {
+  background: #6a4a22;
+}
+
+/* TABLO */
+
+.stok-table {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stok-header {
+  display: grid;
+  grid-template-columns: 160px 1fr 100px 150px 150px 120px;
+  background: #cbb894;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #3c2814;
+  box-shadow: inset 2px 2px 5px #b8a27f;
+}
+
+.stok-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 100px 150px 150px 120px;
+  background: #f4e7cf;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 19px;
+  font-weight: 600;
+  color: #3c2913;
+  box-shadow: inset 2px 2px 6px #c3b08b;
+}
+
+.stok-kazanc {
+  font-weight: bold;
+  text-align: right;
+}
+
+.stok-green {
+  color: #0c8b1b;
+}
+
+.stok-red {
+  color: #b31212;
+}
+
+.stok-durum {
+  text-align: center;
+  font-size: 17px;
+}
+
+.stok-kritik {
+  color: #b30000;
+  font-weight: bold;
+}
+
+.stok-normal {
+  color: #2c4d1c;
+  font-weight: bold;
+}

@@ -1,0 +1,78 @@
+[
+  {
+    "id": 1,
+    "name": "Çay Çeşitleri"
+  },
+  {
+    "id": 2,
+    "name": "Bitki Çayı Çeşitleri"
+  },
+  {
+    "id": 3,
+    "name": "Oralet Çeşitleri"
+  },
+  {
+    "id": 4,
+    "name": "Kahve Çeşitleri"
+  },
+  {
+    "id": 5,
+    "name": "Türk Kahvesi Çeşitleri"
+  },
+  {
+    "id": 6,
+    "name": "Dibek Kahvesi"
+  },
+  {
+    "id": 7,
+    "name": "Meyve Suyu Çeşitleri"
+  },
+  {
+    "id": 8,
+    "name": "Ayran"
+  },
+  {
+    "id": 9,
+    "name": "Asitli İçecekler"
+  },
+  {
+    "id": 10,
+    "name": "Enerji İçeceği"
+  },
+  {
+    "id": 11,
+    "name": "Soda Çeşitleri"
+  },
+  {
+    "id": 12,
+    "name": "Su"
+  },
+  {
+    "id": 13,
+    "name": "Bisküvi Çeşitleri"
+  },
+  {
+    "id": 14,
+    "name": "Çikolata Çeşitleri"
+  },
+  {
+    "id": 15,
+    "name": "Kek Çeşitleri"
+  },
+  {
+    "id": 16,
+    "name": "Kuruyemiş"
+  },
+  {
+    "id": 17,
+    "name": "Tost Çeşitleri"
+  },
+  {
+    "id": 18,
+    "name": "Kavurmalı Tost"
+  },
+  {
+    "id": 22,
+    "name": "Dondurma"
+  }
+]

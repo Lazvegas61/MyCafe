@@ -1,0 +1,488 @@
+/* MASALAR.CSS - ESKİ TASARIMA DÖNÜŞ */
+
+/* 1. ANA CONTAINER */
+.masalar-container {
+  padding: 25px;
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  min-height: 100vh;
+  color: white;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* 2. LOADING */
+.loading {
+  text-align: center;
+  padding: 100px;
+  font-size: 28px;
+  color: #ff9800;
+  font-weight: bold;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* 3. HEADER - ESKİ TASARIM */
+.masalar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 25px 30px;
+  background: rgba(10, 10, 25, 0.85);
+  border-radius: 15px;
+  border: 2px solid rgba(255, 152, 0, 0.3);
+  margin-bottom: 35px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.masalar-header h1 {
+  font-size: 42px;
+  font-weight: 900;
+  color: #ff9800;
+  margin: 0;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  letter-spacing: 1px;
+}
+
+.yenile-btn {
+  padding: 15px 30px;
+  background: linear-gradient(135deg, #2196F3 0%, #0D47A1 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+}
+
+.yenile-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(33, 150, 243, 0.5);
+}
+
+.yenile-btn:active {
+  transform: translateY(0);
+}
+
+/* 4. MASALAR GRID - ESKİ TASARIM */
+.masalar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px;
+  padding: 15px;
+}
+
+/* 5. MASA KARTI - ESKİ TASARIM */
+.masa-kart {
+  background: rgba(20, 20, 40, 0.9);
+  border-radius: 18px;
+  padding: 30px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 3px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  min-height: 240px;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.masa-kart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #ff9800, #ff5722);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.masa-kart:hover::before {
+  opacity: 1;
+}
+
+.masa-kart:hover {
+  transform: translateY(-12px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+}
+
+/* DOLU MASA - KIRMIZI VURGULU */
+.masa-kart.dolu {
+  border-color: #ff5252;
+  background: linear-gradient(145deg, 
+    rgba(255, 82, 82, 0.2) 0%, 
+    rgba(30, 30, 60, 0.95) 70%
+  );
+  animation: dolu-glow 2.5s infinite alternate;
+}
+
+@keyframes dolu-glow {
+  0% {
+    box-shadow: 0 0 20px rgba(255, 82, 82, 0.3),
+                0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 30px rgba(255, 82, 82, 0.5),
+                0 8px 25px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* BOŞ MASA - YEŞİL VURGULU */
+.masa-kart.bos {
+  border-color: #4caf50;
+  background: linear-gradient(145deg, 
+    rgba(76, 175, 80, 0.15) 0%, 
+    rgba(30, 30, 60, 0.85) 70%
+  );
+}
+
+/* 6. MASA NUMARASI */
+.masa-no {
+  font-size: 38px;
+  font-weight: 900;
+  color: white;
+  margin-bottom: 20px;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  letter-spacing: 1px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 7. MASA DURUMU */
+.masa-durum {
+  font-size: 20px;
+  font-weight: 800;
+  padding: 10px 30px;
+  border-radius: 30px;
+  margin-bottom: 25px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.masa-kart.dolu .masa-durum {
+  background: linear-gradient(135deg, #ff5252, #ff1744);
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.masa-kart.bos .masa-durum {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 8. MASA TUTARI */
+.masa-tutar {
+  font-size: 42px;
+  font-weight: 900;
+  color: #ffb300;
+  margin: 20px 0;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  width: 100%;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  border: 3px solid rgba(255, 179, 0, 0.4);
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s;
+}
+
+.masa-kart:hover .masa-tutar {
+  transform: scale(1.05);
+  border-color: rgba(255, 179, 0, 0.7);
+}
+
+.masa-kart.bos .masa-tutar {
+  color: #9e9e9e;
+  border-color: rgba(158, 158, 158, 0.3);
+  font-size: 36px;
+  font-weight: 700;
+}
+
+/* 9. MÜŞTERİ ADI */
+.masa-musteri {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 15px;
+  color: #bb86fc;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 8px 15px;
+  background: rgba(187, 134, 252, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(187, 134, 252, 0.3);
+}
+
+/* 10. SÜRE BİLGİSİ */
+.masa-sure {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  font-size: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.masa-acilis {
+  color: #2196F3;
+  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.masa-acilis::before {
+  content: '⏰';
+  font-size: 12px;
+}
+
+.masa-gecen-sure {
+  color: #ffb300;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.masa-gecen-sure::before {
+  content: '⏱️';
+  font-size: 14px;
+}
+
+/* 11. KİŞİ SAYISI */
+.masa-kisi {
+  font-size: 16px;
+  color: #64b5f6;
+  margin-top: 12px;
+  padding: 6px 15px;
+  background: rgba(100, 181, 246, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(100, 181, 246, 0.3);
+}
+
+/* 12. SPLIT BADGE */
+.masa-split-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #2196F3, #0D47A1);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 25px;
+  font-size: 13px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4);
+  z-index: 2;
+  animation: split-blink 2s infinite;
+}
+
+@keyframes split-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* 13. YENİ MASA EKLE BUTONU */
+.yeni-masa-kart {
+  background: linear-gradient(145deg, #6a11cb 0%, #2575fc 100%);
+  border-radius: 18px;
+  padding: 30px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  border: 3px dashed rgba(255, 255, 255, 0.4);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(106, 17, 203, 0.3);
+}
+
+.yeni-masa-kart::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.7s;
+}
+
+.yeni-masa-kart:hover::before {
+  left: 100%;
+}
+
+.yeni-masa-kart:hover {
+  transform: translateY(-12px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(106, 17, 203, 0.5);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.yeni-masa-icon {
+  font-size: 70px;
+  color: white;
+  margin-bottom: 20px;
+  font-weight: 300;
+  transition: transform 0.3s;
+}
+
+.yeni-masa-kart:hover .yeni-masa-icon {
+  transform: scale(1.2) rotate(90deg);
+}
+
+.yeni-masa-label {
+  font-size: 22px;
+  font-weight: bold;
+  color: white;
+  text-align: center;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* 14. FOOTER */
+.masalar-footer {
+  margin-top: 50px;
+  padding: 25px;
+  background: rgba(10, 10, 25, 0.85);
+  border-radius: 15px;
+  text-align: center;
+  border: 2px solid rgba(255, 152, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.masa-istatistik {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  font-size: 18px;
+}
+
+.masa-istatistik span {
+  padding: 12px 25px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #fff;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.masa-istatistik span:first-child {
+  color: #bb86fc;
+}
+
+.masa-istatistik span:nth-child(2) {
+  color: #ff5252;
+}
+
+.masa-istatistik span:last-child {
+  color: #4caf50;
+}
+
+/* 15. RESPONSIVE */
+@media (max-width: 1200px) {
+  .masalar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .masalar-header {
+    flex-direction: column;
+    gap: 20px;
+    text-align: center;
+  }
+  
+  .masalar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+  }
+  
+  .masa-istatistik {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .masalar-container {
+    padding: 15px;
+  }
+  
+  .masalar-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .masa-kart, .yeni-masa-kart {
+    min-height: 220px;
+    padding: 25px;
+  }
+  
+  .masa-no {
+    font-size: 32px;
+  }
+  
+  .masa-tutar {
+    font-size: 36px;
+  }
+}
+
+/* 16. ESKİ TASARIM İÇİN EK ANİMASYONLAR */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.masa-kart.dolu {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* 17. BİLARDO MASALARI İÇİN ÖZEL STİL */
+.masa-kart[data-bilardo="true"] {
+  border-color: #9c27b0;
+  background: linear-gradient(145deg, 
+    rgba(156, 39, 176, 0.2) 0%, 
+    rgba(30, 30, 60, 0.95) 70%
+  );
+}
+
+.masa-kart[data-bilardo="true"] .masa-no {
+  color: #e1bee7;
+}
+
+.masa-kart[data-bilardo="true"] .masa-durum {
+  background: linear-gradient(135deg, #9c27b0, #6a1b9a);
+}

@@ -1,0 +1,137 @@
+/* ------------------------------------------------------------
+   📌 MasaDetayRaporu.css — Premium Altın–Kahve Tema
+------------------------------------------------------------- */
+
+.masa-page {
+  padding: 30px;
+  min-height: 100vh;
+  background: #d9c8a6;
+}
+
+.masa-title {
+  text-align: center;
+  font-size: 40px;
+  font-weight: bold;
+  color: #4a3014;
+  text-shadow: 2px 2px 6px #f7e7c5;
+  margin-bottom: 20px;
+}
+
+/* EXPORT */
+
+.masa-export {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.masa-btn {
+  background: #4a3216;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.masa-btn:hover {
+  background: #6a4a22;
+}
+
+/* FİLTRELER */
+
+.masa-filters {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.masa-filters input,
+.masa-filter-btn {
+  padding: 10px 15px;
+  border-radius: 10px;
+  border: none;
+  background: #fff2dd;
+  font-size: 18px;
+  box-shadow: inset 2px 2px 4px #c4af8e;
+  cursor: pointer;
+}
+
+/* TABLO */
+
+.masa-table {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.masa-header {
+  display: grid;
+  grid-template-columns: 110px 130px 130px 140px 140px 120px 120px 120px;
+  background: #cbb894;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #3c2814;
+  box-shadow: inset 2px 2px 5px #b8a27f;
+}
+
+.masa-row {
+  display: grid;
+  grid-template-columns: 110px 130px 130px 140px 140px 120px 120px 120px;
+  background: #f4e7cf;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 19px;
+  font-weight: 600;
+  color: #3c2913;
+  position: relative;
+  box-shadow: inset 2px 2px 6px #c3b08b;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+.red {
+  color: #b30000 !important;
+}
+
+.green {
+  color: #0c8b1b !important;
+}
+
+.masa-detay-btn {
+  padding: 6px 12px;
+  background: #4a3216;
+  color: white;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+/* DETAY BLOKU */
+
+.masa-detay-blok {
+  grid-column: 1 / -1;
+  background: #e8d6b7;
+  padding: 20px;
+  border-radius: 12px;
+  margin-top: 12px;
+  box-shadow: inset 2px 2px 6px #c3b08b;
+}
+
+.masa-detay-blok h3 {
+  margin-top: 10px;
+  margin-bottom: 8px;
+  color: #4a3014;
+}
+
+.masa-detay-row {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  padding: 8px 0;
+  font-size: 18px;
+}

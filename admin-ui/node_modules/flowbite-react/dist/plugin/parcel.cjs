@@ -1,0 +1,19 @@
+'use strict';
+
+var plugin = require('@parcel/plugin');
+var build = require('../cli/commands/build.cjs');
+var dev = require('../cli/commands/dev.cjs');
+
+var parcel = new plugin.Reporter({
+  async report({ event, options }) {
+    if (event.type === "buildStart" && options.env.NODE_ENV === "production") {
+      await build.build();
+    }
+    if (event.type === "watchStart") {
+      await dev.dev();
+    }
+  }
+});
+
+module.exports = parcel;
+//# sourceMappingURL=parcel.cjs.map

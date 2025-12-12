@@ -1,0 +1,21 @@
+'use strict';
+
+var build = require('../cli/commands/build.cjs');
+var dev = require('../cli/commands/dev.cjs');
+var index = require('./index.cjs');
+
+var bun = {
+  name: index.pluginName,
+  setup({ onStart, config }) {
+    onStart(async () => {
+      if (config.minify) {
+        await build.build();
+      } else {
+        await dev.dev();
+      }
+    });
+  }
+};
+
+module.exports = bun;
+//# sourceMappingURL=bun.cjs.map

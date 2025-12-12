@@ -1,0 +1,201 @@
+/* ----------------------------------------------------------------
+   PREMIUM PLUS GOLD — GÜNLÜK ÖZET DASHBOARD — SADE TASARIM
+   + RESPONSIVE UYUMU (MASTER KRİTER 2.2)
+-----------------------------------------------------------------*/
+
+.ana-wrapper {
+  min-height: 100vh;
+  padding: 40px 50px;
+  background: linear-gradient(to bottom, #f7e1b6, #d4b074, #b98d44);
+  color: #3b2a15;
+}
+
+/* Üst başlık */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.title-3d {
+  font-size: 62px;
+  font-weight: 900;
+  color: #d4a94d;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Saat */
+.clock-box {
+  background: #3a2815;
+  padding: 12px 32px;
+  color: #ffdb8a;
+  font-size: 32px;
+  font-weight: 900;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  letter-spacing: 2px;
+}
+
+/* ÜST 4 KART */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 22px;
+  margin-bottom: 30px;
+}
+
+.sum-card {
+  background: #3d2e1c;
+  border-radius: 20px;
+  padding: 24px;
+  color: #f8e2b6;
+  text-align: center;
+  border: 2px solid rgba(255,215,136,0.3);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.35);
+}
+
+.sum-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.sum-title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.sum-value {
+  margin-top: 10px;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+/* ORTA PANELLER */
+.middle-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  margin-bottom: 35px;
+}
+
+.panel-box {
+  background: #3d2e1c;
+  border-radius: 20px;
+  padding: 24px;
+  color: #f8e2b6;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.35);
+}
+
+.panel-header {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.panel-small {
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+.panel-list {
+  background: rgba(255,255,255,0.15);
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.panel-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  padding: 10px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-weight: 700;
+}
+
+.stock-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+/* RAPOR KARTLARI */
+.report-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+}
+
+.report-card {
+  background: #3d2e1c;
+  padding: 20px;
+  border-radius: 20px;
+  text-align: center;
+  border: 2px solid rgba(255,215,136,0.3);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+  cursor: pointer;
+}
+
+.report-icon {
+  font-size: 34px;
+  margin-bottom: 8px;
+  color: #ffda94;
+}
+
+.report-label {
+  font-size: 20px;
+  font-weight: 800;
+  color: #f8e2b6;
+}
+
+/* ===============================================
+   RESPONSIVE KURALLAR (MASTER KRİTER 2.2)
+=============================================== */
+
+/* 1200px altı: 4'lü kartları 2'li yap ve başlığı küçült */
+@media (max-width: 1200px) {
+  .title-3d {
+    font-size: 48px;
+  }
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .report-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 900px altı: Orta panelleri tek sütun yap (açık adisyonlar ve stok) */
+@media (max-width: 900px) {
+  .middle-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 600px altı: Tüm kartları tek sütun yap */
+@media (max-width: 600px) {
+  .ana-wrapper {
+    padding: 20px 25px;
+  }
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .title-3d {
+    font-size: 36px;
+    margin-bottom: 10px;
+  }
+  .clock-box {
+    font-size: 24px;
+    padding: 8px 16px;
+  }
+  .summary-cards,
+  .report-row {
+    grid-template-columns: 1fr;
+  }
+  .sum-value {
+    font-size: 28px;
+  }
+}

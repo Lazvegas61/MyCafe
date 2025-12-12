@@ -1,0 +1,36 @@
+src/pages
+├── Adisyon.jsx
+├── Adisyon.jsx.zip
+├── AnaEkran.jsx
+├── ayarlar
+│   └── Ayarlar.jsx
+├── bilardo
+│   └── Bilardo.jsx
+├── GarsonLogin.jsx
+├── Giderler.jsx
+├── KarZararPaneli.jsx
+├── KasaRaporu.jsx
+├── kategori
+│   └── KategoriYonetimi.jsx
+├── Login.jsx
+├── Masalar.jsx
+├── MusteriIslemleri.jsx
+├── personel
+│   └── Personel.jsx
+├── Redirect.jsx
+├── reports
+│   ├── GiderRaporu.jsx
+│   ├── KasaTahsilat.jsx
+│   ├── KategoriBazli.jsx
+│   ├── MasaDetayRaporu.jsx
+│   ├── MusteriBorcRaporu.jsx
+│   ├── PremiumRaporSablon.jsx
+│   ├── ReportsIndex.jsx
+│   └── UrunBazli.jsx
+├── stok
+│   └── StokYonetimi.jsx
+├── urunler
+│   └── UrunYonetimi.jsx
+└── UrunStokYonetimi.jsx
+
+8 directories, 26 files

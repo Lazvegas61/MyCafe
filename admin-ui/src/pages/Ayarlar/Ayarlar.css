@@ -1,0 +1,148 @@
+/* ------------------------------------------------------------
+   AYARLAR SAYFASI — PREMIUM LATTE FİNAL SÜRÜMÜ
+   Tema Renkleri:
+   - Koyu Kahve: #4b2e05
+   - İçerik Metni: #5c4632
+   - Light Latte: #e3c7a2
+   - Gold Latte: #d4a878
+   - İnce Gold Border: #caa885
+------------------------------------------------------------ */
+
+.ayarlar-container {
+  padding: 25px;
+  background: #f3e5d7;
+  min-height: 100vh;
+  color: #5c4632;
+  font-family: "Inter", sans-serif;
+}
+
+.ayarlar-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #4b2e05;
+  margin-bottom: 25px;
+}
+
+/* -----------------------------------------
+   ÜST BUTONLAR (Bilardo Ücreti / Güncelleme)
+------------------------------------------- */
+.ayarlar-btn-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.ayar-btn {
+  padding: 12px 20px;
+  background: #e3c7a2;          /* Light Latte */
+  border: 1px solid #caa885;     /* İnce Gold Border */
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 18px;
+  color: #4b2e05;               /* Premium koyu kahve */
+  transition: 0.2s ease;
+}
+
+.ayar-btn:hover {
+  background: #d4a878;          /* Gold Latte Hover */
+  color: #4b2e05;
+}
+
+.ayar-btn.aktif {
+  background: #d4a878;          /* Gold Latte */
+  color: #ffffff;               /* Aktif yazı beyaz */
+}
+
+/* -----------------------------------------
+   İçerik Alanı
+------------------------------------------- */
+.ayarlar-icerik {
+  margin-top: 10px;
+}
+
+/* -----------------------------------------
+   Kart Panel (Bilardo Ücreti ve Güncelleme)
+------------------------------------------- */
+.ayar-kutu {
+  background: #fff7ef;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid #d9b892;
+  max-width: 500px;
+  box-shadow: 0px 2px 6px rgba(0,0,0,0.08);
+}
+
+.ayar-kutu h2 {
+  margin-bottom: 15px;
+  color: #4b2e05;
+  font-weight: 700;
+}
+
+/* -----------------------------------------
+   Input Alanı
+------------------------------------------- */
+.ayar-kutu label {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #4b2e05;
+}
+
+.ayar-kutu input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #c9a986;
+  background: #f8ead9;
+  font-size: 16px;
+}
+
+/* -----------------------------------------
+   Kaydet Butonu
+------------------------------------------- */
+.btn-kaydet {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #d6b48b;           /* Latte Gold */
+  border: 1px solid #b9956a;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 17px;
+  color: #4b2e05;
+  transition: 0.15s;
+}
+
+.btn-kaydet:hover {
+  background: #c9a276;
+}
+
+/* -----------------------------------------
+   Boş Seçim Yazısı
+------------------------------------------- */
+.bos-yazi {
+  padding: 30px 0;
+  font-size: 18px;
+  opacity: 0.7;
+  color: #4b2e05;
+  text-align: left;
+}
+
+/* ------------------------------------------------------------
+   🔥 %100 GARANTİ: Bootstrap yazı rengini tamamen ez
+   (Ayarlar sayfasındaki TÜM butonlar için)
+------------------------------------------------------------ */
+
+.ayarlar-container button,
+.ayarlar-container .btn,
+.ayarlar-container .btn * {
+  color: #4b2e05 !important;       /* Premium koyu kahve */
+}
+
+.ayarlar-container .ayar-btn.aktif,
+.ayarlar-container .ayar-btn.aktif * {
+  color: #ffffff !important;       /* Aktif butonda beyaz */
+}

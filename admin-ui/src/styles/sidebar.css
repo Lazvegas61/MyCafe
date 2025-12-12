@@ -1,0 +1,130 @@
+/* ===============================================
+   MYCAFE — PREMIUM ALTIN-KAHVE SIDEBAR
+   Responsive: 280 → 240 → 210 → 180 → Mobil kapalı
+=============================================== */
+
+/* ---- Sidebar ana stil ---- */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: rgba(75, 46, 5, 0.92);
+  backdrop-filter: blur(6px);
+  color: white;
+  z-index: 999;
+  padding-top: 20px;
+  box-shadow: 0 0 18px rgba(0,0,0,0.4);
+  transition: all 0.25s ease;
+  width: 280px;   /* Varsayılan geniş ekran */
+}
+
+/* ---- LOGO ---- */
+.sidebar-logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.sidebar-logo img {
+  width: 80px;
+  opacity: 0.95;
+}
+
+/* ---- Menü ---- */
+.sidebar-menu {
+  padding: 10px 0;
+}
+.sidebar-item {
+  padding: 14px 24px;
+  font-size: 1.15rem;
+  cursor: pointer;
+  transition: 0.2s;
+  border-left: 4px solid transparent;
+}
+.sidebar-item:hover {
+  background: rgba(255,255,255,0.12);
+  border-left: 4px solid #d4a94d;
+}
+
+/* ---- Çıkış ---- */
+.sidebar-footer {
+  position: absolute;
+  bottom: 25px;
+  width: 100%;
+  text-align: center;
+}
+.sidebar-logout {
+  padding: 12px 24px;
+  background: #c0392b;
+  color: white;
+  border-radius: 8px;
+  width: 70%;
+  margin: auto;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s;
+}
+.sidebar-logout:hover {
+  filter: brightness(1.1);
+}
+
+/* ===============================================
+   RESPONSIVE KURALLAR
+=============================================== */
+
+/* 1500px ↓ biraz küçült */
+@media (max-width: 1500px) {
+  .sidebar {
+    width: 240px;
+  }
+}
+
+/* 1200px ↓ daha küçük */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 210px;
+  }
+}
+
+/* 992px ↓ tablet */
+@media (max-width: 992px) {
+  .sidebar {
+    width: 180px;
+  }
+}
+
+/* 768px ↓ mobil: sidebar gizli */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* ===============================================
+   MOBİL HAMBURGER BUTTON
+=============================================== */
+.sidebar-toggle-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-toggle-btn {
+    display: block;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 2000;
+    background: #4b2e05;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 1.4rem;
+    border-radius: 8px;
+    border: 2px solid #d4a94d;
+    cursor: pointer;
+  }
+}
+

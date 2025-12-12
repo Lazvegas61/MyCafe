@@ -1,0 +1,75 @@
+/* ------------------------------------------------------------
+   📌 KategoriBazli.css — Premium Plus Tema
+   - Sade liste
+   - Altın-kahve gölge
+------------------------------------------------------------- */
+
+.kate-page {
+  padding: 30px;
+  background: #d9c8a6;
+  min-height: 100vh;
+}
+
+.kate-title {
+  text-align: center;
+  font-size: 40px;
+  font-weight: bold;
+  color: #4a3014;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 5px #f7e7c5;
+}
+
+.kate-export {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.kbtn {
+  padding: 10px 20px;
+  background: #4a3216;
+  color: white;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.kbtn:hover {
+  background: #6a4a22;
+}
+
+.kate-table {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kate-header {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  background: #cbb894;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 22px;
+  font-weight: bold;
+  color: #3c2814;
+  box-shadow: inset 2px 2px 5px #b8a27f;
+}
+
+.kate-row {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  background: #f4e7cf;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  box-shadow: inset 2px 2px 6px #c3b08b;
+  color: #3c2913;
+}
+
+.kate-tutar {
+  text-align: right;
+  font-weight: bold;
+}

@@ -1,0 +1,199 @@
+/* ------------------------------------------------------------
+   📌 Bilardo.css — FINAL V10 (Premium Latte)
+   - Bilardo.jsx V10 ile %100 uyumlu
+   - Premium altın–kahve tonları
+   - Daha güçlü kart görünümü
+   - Mobil uyum optimize edildi
+------------------------------------------------------------- */
+
+.bilardo-container {
+  padding: 25px;
+  background: #f3e4d6; /* Premium Latte arka plan */
+  min-height: 100vh;
+}
+
+/* ------------------------------
+   📌 Başlık Alanı
+------------------------------ */
+.bilardo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bilardo-title {
+  font-size: 36px;
+  font-weight: 900;
+  color: #6a4b33; /* Dark Coffee */
+  letter-spacing: 1px;
+}
+
+.masa-btn-ekle {
+  background: #c79a63; /* Gold Coffee */
+  border: none;
+  padding: 12px 22px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 800;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.masa-btn-ekle:hover {
+  background: #b18452;
+}
+
+/* ------------------------------
+   📌 Masa Grid
+------------------------------ */
+.bilardo-grid {
+  margin-top: 25px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+/* ------------------------------
+   📌 Bilardo Kart Tasarımı
+------------------------------ */
+.bilardo-card {
+  background: #fff9f0;
+  border-radius: 16px;
+  padding: 22px;
+  border: 3px solid #d2b295;
+  box-shadow: 0 5px 10px rgba(0,0,0,0.12);
+  transition: 0.25s ease;
+}
+
+.bilardo-card:hover {
+  transform: translateY(-3px);
+}
+
+/* ------------------------------
+   📌 Kart Üst Alanı
+------------------------------ */
+.bilardo-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bilardo-icon {
+  font-size: 32px;
+}
+
+.bilardo-name {
+  font-size: 22px;
+  font-weight: 900;
+  color: #6a482b;
+}
+
+/* ------------------------------
+   📌 Adisyon Toplam
+------------------------------ */
+.bilardo-toplam {
+  margin-top: 18px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #704a25;
+  text-align: center;
+}
+
+/* ------------------------------
+   📌 Süre Seçim Paneli
+------------------------------ */
+.bilardo-sure-secim {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.secim-btn {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: #c89d72; /* Coffee Beige */
+  color: white;
+  font-weight: 800;
+  font-size: 17px;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.secim-btn:hover {
+  background: #b6895f;
+}
+
+/* ------------------------------
+   📌 Açık Masa Bilgisi
+------------------------------ */
+.bilardo-info {
+  margin: 22px 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: #4b371f;
+  line-height: 1.4;
+}
+
+/* ------------------------------
+   📌 Oyunu Bitir Butonu
+------------------------------ */
+.oyun-bitir-btn {
+  background: #9a3e3e;
+  color: white;
+  border: none;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 18px;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: 0.25s;
+}
+
+.oyun-bitir-btn:hover {
+  background: #7f3131;
+}
+
+/* ------------------------------
+   📌 Masa Sil (Kapalı masada)
+------------------------------ */
+.masa-sil {
+  width: 100%;
+  background: #4a2f1f;
+  color: white;
+  border: none;
+  padding: 13px;
+  font-weight: 800;
+  font-size: 17px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.masa-sil:hover {
+  background: #3b2518;
+}
+
+/* ------------------------------
+   📌 RESPONSIVE KURALLAR
+------------------------------ */
+
+@media (max-width: 1200px) {
+  .bilardo-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .bilardo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bilardo-title {
+    font-size: 30px;
+  }
+}

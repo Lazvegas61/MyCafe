@@ -1,0 +1,23 @@
+/* -----------------------------------------------------
+   dashboard.css — Premium Glow + Card Effects
+-----------------------------------------------------*/
+
+.premium-card,
+.alt-box,
+.rapor-card {
+  transition: all 0.25s ease;
+}
+
+.premium-card:hover,
+.alt-box:hover {
+  transform: translateY(-4px);
+}
+
+.alt-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.alt-list::-webkit-scrollbar-thumb {
+  background: #c09b63;
+  border-radius: 6px;
+}

@@ -1,0 +1,23 @@
+import { build } from '../cli/commands/build.js';
+import { dev } from '../cli/commands/dev.js';
+import { pluginName } from './index.js';
+
+var esbuild = () => ({
+  name: pluginName,
+  setup(pluginBuild) {
+    let registered = false;
+    pluginBuild.onStart(async () => {
+      if (!registered) {
+        registered = true;
+        if (pluginBuild.initialOptions.minify) {
+          await build();
+        } else {
+          dev();
+        }
+      }
+    });
+  }
+});
+
+export { esbuild as default };
+//# sourceMappingURL=esbuild.js.map
