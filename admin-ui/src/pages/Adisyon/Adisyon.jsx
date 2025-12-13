@@ -271,7 +271,7 @@ export default function Adisyon() {
   }, [adisyon, splitAdisyon, indirim]);
 
   // --------------------------------------------------
-  // MENÜ ÜRÜNLERİNİ YÜKLE
+  // MENÜ ÜRÜNLERİNİ YÜKLE ve SIRALA
   // --------------------------------------------------
   useEffect(() => {
     const list = okuJSON(URUN_KEY, []);
@@ -283,7 +283,44 @@ export default function Adisyon() {
       satis: Number(u.satis || u.salePrice || u.Fiyat || 0)
     }));
 
-    setUrunler(fixed);
+    // KATEGORİLERE GÖRE GRUPLAMA ve ALFABETİK SIRALAMA
+    const kategorilereGoreGrupla = () => {
+      const gruplu = {};
+      
+      // Önce kategorilere göre grupla
+      fixed.forEach((u) => {
+        if (!gruplu[u.kategori]) {
+          gruplu[u.kategori] = [];
+        }
+        gruplu[u.kategori].push(u);
+      });
+
+      // Her kategori içindeki ürünleri alfabetik sırala
+      Object.keys(gruplu).forEach(kategori => {
+        gruplu[kategori].sort((a, b) => 
+          a.ad.localeCompare(b.ad, 'tr')
+        );
+      });
+
+      return gruplu;
+    };
+
+    const grupluUrunler = kategorilereGoreGrupla();
+    
+    // Gruplu veriyi düzleştir (sıralı şekilde)
+    const siraliUrunler = [];
+    
+    // Kategorileri alfabetik sırala
+    const siraliKategoriler = Object.keys(grupluUrunler).sort((a, b) => 
+      a.localeCompare(b, 'tr')
+    );
+    
+    // Her kategori için ürünleri ekle
+    siraliKategoriler.forEach(kategori => {
+      siraliUrunler.push(...grupluUrunler[kategori]);
+    });
+
+    setUrunler(siraliUrunler);
   }, [adisyon]);
 
   const kategoriler = useMemo(() => {
@@ -543,10 +580,11 @@ export default function Adisyon() {
 
     // Hesaba Yaz için
     if (aktifOdemeTipi === "HESABA_YAZ") {
-      setHesabaYazModu(true);
-      setBorcTutarInput(String(kalan || 0));
-      return;
-    }
+    console.log("🟢 HESABA_YAZ butonuna tıklandı!");
+    setHesabaYazModu(true);
+    setBorcTutarInput(String(kalan || 0));
+    return; // Bu return çok önemli!
+  }
 
     let tutar = Number(odemeInput);
     if (!tutar || tutar <= 0) {
@@ -1524,162 +1562,177 @@ const adisyonKapat = () => {
             </div>
           </div>
         ) : (
-          // YENİ ADİSYON İÇERİĞİ - SİYAH RENK
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            <div
+// YENİ ADİSYON İÇERİĞİ - SİYAH RENK
+<div style={{ flex: 1, overflowY: "auto" }}>
+  <div
+    style={{
+      fontWeight: "bold",
+      fontSize: "18px",
+      marginBottom: "10px",
+      color: "#000000", // SİYAH
+    }}
+  >
+    ADİSYON
+  </div>
+  <table
+    style={{
+      width: "100%",
+      borderCollapse: "collapse",
+      borderRadius: "8px",
+      overflow: "hidden",
+    }}
+  >
+    <thead>
+      <tr>
+        <th
+          style={{
+            padding: "8px",
+            borderBottom: "1px solid #ecd3a5",
+            textAlign: "left",
+            color: "#000",
+          }}
+        >
+          Ürün Adı
+        </th>
+        <th
+          style={{
+            padding: "8px",
+            borderBottom: "1px solid #ecd3a5",
+            textAlign: "center",
+            color: "#000",
+          }}
+        >
+          Adet
+        </th>
+        <th
+          style={{
+            padding: "8px",
+            borderBottom: "1px solid #ecd3a5",
+            textAlign: "right",
+            color: "#000",
+          }}
+        >
+          Birim
+        </th>
+        <th
+          style={{
+            padding: "8px",
+            borderBottom: "1px solid #ecd3a5",
+            textAlign: "right",
+            color: "#000",
+          }}
+        >
+          Toplam
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {(adisyon.kalemler || []).map((k) => (
+        <React.Fragment key={k.id}>
+          <tr>
+            <td
               style={{
-                fontWeight: "bold",
-                fontSize: "18px",
-                marginBottom: "10px",
-                color: "#000000", // SİYAH
+                padding: "6px 8px",
+                borderBottom: "1px solid #f4e0c2",
+                color: "#000",
               }}
             >
-              ADİSYON
-            </div>
-            <table
+              {k.urunAd}
+              {/* SİPARİŞ YEMEK notu varsa göster */}
+              {k.not && k.not.trim() !== "" && (
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#666",
+                    fontStyle: "italic",
+                    marginTop: "2px",
+                    paddingLeft: "5px",
+                  }}
+                >
+                  📝 {k.not}
+                </div>
+              )}
+            </td>
+            <td
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                borderRadius: "8px",
-                overflow: "hidden",
+                padding: "6px 8px",
+                borderBottom: "1px solid #f4e0c2",
+                textAlign: "center",
+                color: "#000",
               }}
             >
-              <thead>
-                <tr>
-                  <th
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #ecd3a5",
-                      textAlign: "left",
-                      color: "#000",
-                    }}
-                  >
-                    Ürün Adı
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #ecd3a5",
-                      textAlign: "center",
-                      color: "#000",
-                    }}
-                  >
-                    Adet
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #ecd3a5",
-                      textAlign: "right",
-                      color: "#000",
-                    }}
-                  >
-                    Birim
-                  </th>
-                  <th
-                    style={{
-                      padding: "8px",
-                      borderBottom: "1px solid #ecd3a5",
-                      textAlign: "right",
-                      color: "#000",
-                    }}
-                  >
-                    Toplam
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(adisyon.kalemler || []).map((k) => (
-                  <tr key={k.id}>
-                    <td
-                      style={{
-                        padding: "6px 8px",
-                        borderBottom: "1px solid #f4e0c2",
-                        color: "#000",
-                      }}
-                    >
-                      {k.urunAd}
-                    </td>
-                    <td
-                      style={{
-                        padding: "6px 8px",
-                        borderBottom: "1px solid #f4e0c2",
-                        textAlign: "center",
-                        color: "#000",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <button
-                          onClick={() => adetAzalt(k.id)}
-                          style={{
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            border: "1px solid #d0b48c",
-                            background: "#fbe9e7",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            lineHeight: "1",
-                          }}
-                        >
-                          -
-                        </button>
-                        <span>{k.adet}</span>
-                        <button
-                          onClick={() => adetArtir(k.id)}
-                          style={{
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            border: "1px solid #d0b48c",
-                            background: "#e8f5e9",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            lineHeight: "1",
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        padding: "6px 8px",
-                        borderBottom: "1px solid #f4e0c2",
-                        textAlign: "right",
-                        color: "#000",
-                      }}
-                    >
-                      {Number(k.birimFiyat || 0).toFixed(2)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "6px 8px",
-                        borderBottom: "1px solid #f4e0c2",
-                        textAlign: "right",
-                        color: "#000",
-                      }}
-                    >
-                      <b>{Number(k.toplam || 0).toFixed(2)}</b>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {adisyon.kalemler.length === 0 && (
               <div
-                style={{ textAlign: "center", color: "#888", padding: "20px" }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
               >
-                Yeni adisyon üzerinde ürün bulunmamaktadır.
+                <button
+                  onClick={() => adetAzalt(k.id)}
+                  style={{
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    border: "1px solid #d0b48c",
+                    background: "#fbe9e7",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    lineHeight: "1",
+                  }}
+                >
+                  -
+                </button>
+                <span>{k.adet}</span>
+                <button
+                  onClick={() => adetArtir(k.id)}
+                  style={{
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    border: "1px solid #d0b48c",
+                    background: "#e8f5e9",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    lineHeight: "1",
+                  }}
+                >
+                  +
+                </button>
               </div>
-            )}
-          </div>
-        )}
+            </td>
+            <td
+              style={{
+                padding: "6px 8px",
+                borderBottom: "1px solid #f4e0c2",
+                textAlign: "right",
+                color: "#000",
+              }}
+            >
+              {Number(k.birimFiyat || 0).toFixed(2)}
+            </td>
+            <td
+              style={{
+                padding: "6px 8px",
+                borderBottom: "1px solid #f4e0c2",
+                textAlign: "right",
+                color: "#000",
+              }}
+            >
+              <b>{Number(k.toplam || 0).toFixed(2)}</b>
+            </td>
+          </tr>
+        </React.Fragment>
+      ))}
+    </tbody>
+  </table>
+  {adisyon.kalemler.length === 0 && (
+    <div
+      style={{ textAlign: "center", color: "#888", padding: "20px" }}
+    >
+      Yeni adisyon üzerinde ürün bulunmamaktadır.
+    </div>
+  )}
+</div>        )}
       </div>
 
       {/* SÜTUN 3: SAĞ 1 PANEL – MENÜ */}

@@ -44,13 +44,33 @@ export default function UrunStokYonetimi() {
       return d;
     }
   };
+  
   const write = (k, val) => localStorage.setItem(k, JSON.stringify(val));
+
+  // ALFABETİK SIRALAMA FONKSİYONU
+  const siralamaFonksiyonu = (a, b) => {
+    // Türkçe karakterler için localeCompare kullan
+    return (a.name || a).toString().localeCompare((b.name || b).toString(), 'tr', { sensitivity: 'base' });
+  };
 
   const refresh = () => {
     const kat = read(KATEGORI_KEY, []);
     const ur = read(URUN_KEY, []);
-    setKategoriler(kat);
-    setUrunler(ur);
+    
+    // Kategorileri alfabetik sırala
+    const siraliKategoriler = [...kat].sort(siralamaFonksiyonu);
+    setKategoriler(siraliKategoriler);
+    
+    // Ürünleri kategori içinde alfabetik sırala
+    const siraliUrunler = [...ur].sort((a, b) => {
+      // Önce kategori adına göre sırala
+      const kategoriKarsilastirma = (a.categoryName || "").localeCompare(b.categoryName || "", 'tr');
+      if (kategoriKarsilastirma !== 0) return kategoriKarsilastirma;
+      
+      // Aynı kategori içinde ürün adına göre sırala
+      return (a.name || "").localeCompare(b.name || "", 'tr');
+    });
+    setUrunler(siraliUrunler);
   };
 
   const notify = () => window.dispatchEvent(new Event("mc_data_updated"));
@@ -78,7 +98,10 @@ export default function UrunStokYonetimi() {
       return alert("Bu kategori zaten var.");
     }
     list.push({ name });
-    write(KATEGORI_KEY, list);
+    
+    // Ekleme sonrası alfabetik sırala
+    const siraliList = [...list].sort(siralamaFonksiyonu);
+    write(KATEGORI_KEY, siraliList);
 
     setYeniKategori("");
     refresh();
@@ -88,11 +111,20 @@ export default function UrunStokYonetimi() {
   const kategoriSil = (name) => {
     if (!window.confirm(`${name} kategorisi silinsin mi?`)) return;
     const kat = read(KATEGORI_KEY, []).filter((k) => k.name !== name);
+    
+    // Alfabetik sıralamayı koru (filtreleme zaten sıralı yapıyı bozmaz)
     write(KATEGORI_KEY, kat);
 
     // O kategorideki ürünleri de sil
     const uru = read(URUN_KEY, []).filter((u) => u.categoryName !== name);
-    write(URUN_KEY, uru);
+    
+    // Ürünleri kategori içinde alfabetik sırala
+    const siraliUrunler = [...uru].sort((a, b) => {
+      const kategoriKarsilastirma = (a.categoryName || "").localeCompare(b.categoryName || "", 'tr');
+      if (kategoriKarsilastirma !== 0) return kategoriKarsilastirma;
+      return (a.name || "").localeCompare(b.name || "", 'tr');
+    });
+    write(URUN_KEY, siraliUrunler);
 
     refresh();
     notify();
@@ -118,7 +150,14 @@ export default function UrunStokYonetimi() {
       stokTakibi: uTakip,
     });
 
-    write(URUN_KEY, list);
+    // Ekleme sonrası kategori içinde alfabetik sırala
+    const siraliList = [...list].sort((a, b) => {
+      const kategoriKarsilastirma = (a.categoryName || "").localeCompare(b.categoryName || "", 'tr');
+      if (kategoriKarsilastirma !== 0) return kategoriKarsilastirma;
+      return (a.name || "").localeCompare(b.name || "", 'tr');
+    });
+    
+    write(URUN_KEY, siraliList);
     notify();
     refresh();
 
@@ -135,7 +174,15 @@ export default function UrunStokYonetimi() {
   const urunSil = (name) => {
     if (!window.confirm(`${name} ürünü silinsin mi?`)) return;
     const yeni = read(URUN_KEY, []).filter((u) => u.name !== name);
-    write(URUN_KEY, yeni);
+    
+    // Silme sonrası kategori içinde alfabetik sıralamayı koru
+    const siraliYeni = [...yeni].sort((a, b) => {
+      const kategoriKarsilastirma = (a.categoryName || "").localeCompare(b.categoryName || "", 'tr');
+      if (kategoriKarsilastirma !== 0) return kategoriKarsilastirma;
+      return (a.name || "").localeCompare(b.name || "", 'tr');
+    });
+    
+    write(URUN_KEY, siraliYeni);
     refresh();
     notify();
 
@@ -162,14 +209,14 @@ export default function UrunStokYonetimi() {
   );
 
   const filtreliUrunler = useMemo(
-  () =>
-    urunMap
-      .filter((u) =>
-        filtreKategori ? u.categoryName === filtreKategori : true
-      )
-      .sort((a, b) => (a?.name || "").localeCompare(b?.name || "")),
-  [urunMap, filtreKategori]
-);
+    () =>
+      urunMap
+        .filter((u) =>
+          filtreKategori ? u.categoryName === filtreKategori : true
+        )
+        .sort((a, b) => (a?.name || "").localeCompare(b?.name || "", 'tr')),
+    [urunMap, filtreKategori]
+  );
 
   const seciliUrun = useMemo(
     () => urunMap.find((u) => u.name === seciliUrunAd) || null,
@@ -205,7 +252,14 @@ export default function UrunStokYonetimi() {
     cb(kopya);
     list[idx] = kopya;
 
-    write(URUN_KEY, list);
+    // Güncelleme sonrası kategori içinde alfabetik sırala
+    const siraliList = [...list].sort((a, b) => {
+      const kategoriKarsilastirma = (a.categoryName || "").localeCompare(b.categoryName || "", 'tr');
+      if (kategoriKarsilastirma !== 0) return kategoriKarsilastirma;
+      return (a.name || "").localeCompare(b.name || "", 'tr');
+    });
+    
+    write(URUN_KEY, siraliList);
     refresh();
     notify();
   };

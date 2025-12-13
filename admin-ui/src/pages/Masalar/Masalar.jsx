@@ -1,15 +1,10 @@
-// Masalar.jsx - SYNC SERVICE EVENT LISTENER EKLENDİ
-
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-// SYNC SERVICE IMPORT EKLENDİ
-import syncService, { SYNC_EVENTS } from "../../services/syncService"; // YOLU DÜZELTİN
-
 // MyCafe Premium Tema Renkleri
 const RENK = {
-  arka: "#e5cfa5",
-  kart: "#4a3722",
+  arka: "#e5cfa5",      // Altın–Bej zemin
+  kart: "#4a3722",      // Koyu kahve 3D kart
   kartYazi: "#ffffff",
   altin: "#f5d085",
   yesil: "#2ecc71",
@@ -37,14 +32,6 @@ const normalizeMasalar = (list) => {
       ...m,
       id: m.id ?? no,
       no,
-      durum: m.durum || "BOŞ",
-      renk: m.renk || "gri",
-      toplamTutar: m.toplamTutar || "0.00",
-      musteriAdi: m.musteriAdi || null,
-      kisiSayisi: m.kisiSayisi || null,
-      acilisZamani: m.acilisZamani || null,
-      adisyonId: m.adisyonId || null,
-      ayirId: m.ayirId || null
     };
   });
 };
@@ -86,7 +73,6 @@ export default function Masalar({ onOpenAdisyon }) {
   // YARDIMCI FONKSİYONLAR
   // --------------------------------------------------
   const loadMasalar = () => {
-    console.log('🔄 Masalar yeniden yükleniyor...');
     const raw = readJSON("mc_masalar", []);
     const norm = normalizeMasalar(raw);
     localStorage.setItem("mc_masalar", JSON.stringify(norm));
@@ -104,7 +90,16 @@ export default function Masalar({ onOpenAdisyon }) {
     localStorage.setItem("mc_adisyonlar", JSON.stringify(list));
   };
 
-  // 🟡 Belirli masanın durumunu hesapla
+  // 🔄 TIMER: Her 1 dakikada bir yenile
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadMasalar();
+      setAdisyonlar(readJSON("mc_adisyonlar", []));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 🟡 Belirli masanın durumunu hesapla (ANLIK FİYAT GÜNCELLEMESİ İÇİN DÜZELTİLDİ)
   const getMasaBilgi = (masa) => {
     if (!masa.adisyonId) return { acik: false };
 
@@ -114,8 +109,7 @@ export default function Masalar({ onOpenAdisyon }) {
     // Eğer status/durum alanı kapalıysa, kapalı say
     if (
       (ads.status && ads.status.toUpperCase() === "CLOSED") ||
-      (ads.durum && ads.durum.toUpperCase() === "KAPALI") ||
-      ads.kapali === true
+      (ads.durum && ads.durum.toUpperCase() === "KAPALI")
     ) {
       return { acik: false };
     }
@@ -125,76 +119,63 @@ export default function Masalar({ onOpenAdisyon }) {
 
     const simdi = new Date();
     const gecenDakika = Math.floor((simdi - acilis) / 60000);
+    
+    // YENİ: Açılış saatini formatla
+    const acilisSaati = `${String(acilis.getHours()).padStart(2, '0')}:${String(acilis.getMinutes()).padStart(2, '0')}`;
 
-    const toplamTutar = (ads.kalemler || []).reduce(
+    // Toplam tutarı hesapla (ana adisyon + tüm açık ayırma adisyonları)
+    let toplamTutar = (ads.kalemler || []).reduce(
       (t, k) => t + Number(k.adet || 0) * Number(k.fiyat || 0),
       0
     );
 
+    // YENİ: Aynı masadaki TÜM açık ayırma adisyonlarını bul ve toplama ekle
+    const ayirmaAdisyonlari = adisyonlar.filter(a => {
+      // Aynı masa numarasına sahip
+      const isSameMasa = a.masaNo === masa.no || (a.masaNo && a.masaNo.toString() === masa.no.toString());
+      // Farklı ID (ana adisyon değil)
+      const isDifferentId = a.id !== masa.adisyonId;
+      // Kapalı değil
+      const isNotClosed = !(a.status && a.status.toUpperCase() === "CLOSED") &&
+                         !(a.durum && a.durum.toUpperCase() === "KAPALI");
+      
+      return isSameMasa && isDifferentId && isNotClosed;
+    });
+
+    // Tüm ayırma adisyonlarını toplama ekle
+    ayirmaAdisyonlari.forEach(ayir => {
+      toplamTutar += (ayir.kalemler || []).reduce(
+        (t, k) => t + Number(k.adet || 0) * Number(k.fiyat || 0),
+        0
+      );
+    });
+
     return {
       acik: true,
       gecenDakika,
-      toplamTutar,
+      acilisSaati,      // YENİ: Açılış saati
+      toplamTutar,      // DÜZELTİLDİ: Tüm adisyonların toplamı
       adisyon: ads,
     };
   };
 
-  // --------------------------------------------------
-  // SYNC SERVICE EVENT LISTENERS - YENİ EKLENDİ
-  // --------------------------------------------------
+  // YENİ: Real-time güncelleme için useEffect
   useEffect(() => {
-    const loadMasalar = () => {
-      console.log('🔄 Masalar yeniden yükleniyor...');
-      const raw = readJSON("mc_masalar", []);
-      const norm = normalizeMasalar(raw);
-      localStorage.setItem("mc_masalar", JSON.stringify(norm));
-      setMasalar(norm);
-    };
-
-    const loadAdisyonlar = () => {
+    const handleStorageChange = () => {
+      loadMasalar();
       setAdisyonlar(readJSON("mc_adisyonlar", []));
     };
 
-    // İlk yükleme
-    loadMasalar();
-    loadAdisyonlar();
-
-    // 🔴 SYNC SERVICE EVENT'LERİNİ DİNLE
-    const handleMasaGuncellendi = (eventData) => {
-      console.log("📢 SYNC EVENT: Masa güncellendi", eventData);
-      // Masaları yeniden yükle
-      loadMasalar();
-    };
-
-    const handleStorageChange = () => {
-      console.log("📢 STORAGE EVENT: Veri değişti");
-      loadMasalar();
-      loadAdisyonlar();
-    };
-
-    // Event listener'ları ekle
-    if (syncService) {
-      syncService.on(SYNC_EVENTS.MASA_GUNCELLENDI, handleMasaGuncellendi);
-      console.log('✅ SYNC EVENT listener eklendi');
-    }
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('adisyonUpdated', handleStorageChange);
     
-    window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("masaUpdated", handleMasaGuncellendi);
-
-    // 🔄 TIMER: Her 30 saniyede bir yenile
-    const interval = setInterval(() => {
-      loadMasalar();
-      loadAdisyonlar();
-    }, 30000);
+    // Her 10 saniyede bir kontrol et (daha sık)
+    const realTimeInterval = setInterval(handleStorageChange, 10000);
 
     return () => {
-      // Event listener'ları temizle
-      if (syncService) {
-        syncService.off(SYNC_EVENTS.MASA_GUNCELLENDI, handleMasaGuncellendi);
-      }
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("masaUpdated", handleMasaGuncellendi);
-      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('adisyonUpdated', handleStorageChange);
+      clearInterval(realTimeInterval);
     };
   }, []);
 
@@ -215,26 +196,10 @@ export default function Masalar({ onOpenAdisyon }) {
       id: nextNo,
       no: nextNo,
       adisyonId: null,
-      durum: "BOŞ",
-      renk: "gri",
-      toplamTutar: "0.00",
-      musteriAdi: null,
-      kisiSayisi: null,
-      acilisZamani: null
     };
 
     const yeniListe = [...list, yeniMasa];
     saveMasalar(yeniListe);
-    
-    // SYNC EVENT TETİKLE
-    if (syncService) {
-      syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-        masaNo: nextNo,
-        masa: yeniMasa
-      });
-    }
-    
-    window.dispatchEvent(new Event('storage'));
   };
 
   // 🔴 Masa Sil — inputa sadece numara girilecek
@@ -265,9 +230,6 @@ export default function Masalar({ onOpenAdisyon }) {
     const yeniListe = list.filter((m) => Number(m.no) !== masaNo);
     saveMasalar(yeniListe);
     setSilMasaNo("");
-    
-    // SYNC EVENT TETİKLE
-    window.dispatchEvent(new Event('storage'));
   };
 
   // --------------------------------------------------
@@ -308,10 +270,10 @@ export default function Masalar({ onOpenAdisyon }) {
     // Masalar üzerinde taşıma
     const yeniMasalar = masalar.map((m) => {
       if (m.no === sourceNo) {
-        return { ...m, adisyonId: null, durum: "BOŞ", renk: "gri", toplamTutar: "0.00" };
+        return { ...m, adisyonId: null };
       }
       if (m.no === targetMasa.no) {
-        return { ...m, adisyonId, durum: "DOLU", renk: "kırmızı" };
+        return { ...m, adisyonId };
       }
       return m;
     });
@@ -328,20 +290,6 @@ export default function Masalar({ onOpenAdisyon }) {
     );
     saveAdisyonlar(yeniAdisyonlar);
 
-    // SYNC EVENT TETİKLE
-    if (syncService) {
-      syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-        masaNo: sourceNo,
-        masa: yeniMasalar.find(m => m.no === sourceNo)
-      });
-      syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-        masaNo: targetMasa.no,
-        masa: yeniMasalar.find(m => m.no === targetMasa.no)
-      });
-    }
-    
-    window.dispatchEvent(new Event('storage'));
-    
     alert(`Adisyon MASA ${sourceNo} → MASA ${targetMasa.no} taşındı.`);
   };
 
@@ -370,56 +318,25 @@ export default function Masalar({ onOpenAdisyon }) {
         acilisZamani: new Date().toISOString(),
         kalemler: [],
         status: "OPEN",
-        durum: "AÇIK",
-        kapali: false
       };
 
       const yeniAdisyonList = [...adisyonlar, yeniAdisyon];
       saveAdisyonlar(yeniAdisyonList);
 
       const yeniMasaList = masalar.map((m) =>
-        m.no === masa.no ? { ...m, adisyonId, durum: "DOLU", renk: "kırmızı" } : m
+        m.no === masa.no ? { ...m, adisyonId } : m
       );
       saveMasalar(yeniMasaList);
-      
-      // SYNC EVENT TETİKLE
-      if (syncService) {
-        syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-          masaNo: masa.no,
-          masa: yeniMasaList.find(m => m.no === masa.no)
-        });
-      }
-      
-      window.dispatchEvent(new Event('storage'));
     }
 
     // 2) Adisyon ekranına git
     if (typeof onOpenAdisyon === "function") {
+      // Eğer App.jsx props üzerinden yönetecekse
       onOpenAdisyon({ masaId: masa.no, adisyonId });
     } else {
-      navigate("/adisyon/" + masa.no);
+      // Normal navigate ile
+      navigate("/adisyon/" + adisyonId);
     }
-  };
-
-  // --------------------------------------------------
-  // MASA DURUMU GÖSTERİMİ
-  // --------------------------------------------------
-  const getMasaDurumu = (masa) => {
-    if (masa.durum && masa.durum !== "") {
-      return masa.durum;
-    }
-    
-    const bilgi = getMasaBilgi(masa);
-    return bilgi.acik ? "DOLU" : "BOŞ";
-  };
-
-  const getMasaRengi = (masa) => {
-    if (masa.renk && masa.renk !== "") {
-      return masa.renk === "kırmızı" ? RENK.kirmizi : RENK.yesil;
-    }
-    
-    const bilgi = getMasaBilgi(masa);
-    return bilgi.acik ? RENK.kirmizi : RENK.yesil;
   };
 
   // --------------------------------------------------
@@ -429,7 +346,7 @@ export default function Masalar({ onOpenAdisyon }) {
     <div
       style={{
         background: RENK.arka,
-        minHeight: "100%",
+        minHeight: "100vh",
         padding: 26,
         boxSizing: "border-box",
         overflowY: "auto",
@@ -464,33 +381,6 @@ export default function Masalar({ onOpenAdisyon }) {
             gap: 12,
           }}
         >
-          {/* SENKRONİZASYON BUTONU */}
-          <button
-            onClick={() => {
-              if (syncService && syncService.senkronizeMasalar) {
-                const result = syncService.senkronizeMasalar();
-                alert(`${result.length} masa senkronize edildi.`);
-              } else {
-                window.dispatchEvent(new Event('storage'));
-                alert('Masalar yenilendi.');
-              }
-            }}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "none",
-              cursor: "pointer",
-              background: "linear-gradient(135deg, #3498db, #2980b9)",
-              color: "#fff",
-              fontWeight: 800,
-              fontSize: 14,
-              boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
-              minWidth: 120,
-            }}
-          >
-            🔄 Yenile
-          </button>
-
           {/* MASA EKLE */}
           <button
             onClick={handleAddMasa}
@@ -557,31 +447,6 @@ export default function Masalar({ onOpenAdisyon }) {
         </div>
       </div>
 
-      {/* DURUM GÖSTERGESİ */}
-      <div
-        style={{
-          display: "flex",
-          gap: 20,
-          marginBottom: 20,
-          background: "rgba(255,255,255,0.7)",
-          padding: "10px 20px",
-          borderRadius: 12,
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 20, height: 20, background: RENK.kirmizi, borderRadius: 4 }}></div>
-          <span>Dolu: {masalar.filter(m => getMasaDurumu(m) === "DOLU").length}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 20, height: 20, background: RENK.yesil, borderRadius: 4 }}></div>
-          <span>Boş: {masalar.filter(m => getMasaDurumu(m) === "BOŞ").length}</span>
-        </div>
-        <div>
-          <span>Toplam: {masalar.length} masa</span>
-        </div>
-      </div>
-
       {/* MASA GRID */}
       {masalar.length === 0 && (
         <div
@@ -589,10 +454,6 @@ export default function Masalar({ onOpenAdisyon }) {
             fontSize: 16,
             color: "#7f8c8d",
             marginBottom: 16,
-            textAlign: "center",
-            padding: "40px",
-            background: "rgba(255,255,255,0.5)",
-            borderRadius: 12,
           }}
         >
           Henüz masa yok. Sağ üstten "+ Masa Ekle" ile masa oluşturabilirsiniz.
@@ -609,21 +470,19 @@ export default function Masalar({ onOpenAdisyon }) {
         {masalar.map((masa) => {
           const bilgi = getMasaBilgi(masa);
           const acik = bilgi.acik;
-          const masaDurumu = getMasaDurumu(masa);
-          const masaRengi = getMasaRengi(masa);
 
           return (
             <div
               key={masa.no}
-              draggable={acik}
+              draggable={acik} // sadece açık masalar sürüklenebilir
               onDragStart={(e) => handleDragStart(e, masa)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, masa)}
               onClick={() => handleSingleClick(masa)}
               onDoubleClick={() => handleDoubleClick(masa)}
               style={{
-                background: masaRengi,
-                color: "#fff",
+                background: RENK.kart,
+                color: RENK.kartYazi,
                 borderRadius: 26,
                 height: 240,
                 padding: "18px 16px",
@@ -634,8 +493,6 @@ export default function Masalar({ onOpenAdisyon }) {
                     ? "0 0 0 3px #f5d085, 0 10px 18px rgba(0,0,0,0.35)"
                     : "0 10px 18px rgba(0,0,0,0.45)",
                 transition: "all 0.15s ease",
-                position: "relative",
-                overflow: "hidden",
               }}
             >
               {/* MASA BAŞLIK */}
@@ -644,8 +501,7 @@ export default function Masalar({ onOpenAdisyon }) {
                   fontSize: 26,
                   fontWeight: 900,
                   marginBottom: 10,
-                  color: "#fff",
-                  textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+                  color: RENK.altin,
                 }}
               >
                 Masa {masa.no}
@@ -656,73 +512,59 @@ export default function Masalar({ onOpenAdisyon }) {
                 style={{
                   fontSize: 74,
                   marginBottom: 10,
-                  color: "#fff",
+                  color: RENK.altin,
                   textShadow: "0 5px 8px rgba(0,0,0,0.4)",
                 }}
               >
                 {acik ? "🔔" : "🪑"}
               </div>
 
-              {/* DURUM YAZISI */}
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  marginTop: 10,
-                  textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                }}
-              >
-                {masaDurumu}
-              </div>
-
-              {/* EK BİLGİLER (DOLU İSE) */}
-              {acik && (
+              {/* AÇIK - KAPALI YAZI */}
+              {!acik ? (
                 <div
                   style={{
+                    fontSize: 22,
+                    opacity: 0.85,
                     marginTop: 10,
-                    fontSize: 14,
-                    background: "rgba(0,0,0,0.2)",
-                    padding: "6px 10px",
-                    borderRadius: 8,
+                    fontWeight: 700,
                   }}
                 >
-                  <div>Süre: {formatSure(bilgi.gecenDakika)}</div>
-                  <div style={{ fontWeight: 800, marginTop: 4 }}>
+                  BOŞ
+                </div>
+              ) : (
+                <div>
+                  {/* YENİ: Açılış Saati ve Geçen Süre - YAN YANA */}
+                  <div
+                    style={{
+                      fontSize: 14,
+                      marginBottom: 8,
+                      opacity: 0.9,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "0 5px",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                      <span>⏰</span>
+                      <span>{bilgi.acilisSaati}</span>
+                    </div>
+                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                      <span>⏱️</span>
+                      <span>{formatSure(bilgi.gecenDakika)}</span>
+                    </div>
+                  </div>
+
+                  {/* TOPLAM TUTAR */}
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: RENK.altin,
+                    }}
+                  >
                     ₺ {bilgi.toplamTutar.toFixed(2)}
                   </div>
-                </div>
-              )}
-
-              {/* MÜŞTERİ ADI (Varsa) */}
-              {masa.musteriAdi && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 10,
-                    left: 0,
-                    right: 0,
-                    fontSize: 12,
-                    opacity: 0.9,
-                    padding: "0 10px",
-                  }}
-                >
-                  {masa.musteriAdi}
-                </div>
-              )}
-
-              {/* DRAG İNDİKATÖRÜ (Sadece Dolu Masalar) */}
-              {acik && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 10,
-                    right: 10,
-                    fontSize: 20,
-                    opacity: 0.7,
-                  }}
-                  title="Sürükleyerek taşıyabilirsiniz"
-                >
-                  ↕️
                 </div>
               )}
             </div>

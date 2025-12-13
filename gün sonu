@@ -1,5 +1,52 @@
-git commit -m "Adisyon tasarımı tamamen bitti"
+Aşağıda Git commit işlemini en sade, net ve hatasız şekilde anlatıyorum.
+Bunu öğrendiğinde Git’in %80’ini kullanabiliyor olacaksın.
+
+1️⃣ Commit atmadan önce: Değişiklik var mı kontrol et
+
+Terminalde proje klasöründeyken:
+
+git status
+
+
+Bu komut sana şunu söyler:
+
+Hangi dosyalar değişmiş
+
+Hangileri henüz commit’e eklenmemiş
+
+Örnek çıktı mantığı:
+
+kırmızı → commit’e eklenmemiş
+
+yeşil → commit’e hazır
+
+2️⃣ Dosyaları commit’e ekle (STAGE)
+🔹 Tüm değişiklikleri eklemek için:
+git add .
+
+🔹 Sadece tek dosya eklemek için:
+git add src/pages/Bilardo/Bilardo.jsx
+
+
+git add = “Bu değişikliği kayda alacağım” demektir
+
+3️⃣ Commit at (ASIL KAYIT)
+git commit -m "Bilardo: masa kartları için ikon altyapısı eklendi"
+
+
+Bu an:
+
+Değişiklik kalıcı olarak git geçmişine yazılır
+
+Codespace silinse bile kaybolmaz
+
+4️⃣ GitHub’a gönder (push)
+
+Commit lokaldedir.
+GitHub’a gitmesi için:
+
 git push
+
 
 Gün bittiğinde:
 
