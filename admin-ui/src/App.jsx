@@ -1,23 +1,32 @@
 /* ------------------------------------------------------------
-   📌 App.jsx — MyCafe (FULL FINAL – IMPORT DÜZELTMELERİ)
+   📌 App.jsx — MyCafe (FULL FINAL – SYNC SERVICE ENTEGRASYONLU)
 ------------------------------------------------------------ */
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
   useLocation,
 } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
+import syncService from "./services/syncService";
 
 /* ------------------------------------------------------------
    🔧 İlk Kurulum Verileri
 ------------------------------------------------------------ */
 import categoriesData from "./data/initial_categories.json";
 import productsData from "./data/initial_products.json";
+
+// SYNC EVENTS sabitleri
+const SYNC_EVENTS = {
+  MASA_GUNCELLENDI: 'MASA_GUNCELLENDI',
+  ADISYON_GUNCELLENDI: 'ADISYON_GUNCELLENDI',
+  FİYAT_GUNCELLENDİ: 'FİYAT_GUNCELLENDİ',
+  SENKRONIZE_ET: 'SENKRONIZE_ET',
+  KALEM_EKLENDI: 'KALEM_EKLENDI'
+};
 
 function loadInitialData() {
   const hasData = localStorage.getItem("mc_data_updated");
@@ -26,6 +35,30 @@ function loadInitialData() {
   localStorage.setItem("mc_kategoriler", JSON.stringify(categoriesData));
   localStorage.setItem("mc_urunler", JSON.stringify(productsData));
   localStorage.setItem("mc_data_updated", "1");
+  
+  // İlk masa verilerini oluştur - MASA NUMARALARI 1'DEN 30'A KADAR
+  const initialMasalar = [];
+  for (let i = 1; i <= 30; i++) {
+    initialMasalar.push({
+      id: i,
+      no: i.toString(),  // Masa numarası string olarak (1, 2, 3, ... 30)
+      adisyonId: null,
+      ayirId: null,
+      ayirToplam: null,
+      toplamTutar: "0.00",
+      acilisZamani: null,
+      durum: "BOŞ",
+      renk: "gri",
+      musteriAdi: null,
+      kisiSayisi: null,
+      guncellemeZamani: new Date().toISOString()
+    });
+  }
+  
+  localStorage.setItem("mc_masalar", JSON.stringify(initialMasalar));
+  localStorage.setItem("mc_adisyonlar", JSON.stringify([]));
+  localStorage.setItem("mc_musteriler", JSON.stringify([]));
+  localStorage.setItem("mc_borclar", JSON.stringify([]));
 }
 loadInitialData();
 
@@ -90,10 +123,89 @@ function autoFixCategoryAndProducts() {
     localStorage.setItem("mc_kategoriler", JSON.stringify(cats));
     localStorage.setItem("mc_urunler", JSON.stringify(prods));
     localStorage.setItem("mc_data_updated", "1");
-    window.location.reload();
   }
 }
 autoFixCategoryAndProducts();
+
+/* ------------------------------------------------------------
+   🔧 SYNC SERVICE ENTEGRASYONU
+------------------------------------------------------------ */
+
+// SyncService'i global olarak yükle
+if (typeof window !== 'undefined') {
+  window.syncService = syncService;
+  console.log('🌟 SyncService global olarak yüklendi');
+  
+  // Test fonksiyonlarını ekle
+  window.testSyncService = () => {
+    if (window.syncService) {
+      console.log('🧪 SyncService Test Fonksiyonları:');
+      console.log('1. Masa temizleme:', window.syncService.masaBosalt ? '✅ VAR' : '❌ YOK');
+      console.log('2. Kalem ekleme:', window.syncService.kalemEkleVeToplamGuncelle ? '✅ VAR' : '❌ YOK');
+      console.log('3. Senkronizasyon:', window.syncService.senkronizeMasalar ? '✅ VAR' : '❌ YOK');
+      
+      // Tüm masaları senkronize et
+      if (window.syncService.senkronizeMasalar) {
+        window.syncService.senkronizeMasalar();
+      }
+      return true;
+    }
+    console.error('❌ SyncService bulunamadı!');
+    return false;
+  };
+}
+
+// SyncService initializasyonu - useRef ile takip edelim
+let syncServiceInitialized = false;
+
+function initializeSyncService() {
+  if (syncServiceInitialized) {
+    console.log('🔄 SyncService zaten başlatılmış');
+    return;
+  }
+  
+  console.log('🔄 SyncService başlatılıyor...');
+  
+  if (!window.syncService) {
+    console.error('❌ SyncService başlatılamadı!');
+    return;
+  }
+  
+  // Event listener'ları kur
+  if (window.syncService.on) {
+    window.syncService.on(SYNC_EVENTS.MASA_GUNCELLENDI, (data) => {
+      console.log('📢 SyncService: Masa güncellendi', data?.masaNo || data?.masaNum || data);
+    });
+    
+    window.syncService.on(SYNC_EVENTS.ADISYON_GUNCELLENDI, (data) => {
+      console.log('📢 SyncService: Adisyon güncellendi', data?.adisyonId || data);
+    });
+    
+    window.syncService.on(SYNC_EVENTS.FİYAT_GUNCELLENDİ, (data) => {
+      console.log('💰 SyncService: Fiyat güncellendi', data?.toplamTutar || data);
+    });
+    
+    window.syncService.on(SYNC_EVENTS.KALEM_EKLENDI, (data) => {
+      console.log('➕ SyncService: Kalem eklendi', data?.adisyonId || data);
+    });
+    
+    window.syncService.on(SYNC_EVENTS.SENKRONIZE_ET, () => {
+      console.log('🔄 SyncService: Tüm veriler senkronize edildi');
+    });
+    
+    syncServiceInitialized = true;
+    console.log('✅ SyncService başlatıldı ve event listener\'lar kuruldu');
+    
+    // Uygulama başladığında tüm masaları senkronize et
+    setTimeout(() => {
+      if (window.syncService.senkronizeMasalar) {
+        window.syncService.senkronizeMasalar();
+      }
+    }, 1500);
+  } else {
+    console.warn('⚠️ SyncService.on() methodu bulunamadı, event listener\'lar kurulamadı');
+  }
+}
 
 /* ------------------------------------------------------------
    📌 SAYFA IMPORTLARI — DÜZELTİLDİ
@@ -101,8 +213,7 @@ autoFixCategoryAndProducts();
 
 // ANA SAYFALAR
 import Login from "./pages/Login.jsx";
-// ANA EKRAN IMPORT'U DÜZELTİLDİ
-import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx"; // BU DOĞRU OLMALI
+import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
 import Masalar from "./pages/Masalar/Masalar.jsx";
 import Adisyon from "./pages/Adisyon/Adisyon.jsx";
 import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx";
@@ -177,10 +288,17 @@ const getUser = () => {
 function Layout({ children }) {
   const location = useLocation();
   const path = location.pathname;
-
   const user = getUser();
-
   const hideSidebar = path === "/login";
+  const initializedRef = useRef(false);
+
+  // SyncService'i başlat - sadece bir kez
+  useEffect(() => {
+    if (!hideSidebar && window.syncService && !initializedRef.current) {
+      initializeSyncService();
+      initializedRef.current = true;
+    }
+  }, [hideSidebar]);
 
   return (
     <div
@@ -212,7 +330,44 @@ function Layout({ children }) {
    🚀 ROOT APP — ANA SAYFA DÜZELTİLDİ
 ------------------------------------------------------------ */
 export default function App() {
-  ensureDemoAdmin();
+  const syncInitializedRef = useRef(false);
+
+  useEffect(() => {
+    ensureDemoAdmin();
+    
+    // Sadece bir kez başlat
+    if (!syncInitializedRef.current) {
+      // SyncService global event listener'larını kur
+      const handleStorageChange = (event) => {
+        if (event.key && event.key.startsWith('mc_')) {
+          console.log('💾 Storage değişti:', event.key);
+          
+          // Storage değişikliğinde senkronizasyon tetikle
+          if (window.syncService && window.syncService.senkronizeMasalar) {
+            setTimeout(() => {
+              window.syncService.senkronizeMasalar();
+            }, 300);
+          }
+        }
+      };
+      
+      window.addEventListener('storage', handleStorageChange);
+      
+      // Uygulama başlangıç senkronizasyonu - gecikmeli
+      setTimeout(() => {
+        if (window.syncService && window.syncService.senkronizeMasalar) {
+          console.log('🔄 Uygulama başlangıç senkronizasyonu yapılıyor...');
+          window.syncService.senkronizeMasalar();
+        }
+      }, 2000);
+      
+      syncInitializedRef.current = true;
+      
+      return () => {
+        window.removeEventListener('storage', handleStorageChange);
+      };
+    }
+  }, []);
 
   return (
     <ErrorBoundary>

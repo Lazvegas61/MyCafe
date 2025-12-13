@@ -1,0 +1,197 @@
+/* Masalar.css - EK STİLLER */
+.masalar-container {
+  padding: 20px;
+  background: #f5e7d0;
+  min-height: 100vh;
+}
+
+.masalar-header {
+  background: #fff7e6;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.masalar-title {
+  color: #4b2e05;
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 2.5rem;
+  border-bottom: 3px solid #ecd3a5;
+  padding-bottom: 10px;
+}
+
+.masalar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #fdf4e4;
+  border-radius: 8px;
+  border: 1px solid #ecd3a5;
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 15px;
+  background: #e8f8f1;
+  border-radius: 20px;
+  border: 1px solid #27ae60;
+  color: #1e8449;
+}
+
+.sync-icon {
+  font-size: 18px;
+}
+
+.sync-text {
+  font-weight: 500;
+}
+
+.masa-count {
+  display: flex;
+  gap: 15px;
+  font-size: 14px;
+}
+
+.dolu-count {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+.bos-count {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.total-count {
+  color: #2980b9;
+  font-weight: bold;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.sync-button, .test-button, .debug-button {
+  padding: 8px 15px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.sync-button {
+  background: #3498db;
+  color: white;
+}
+
+.sync-button:hover {
+  background: #2980b9;
+}
+
+.test-button {
+  background: #e74c3c;
+  color: white;
+}
+
+.test-button:hover {
+  background: #c0392b;
+}
+
+.debug-button {
+  background: #9b59b6;
+  color: white;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.masalar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.masa-wrapper {
+  transition: all 0.3s ease;
+}
+
+.masa-wrapper.highlighted {
+  animation: highlightPulse 1s infinite;
+  transform: scale(1.05);
+}
+
+@keyframes highlightPulse {
+  0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  text-align: center;
+}
+
+.loading-spinner {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #4b2e05;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 20px 0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.debug-panel {
+  margin-top: 30px;
+  padding: 15px;
+  background: #2c3e50;
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.debug-panel h3 {
+  margin-top: 0;
+  color: #ecf0f1;
+}
+
+.debug-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+/* Responsive tasarım */
+@media (max-width: 768px) {
+  .masalar-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .masalar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+  }
+  
+  .masalar-title {
+    font-size: 2rem;
+  }
+}

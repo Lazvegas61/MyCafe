@@ -1,0 +1,159 @@
+/* ------------------------------------------------------------
+   🎨 MusteriIslemleri.css — FINAL (MyCafe Premium)
+   Tema:
+   - Bej / kahve tonları
+   - Net tablo, sakin kontrast
+   - Inline tahsilat vurgusu
+------------------------------------------------------------- */
+
+.musteri-islemleri {
+  padding: 20px 24px;
+  background: #f6f1ea; /* açık bej */
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.musteri-islemleri h2 {
+  margin-bottom: 16px;
+  color: #5a3e2b; /* koyu kahve */
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------
+   TABLO
+-------------------------------------------------- */
+
+.musteri-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.musteri-table thead {
+  background: #e9ddcf; /* açık kahve */
+}
+
+.musteri-table th,
+.musteri-table td {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.musteri-table th {
+  color: #5a3e2b;
+  font-weight: 600;
+  border-bottom: 1px solid #d8c7b4;
+}
+
+.musteri-table tbody tr {
+  border-bottom: 1px solid #eee3d8;
+}
+
+.musteri-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* --------------------------------------------------
+   BORÇLU MÜŞTERİ VURGUSU
+-------------------------------------------------- */
+
+.musteri-table tr.borclu {
+  background: #fff7f2;
+}
+
+.musteri-table tr.borclu td {
+  color: #8a2f1d; /* koyu kırmızımsı */
+  font-weight: 500;
+}
+
+/* --------------------------------------------------
+   BUTONLAR
+-------------------------------------------------- */
+
+.musteri-table button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: #6b4a2b; /* kahve */
+  color: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.musteri-table button:hover {
+  background: #583a20;
+  transform: translateY(-1px);
+}
+
+.musteri-table button:active {
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------
+   TAHSİLAT PANELİ (INLINE)
+-------------------------------------------------- */
+
+.tahsilat-row td {
+  background: #f1e6da;
+}
+
+.tahsilat-panel {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.tahsilat-panel input,
+.tahsilat-panel select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #cdb9a4;
+  font-size: 13px;
+  background: #ffffff;
+}
+
+.tahsilat-panel input {
+  width: 120px;
+}
+
+.tahsilat-panel select {
+  width: 140px;
+}
+
+.tahsilat-panel button {
+  background: #2e7d32; /* yeşil - tahsilat */
+}
+
+.tahsilat-panel button:hover {
+  background: #256628;
+}
+
+/* --------------------------------------------------
+   RESPONSIVE (TEMEL)
+-------------------------------------------------- */
+
+@media (max-width: 768px) {
+  .musteri-table th,
+  .musteri-table td {
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  .tahsilat-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tahsilat-panel input,
+  .tahsilat-panel select,
+  .tahsilat-panel button {
+    width: 100%;
+  }
+}

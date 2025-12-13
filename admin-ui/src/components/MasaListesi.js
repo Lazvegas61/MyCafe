@@ -75,4 +75,17 @@ const MasaListesi = () => {
   );
 };
 
+// Masa kapatma işleminden önce
+console.log('Masa kapatma parametreleri:', {
+  originalMasaNo: masaNo,
+  parsedMasaNo: Number(masaNo),
+  type: typeof masaNo
+});
+
+// Masa numarasını temizle
+const cleanMasaNo = masaNo.toString().replace(/[^0-9]/g, '');
+console.log('Temizlenmiş masa no:', cleanMasaNo);
+
+// syncService.masaBosalt(cleanMasaNo) şeklinde kullanın
+
 export default MasaListesi;

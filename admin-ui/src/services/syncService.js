@@ -1,546 +1,612 @@
-// 📁 src/services/syncService.js
-// GÜNCELLENMİŞ SENKRONİZASYON SERVİSİ - MASA BOSALT VE ANLIK FİYAT DÜZELTİLDİ
+/* ------------------------------------------------------------
+   🔧 syncService.js — MyCafe Senkronizasyon Servisi
+   📌 TÜM MASA, ADİSYON ve VERİ SENKRONİZASYONU
+------------------------------------------------------------ */
+
+const SYNC_EVENTS = {
+  MASA_GUNCELLENDI: 'MASA_GUNCELLENDI',
+  ADİSYON_GUNCELLENDİ: 'ADİSYON_GUNCELLENDİ',
+  FİYAT_GUNCELLENDİ: 'FİYAT_GUNCELLENDİ',
+  KALEM_EKLENDİ: 'KALEM_EKLENDİ',
+  SENKRONIZE_ET: 'SENKRONIZE_ET',
+  MASA_TEMİZLENDİ: 'MASA_TEMİZLENDİ'
+};
 
 // LocalStorage key'leri
-const KEYS = {
-  MASALAR: 'mc_masalar',
-  ADISYONLAR: 'mc_adisyonlar',
-  URUNLER: 'mc_urunler',
-  MUSTERILER: 'mc_musteriler',
-  BORCLAR: 'mc_borclar'
-};
+const MASA_KEY = "mc_masalar";
+const ADİSYON_KEY = "mc_adisyonlar";
+const URUN_KEY = "mc_urunler";
+const MUSTERI_KEY = "mc_musteriler";
+const BORC_KEY = "mc_borclar";
 
-// Event tipleri
-export const SYNC_EVENTS = {
-  MASA_GUNCELLENDI: 'MASA_GUNCELLENDI',
-  ADISYON_GUNCELLENDI: 'ADISYON_GUNCELLENDI',
-  URUN_GUNCELLENDI: 'URUN_GUNCELLENDI',
-  MUSTERI_GUNCELLENDI: 'MUSTERI_GUNCELLENDI',
-  BORC_GUNCELLENDI: 'BORC_GUNCELLENDI',
-  SENKRONIZE_ET: 'SENKRONIZE_ET',
-  FİYAT_GUNCELLENDI: 'FİYAT_GUNCELLENDI',
-  KALEM_EKLENDI: 'KALEM_EKLENDI',
-  KALEM_SILINDI: 'KALEM_SILINDI',
-  TOPLAM_GUNCELLENDI: 'TOPLAM_GUNCELLENDI'
-};
-
-// Yardımcı fonksiyonlar - DÜZELTİLDİ!
-const okuJSON = (key, defaultValue = []) => {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return defaultValue;
-    return JSON.parse(raw);
-  } catch {
-    return defaultValue;
-  }
-};
-
-const yazJSON = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    
-    // CRITICAL FIX: Storage event'ini tetikle
-    window.dispatchEvent(new Event('storage'));
-    
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const formatFiyat = (fiyat) => {
-  return Number(fiyat || 0).toFixed(2);
-};
-
-// Ana senkronizasyon servisi
-export const syncService = {
-  // =============== OKUMA/YAZMA ===============
-  oku: (key) => okuJSON(key),
+const syncService = {
+  // Event listener'lar
+  _listeners: {},
   
+  // --------------------------------------------------
+  // TEMEL FONKSİYONLAR
+  // --------------------------------------------------
+  oku: (key, defaultValue = []) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return defaultValue;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error(`❌ JSON parse hatası (${key}):`, error);
+      return defaultValue;
+    }
+  },
+
   yaz: (key, value) => {
-    const result = yazJSON(key, value);
-    
-    // İlgili event'i tetikle
-    const eventMap = {
-      'mc_masalar': SYNC_EVENTS.MASA_GUNCELLENDI,
-      'mc_adisyonlar': SYNC_EVENTS.ADISYON_GUNCELLENDI,
-      'mc_urunler': SYNC_EVENTS.URUN_GUNCELLENDI,
-      'mc_musteriler': SYNC_EVENTS.MUSTERI_GUNCELLENDI,
-      'mc_borclar': SYNC_EVENTS.BORC_GUNCELLENDI
-    };
-    
-    if (eventMap[key]) {
-      syncService.emitEvent(eventMap[key], { key, value });
-    }
-    
-    return result;
-  },
-
-  // =============== MASA İŞLEMLERİ - DÜZELTİLDİ! ===============
-  
-  // MASAYI TEMİZLE (KAPAT) - EN KRİTİK DÜZELTME!
-  masaBosalt: (masaNum) => {
-    console.log('🧹 SYNC: Masa temizleniyor', masaNum);
-    
     try {
-      let masalar = okuJSON(KEYS.MASALAR);
-      
-      // Masa numarasını parse et
-      let masaNoNum;
-      
-      if (typeof masaNum === 'string') {
-        if (masaNum.startsWith("MASA ")) {
-          masaNoNum = Number(masaNum.replace("MASA ", ""));
-        } else if (masaNum.startsWith("MASA")) {
-          masaNoNum = Number(masaNum.replace("MASA", ""));
-        } else {
-          masaNoNum = Number(masaNum);
-        }
-      } else {
-        masaNoNum = Number(masaNum);
-      }
-      
-      console.log('🔍 Aranan masa no:', masaNoNum);
-      
-      const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
-
-      if (masaIdx !== -1) {
-        console.log('✅ Masa bulundu, indeks:', masaIdx);
-        
-        const bosMasa = {
-          ...masalar[masaIdx],
-          adisyonId: null,
-          ayirId: null,
-          ayirToplam: null,
-          toplamTutar: "0.00",
-          acilisZamani: null,
-          durum: "BOŞ",
-          renk: "gri",
-          musteriAdi: null,
-          kisiSayisi: null,
-          guncellemeZamani: new Date().toISOString()
-        };
-        
-        masalar[masaIdx] = bosMasa;
-        
-        // Kaydet ve storage event'ini tetikle
-        yazJSON(KEYS.MASALAR, masalar);
-        
-        // Event'i hemen tetikle (setTimeout'a gerek yok)
-        syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-          masaNo: masaNoNum,
-          masa: bosMasa,
-          toplamTutar: "0.00",
-          durum: "BOŞ"
-        });
-        
-        console.log('✅ SYNC: Masa temizlendi', bosMasa);
-        return true;
-      } else {
-        console.error('❌ SYNC: Masa bulunamadı', masaNoNum);
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ SYNC: Masa temizleme hatası', error);
-      return false;
-    }
-  },
-
-  // MASA AÇ (Yeni müşteri için)
-  masaAc: (masaNum, musteriAdi = null, kisiSayisi = null) => {
-    try {
-      let masalar = okuJSON(KEYS.MASALAR);
-      const masaNoNum = Number(masaNum.toString().replace("MASA ", ""));
-      const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
-
-      if (masaIdx !== -1) {
-        const acikMasa = {
-          ...masalar[masaIdx],
-          musteriAdi: musteriAdi,
-          kisiSayisi: kisiSayisi,
-          acilisZamani: new Date().toISOString(),
-          guncellemeZamani: new Date().toISOString()
-        };
-        
-        masalar[masaIdx] = acikMasa;
-        yazJSON(KEYS.MASALAR, masalar);
-        
-        syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-          masaNo: masaNoNum,
-          masa: acikMasa
-        });
-        
-        console.log('🚪 SYNC: Masa açıldı', masaNoNum);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('❌ SYNC: Masa açma hatası', error);
-      return false;
-    }
-  },
-
-  // GÜNCEL MASA
-  guncelMasa: (masaNum, anaAdisyonId, splitAdisyonObj = null) => {
-    console.log('🔄 SYNC: Masa güncelleniyor', { masaNum, anaAdisyonId, splitAdisyonObj: splitAdisyonObj ? 'VAR' : 'YOK' });
-    
-    try {
-      let masalar = okuJSON(KEYS.MASALAR);
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
-      
-      // Masa numarasını parse et
-      const masaNoNum = Number(masaNum.toString().replace("MASA ", ""));
-      const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
-      
-      if (masaIdx === -1) {
-        console.error('❌ SYNC: Masa bulunamadı', masaNoNum);
-        return false;
-      }
-      
-      // 1. Ana adisyon toplamını hesapla
-      let anaAdisyonToplam = 0;
-      let acilisZamani = null;
-      const anaAdisyon = adisyonlar.find(a => a.id === anaAdisyonId && !a.kapali);
-      
-      if (anaAdisyon) {
-        if (anaAdisyon.kalemler) {
-          anaAdisyonToplam = anaAdisyon.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-        }
-        acilisZamani = anaAdisyon.acilisZamani;
-      }
-      
-      // 2. Split adisyon toplamını hesapla
-      let ayirToplam = null;
-      if (splitAdisyonObj && splitAdisyonObj.kalemler && splitAdisyonObj.kalemler.length > 0) {
-        ayirToplam = splitAdisyonObj.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-      }
-      
-      // 3. Toplam tutarı hesapla (ana + split)
-      const toplamTutar = anaAdisyonToplam + (ayirToplam ? Number(ayirToplam) : 0);
-      
-      // 4. Masa kaydını güncelle
-      const guncelMasa = {
-        ...masalar[masaIdx],
-        adisyonId: anaAdisyonId,
-        ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
-        ayirToplam: ayirToplam ? formatFiyat(ayirToplam) : null,
-        toplamTutar: formatFiyat(toplamTutar),
-        acilisZamani: acilisZamani || masalar[masaIdx].acilisZamani,
-        durum: toplamTutar > 0 ? "DOLU" : "BOŞ",
-        renk: toplamTutar > 0 ? "kırmızı" : "gri",
-        guncellemeZamani: new Date().toISOString()
-      };
-      
-      masalar[masaIdx] = guncelMasa;
-      
-      // 5. Kaydet
-      yazJSON(KEYS.MASALAR, masalar);
-      
-      // 6. Event yayınla
-      syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
-        masaNo: masaNoNum,
-        masa: guncelMasa,
-        toplamTutar: formatFiyat(toplamTutar)
-      });
-      
-      console.log('✅ SYNC: Masa güncellendi', guncelMasa);
+      localStorage.setItem(key, JSON.stringify(value));
       return true;
-      
     } catch (error) {
-      console.error('❌ SYNC: Masa güncelleme hatası', error);
+      console.error(`❌ LocalStorage yazma hatası (${key}):`, error);
       return false;
     }
   },
 
-  // =============== ADİSYON İŞLEMLERİ ===============
-  guncelAdisyon: (adisyonData) => {
-    if (!adisyonData || !adisyonData.id) {
-      console.error('❌ SYNC: Geçersiz adisyon data');
-      return;
+  // --------------------------------------------------
+  // EVENT SİSTEMİ
+  // --------------------------------------------------
+  on: (eventName, callback) => {
+    if (!syncService._listeners[eventName]) {
+      syncService._listeners[eventName] = [];
+    }
+    syncService._listeners[eventName].push(callback);
+    console.log(`📢 Event listener eklendi: ${eventName}`);
+  },
+
+  off: (eventName, callback) => {
+    if (!syncService._listeners[eventName]) return;
+    const index = syncService._listeners[eventName].indexOf(callback);
+    if (index !== -1) {
+      syncService._listeners[eventName].splice(index, 1);
+    }
+  },
+
+  emitEvent: (eventName, data = {}) => {
+    console.log(`📢 SYNC: Event yayınlandı - ${eventName}`, data);
+    
+    // Global event yayınla (diğer sayfalar için)
+    if (typeof window !== 'undefined') {
+      const event = new CustomEvent(`sync:${eventName.toLowerCase()}`, { detail: data });
+      window.dispatchEvent(event);
     }
     
-    try {
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
-      const idx = adisyonlar.findIndex((a) => a.id === adisyonData.id);
-      
-      if (idx === -1) {
-        adisyonlar.push(adisyonData);
-      } else {
-        adisyonlar[idx] = adisyonData;
-      }
-      
-      yazJSON(KEYS.ADISYONLAR, adisyonlar);
-      
-      // Event yayınla
-      syncService.emitEvent(SYNC_EVENTS.ADISYON_GUNCELLENDI, {
-        adisyonId: adisyonData.id,
-        adisyon: adisyonData
-      });
-      
-      console.log('✅ SYNC: Adisyon güncellendi', adisyonData.id);
-      return adisyonData;
-      
-    } catch (error) {
-      console.error('❌ SYNC: Adisyon güncelleme hatası', error);
-      return null;
-    }
-  },
-
-  // YENİ ADİSYON OLUŞTUR
-  yeniAdisyon: (masaNo, musteriAdi = null) => {
-    try {
-      const yeniAdisyon = {
-        id: Date.now().toString(),
-        masaNo: masaNo,
-        acilisZamani: new Date().toISOString(),
-        kapanisZamani: null,
-        kalemler: [],
-        odemeler: [],
-        indirim: 0,
-        hesabaYazKayitlari: [],
-        kapali: false,
-        isSplit: false,
-        parentAdisyonId: null,
-        durum: "AÇIK",
-      };
-      
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
-      adisyonlar.push(yeniAdisyon);
-      yazJSON(KEYS.ADISYONLAR, adisyonlar);
-      
-      // Masa açılış zamanını güncelle
-      syncService.masaAc(masaNo, musteriAdi, null);
-      
-      console.log('📄 SYNC: Yeni adisyon oluşturuldu', yeniAdisyon.id);
-      return yeniAdisyon;
-    } catch (error) {
-      console.error('❌ SYNC: Yeni adisyon hatası', error);
-      return null;
-    }
-  },
-
-  // ADİSYONU KAPAT VE MASAYI TEMİZLE - GERİ EKLENDİ!
-  kapatAdisyonVeMasayiTemizle: (adisyonId, masaNum) => {
-    try {
-      console.log('🔄 SYNC: Adisyon kapatılıyor ve masa temizleniyor', { adisyonId, masaNum });
-      
-      // 1. Adisyonu kapat
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
-      const adisyonIdx = adisyonlar.findIndex(a => a.id === adisyonId);
-      
-      if (adisyonIdx !== -1) {
-        adisyonlar[adisyonIdx] = {
-          ...adisyonlar[adisyonIdx],
-          kapali: true,
-          kapanisZamani: new Date().toISOString(),
-          durum: "KAPALI"
-        };
-        yazJSON(KEYS.ADISYONLAR, adisyonlar);
-        console.log('✅ Adisyon kapatıldı:', adisyonId);
-      }
-      
-      // 2. Masayı temizle (yukarıdaki düzeltilmiş fonksiyonu kullan)
-      const success = syncService.masaBosalt(masaNum);
-      
-      return success;
-    } catch (error) {
-      console.error('❌ SYNC: Adisyon kapatma ve masa temizleme hatası', error);
-      return false;
-    }
-  },
-
-  // =============== ANLIK FİYAT GÜNCELLEME - BASİT VERSİYON ===============
-  
-  // KALEM EKLE VE MASA TOPLAMINI GÜNCELLE
-  kalemEkleVeToplamGuncelle: (adisyonId, kalemData) => {
-    console.log('➕ SYNC: Kalem ekleniyor ve toplam güncelleniyor...', { adisyonId, kalemData });
-    
-    try {
-      // 1. Adisyonu bul
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
-      const adisyonIndex = adisyonlar.findIndex(a => a.id === adisyonId);
-      
-      if (adisyonIndex === -1) {
-        console.error('❌ SYNC: Adisyon bulunamadı');
-        return false;
-      }
-      
-      // 2. Yeni kalem
-      const yeniKalem = {
-        id: `kalem_${Date.now()}`,
-        urunId: kalemData.urunId,
-        urunAdi: kalemData.urunAdi,
-        birimFiyat: formatFiyat(kalemData.birimFiyat),
-        miktar: Number(kalemData.miktar) || 1,
-        toplam: formatFiyat(kalemData.birimFiyat * (kalemData.miktar || 1)),
-        tarih: new Date().toISOString()
-      };
-      
-      // 3. Kalemi ekle
-      if (!adisyonlar[adisyonIndex].kalemler) {
-        adisyonlar[adisyonIndex].kalemler = [];
-      }
-      adisyonlar[adisyonIndex].kalemler.push(yeniKalem);
-      
-      // 4. Adisyon toplamını güncelle
-      const toplamTutar = adisyonlar[adisyonIndex].kalemler.reduce(
-        (sum, k) => sum + Number(k.toplam || 0), 
-        0
-      );
-      
-      adisyonlar[adisyonIndex].toplamTutar = formatFiyat(toplamTutar);
-      adisyonlar[adisyonIndex].guncellemeZamani = new Date().toISOString();
-      
-      // 5. Kaydet
-      yazJSON(KEYS.ADISYONLAR, adisyonlar);
-      
-      // 6. Masayı güncelle (masaNo'yu adisyondan al)
-      const masaNo = adisyonlar[adisyonIndex].masaNo;
-      if (masaNo) {
-        syncService.guncelMasa(masaNo, adisyonId);
-      }
-      
-      // 7. Event'leri tetikle
-      syncService.emitEvent(SYNC_EVENTS.KALEM_EKLENDI, {
-        adisyonId: adisyonId,
-        kalem: yeniKalem
-      });
-      
-      syncService.emitEvent(SYNC_EVENTS.FİYAT_GUNCELLENDI, {
-        adisyonId: adisyonId,
-        toplamTutar: formatFiyat(toplamTutar)
-      });
-      
-      console.log('✅ SYNC: Kalem eklendi ve toplam güncellendi');
-      return true;
-      
-    } catch (error) {
-      console.error('❌ SYNC: Kalem ekleme hatası:', error);
-      return false;
-    }
-  },
-
-  // =============== EVENT SİSTEMİ ===============
-  eventListeners: new Map(),
-  
-  on: (event, callback) => {
-    if (!syncService.eventListeners.has(event)) {
-      syncService.eventListeners.set(event, []);
-    }
-    syncService.eventListeners.get(event).push(callback);
-  },
-  
-  off: (event, callback) => {
-    if (syncService.eventListeners.has(event)) {
-      const listeners = syncService.eventListeners.get(event);
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
-    }
-  },
-  
-  emitEvent: (event, data) => {
-    console.log(`📢 SYNC: Event yayınlandı - ${event}`, data);
-    
-    // Local event listeners
-    if (syncService.eventListeners.has(event)) {
-      syncService.eventListeners.get(event).forEach(callback => {
+    // Local listener'ları çağır
+    if (syncService._listeners[eventName]) {
+      syncService._listeners[eventName].forEach(callback => {
         try {
           callback(data);
         } catch (error) {
-          console.error(`❌ SYNC: Event listener hatası (${event})`, error);
+          console.error(`❌ Event callback hatası (${eventName}):`, error);
         }
       });
     }
-    
-    // Window event
-    window.dispatchEvent(new CustomEvent(event.toLowerCase(), { detail: data }));
-    
-    // Storage event
-    window.dispatchEvent(new Event('storage'));
   },
 
-  // =============== SENKRONİZASYON İŞLEMLERİ ===============
+  // --------------------------------------------------
+  // MASA İŞLEMLERİ - DÜZELTİLDİ
+  // --------------------------------------------------
+  normalizeMasaNo: (masaNo) => {
+    if (masaNo === null || masaNo === undefined) return "1";
+    
+    // String ise
+    if (typeof masaNo === 'string') {
+      // "MASA " ön ekini kaldır ve sadece sayıyı al
+      const cleaned = masaNo.replace(/MASA\s*/i, '').trim();
+      const numbers = cleaned.match(/\d+/);
+      return numbers ? numbers[0] : "1";
+    }
+    
+    // Number ise
+    if (typeof masaNo === 'number') {
+      return String(masaNo);
+    }
+    
+    return "1";
+  },
+
+  masaBosalt: (masaNum) => {
+    console.log('🧹 SYNC: Masa temizleniyor', masaNum);
+    
+    const normalizedMasaNo = syncService.normalizeMasaNo(masaNum);
+    let masalar = syncService.oku(MASA_KEY, []);
+    
+    const masaIdx = masalar.findIndex(m => 
+      m.no === normalizedMasaNo || 
+      m.id === Number(normalizedMasaNo) ||
+      m.masaNo === `MASA ${normalizedMasaNo}` ||
+      m.masaNum === normalizedMasaNo
+    );
+    
+    if (masaIdx === -1) {
+      console.error('❌ SYNC: Masa bulunamadı', { aranan: normalizedMasaNo, masalar });
+      return false;
+    }
+    
+    // Toplam tutarı kaydet (rapor için)
+    const toplamTutar = masalar[masaIdx].toplamTutar || "0.00";
+    
+    // MASAYI TEMİZLE
+    masalar[masaIdx] = {
+      ...masalar[masaIdx],
+      adisyonId: null,
+      ayirId: null,
+      ayirToplam: null,
+      toplamTutar: "0.00", // Sıfırla
+      acilisZamani: null,
+      kapanisZamani: new Date().toISOString(), // Kapanış zamanı
+      durum: "BOŞ",
+      renk: "gri",
+      musteriAdi: null,
+      kisiSayisi: null,
+      guncellemeZamani: new Date().toISOString(),
+      sonAdisyonToplam: toplamTutar // Son adisyon tutarını kaydet
+    };
+    
+    syncService.yaz(MASA_KEY, masalar);
+    
+    // EVENT YAYINLA
+    syncService.emitEvent(SYNC_EVENTS.MASA_TEMİZLENDİ, {
+      masaNo: normalizedMasaNo,
+      masaNum: normalizedMasaNo,
+      toplamTutar: toplamTutar
+    });
+    
+    console.log('✅ SYNC: Masa temizlendi - Masa', normalizedMasaNo, 'Son Tutar:', toplamTutar);
+    return true;
+  },
+
+  masaAc: (masaNum, adisyonId, musteriAdi = null) => {
+    console.log('🔄 SYNC: Masa açılıyor', { masaNum, adisyonId, musteriAdi });
+    
+    const normalizedMasaNo = syncService.normalizeMasaNo(masaNum);
+    let masalar = syncService.oku(MASA_KEY, []);
+    
+    const masaIdx = masalar.findIndex(m => 
+      m.no === normalizedMasaNo || 
+      m.id === Number(normalizedMasaNo) ||
+      m.masaNo === `MASA ${normalizedMasaNo}` ||
+      m.masaNum === normalizedMasaNo
+    );
+    
+    if (masaIdx === -1) {
+      console.error('❌ SYNC: Masa bulunamadı', normalizedMasaNo);
+      return false;
+    }
+    
+    // MASAYI AÇ
+    masalar[masaIdx] = {
+      ...masalar[masaIdx],
+      adisyonId: adisyonId,
+      ayirId: null,
+      ayirToplam: null,
+      toplamTutar: "0.00",
+      acilisZamani: new Date().toISOString(),
+      kapanisZamani: null,
+      durum: "DOLU",
+      renk: "red",
+      musteriAdi: musteriAdi,
+      kisiSayisi: musteriAdi ? 1 : null,
+      guncellemeZamani: new Date().toISOString()
+    };
+    
+    syncService.yaz(MASA_KEY, masalar);
+    
+    // EVENT YAYINLA
+    syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
+      masaNo: normalizedMasaNo,
+      masaNum: normalizedMasaNo,
+      masa: masalar[masaIdx],
+      toplamTutar: "0.00"
+    });
+    
+    console.log('✅ SYNC: Masa açıldı - Masa', normalizedMasaNo);
+    return true;
+  },
+
+  guncelMasa: (masaNum, anaAdisyonId, splitAdisyonObj, toplamTutar = "0.00") => {
+    console.log('🔄 SYNC: Masa güncelleniyor', { 
+      masaNum, 
+      anaAdisyonId, 
+      hasSplit: splitAdisyonObj ? 'VAR' : 'YOK', 
+      toplamTutar 
+    });
+    
+    const normalizedMasaNo = syncService.normalizeMasaNo(masaNum);
+    let masalar = syncService.oku(MASA_KEY, []);
+    
+    const masaIdx = masalar.findIndex(m => 
+      m.no === normalizedMasaNo || 
+      m.id === Number(normalizedMasaNo) ||
+      m.masaNo === `MASA ${normalizedMasaNo}` ||
+      m.masaNum === normalizedMasaNo
+    );
+    
+    if (masaIdx === -1) {
+      console.error('❌ SYNC: Masa bulunamadı', { aranan: normalizedMasaNo, masalar });
+      return false;
+    }
+    
+    // Ayırma toplamını hesapla
+    let ayirToplam = null;
+    if (splitAdisyonObj && splitAdisyonObj.kalemler) {
+      ayirToplam = Number(
+        splitAdisyonObj.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0)
+      ).toFixed(2);
+    }
+    
+    // MASAYI GÜNCELLE
+    masalar[masaIdx] = {
+      ...masalar[masaIdx],
+      adisyonId: anaAdisyonId,
+      ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
+      ayirToplam: ayirToplam,
+      toplamTutar: toplamTutar,
+      durum: "DOLU",
+      renk: "red",
+      guncellemeZamani: new Date().toISOString()
+    };
+    
+    syncService.yaz(MASA_KEY, masalar);
+    
+    // EVENT YAYINLA
+    syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
+      masaNo: normalizedMasaNo,
+      masaNum: normalizedMasaNo,
+      masa: masalar[masaIdx],
+      toplamTutar: toplamTutar
+    });
+    
+    console.log('✅ SYNC: Masa güncellendi - Masa', normalizedMasaNo, 'Toplam:', toplamTutar);
+    return true;
+  },
+
+  // --------------------------------------------------
+  // ADİSYON İŞLEMLERİ
+  // --------------------------------------------------
+  guncelAdisyon: (adisyonId, guncelAdisyon) => {
+    console.log('📝 SYNC: Adisyon güncelleniyor', adisyonId);
+    
+    let adisyonlar = syncService.oku(ADİSYON_KEY, []);
+    const adisyonIdx = adisyonlar.findIndex(a => a.id === adisyonId);
+    
+    if (adisyonIdx === -1) {
+      console.error('❌ SYNC: Adisyon bulunamadı', adisyonId);
+      return false;
+    }
+    
+    adisyonlar[adisyonIdx] = {
+      ...adisyonlar[adisyonIdx],
+      ...guncelAdisyon,
+      guncellemeZamani: new Date().toISOString()
+    };
+    
+    syncService.yaz(ADİSYON_KEY, adisyonlar);
+    
+    // EVENT YAYINLA
+    syncService.emitEvent(SYNC_EVENTS.ADİSYON_GUNCELLENDİ, {
+      adisyonId: adisyonId,
+      adisyon: adisyonlar[adisyonIdx]
+    });
+    
+    console.log('✅ SYNC: Adisyon güncellendi', adisyonId);
+    return true;
+  },
+
+  yeniAdisyon: (masaNum, musteriAdi = null) => {
+    console.log('🆕 SYNC: Yeni adisyon oluşturuluyor', { masaNum, musteriAdi });
+    
+    const normalizedMasaNo = syncService.normalizeMasaNo(masaNum);
+    const yeniAdisyon = {
+      id: `ad_${Date.now().toString()}`,
+      masaNo: `MASA ${normalizedMasaNo}`,
+      masaNum: normalizedMasaNo,
+      acilisZamani: new Date().toISOString(),
+      kapanisZamani: null,
+      kalemler: [],
+      odemeler: [],
+      indirim: 0,
+      hesabaYazKayitlari: [],
+      kapali: false,
+      isSplit: false,
+      parentAdisyonId: null,
+      durum: "AÇIK",
+      toplamTutar: "0.00",
+      musteriAdi: musteriAdi,
+      guncellemeZamani: new Date().toISOString()
+    };
+    
+    let adisyonlar = syncService.oku(ADİSYON_KEY, []);
+    adisyonlar.push(yeniAdisyon);
+    syncService.yaz(ADİSYON_KEY, adisyonlar);
+    
+    // EVENT YAYINLA
+    syncService.emitEvent(SYNC_EVENTS.ADİSYON_GUNCELLENDİ, {
+      adisyonId: yeniAdisyon.id,
+      adisyon: yeniAdisyon,
+      isNew: true
+    });
+    
+    console.log('✅ SYNC: Yeni adisyon oluşturuldu', yeniAdisyon.id);
+    return yeniAdisyon.id;
+  },
+
+  kapatAdisyonVeMasayiTemizle: (masaNum, adisyonId, toplamTutar = "0.00") => {
+    console.log('🔴 SYNC: Adisyon kapatılıyor ve masa temizleniyor', { 
+      masaNum, 
+      adisyonId, 
+      toplamTutar 
+    });
+    
+    // 1. ADİSYONU KAPAT
+    let adisyonlar = syncService.oku(ADİSYON_KEY, []);
+    const adisyonIdx = adisyonlar.findIndex(a => a.id === adisyonId);
+    
+    if (adisyonIdx !== -1) {
+      adisyonlar[adisyonIdx] = {
+        ...adisyonlar[adisyonIdx],
+        kapali: true,
+        kapanisZamani: new Date().toISOString(),
+        durum: "KAPALI",
+        toplamTutar: toplamTutar,
+        guncellemeZamani: new Date().toISOString()
+      };
+      syncService.yaz(ADİSYON_KEY, adisyonlar);
+      console.log('✅ SYNC: Adisyon kapatıldı', adisyonId);
+    }
+    
+    // 2. MASAYI TEMİZLE
+    const masaSuccess = syncService.masaBosalt(masaNum);
+    
+    if (masaSuccess) {
+      console.log('✅ SYNC: Adisyon kapatıldı ve masa temizlendi', { masaNum, adisyonId });
+      return true;
+    }
+    
+    return false;
+  },
+
+  // --------------------------------------------------
+  // KALEM İŞLEMLERİ
+  // --------------------------------------------------
+  kalemEkleVeToplamGuncelle: (adisyonId, kalemData, yeniToplam = null) => {
+    console.log('➕ SYNC: Kalem ekleniyor ve toplam güncelleniyor...', { adisyonId, kalemData });
+    
+    // 1. ADİSYONU BUL
+    let adisyonlar = syncService.oku(ADİSYON_KEY, []);
+    const adisyonIdx = adisyonlar.findIndex(a => a.id === adisyonId);
+    
+    if (adisyonIdx === -1) {
+      console.error('❌ SYNC: Adisyon bulunamadı', adisyonId);
+      return false;
+    }
+    
+    const adisyon = adisyonlar[adisyonIdx];
+    
+    // 2. KALEMİ EKLE
+    const yeniKalem = {
+      id: `kalem_${Date.now().toString()}`,
+      urunId: kalemData.urunId,
+      urunAd: kalemData.urunAdi,
+      urunAdi: kalemData.urunAdi,
+      adet: kalemData.miktar || 1,
+      birimFiyat: Number(kalemData.birimFiyat || 0),
+      toplam: Number(kalemData.birimFiyat || 0) * (kalemData.miktar || 1),
+      eklenmeZamani: new Date().toISOString()
+    };
+    
+    // Mevcut kalemleri al
+    const mevcutKalemler = [...(adisyon.kalemler || [])];
+    
+    // Aynı ürün var mı kontrol et
+    const mevcutKalemIdx = mevcutKalemler.findIndex(
+      k => k.urunId === kalemData.urunId && 
+           Number(k.birimFiyat) === Number(kalemData.birimFiyat || 0)
+    );
+    
+    if (mevcutKalemIdx === -1) {
+      // Yeni kalem ekle
+      mevcutKalemler.push(yeniKalem);
+    } else {
+      // Mevcut kalemi güncelle
+      const kalem = { ...mevcutKalemler[mevcutKalemIdx] };
+      kalem.adet += (kalemData.miktar || 1);
+      kalem.toplam = kalem.adet * kalem.birimFiyat;
+      mevcutKalemler[mevcutKalemIdx] = kalem;
+    }
+    
+    // 3. TOPLAM TUTARI HESAPLA
+    let toplamTutar = "0.00";
+    if (yeniToplam !== null) {
+      toplamTutar = Number(yeniToplam).toFixed(2);
+    } else {
+      toplamTutar = Number(
+        mevcutKalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0)
+      ).toFixed(2);
+    }
+    
+    // 4. ADİSYONU GÜNCELLE
+    adisyonlar[adisyonIdx] = {
+      ...adisyon,
+      kalemler: mevcutKalemler,
+      toplamTutar: toplamTutar,
+      guncellemeZamani: new Date().toISOString()
+    };
+    
+    syncService.yaz(ADİSYON_KEY, adisyonlar);
+    
+    // 5. MASAYI GÜNCELLE (Eğer masaNo varsa)
+    if (adisyon.masaNum || adisyon.masaNo) {
+      const masaNum = adisyon.masaNum || syncService.normalizeMasaNo(adisyon.masaNo);
+      syncService.guncelMasa(masaNum, adisyonId, null, toplamTutar);
+    }
+    
+    // 6. EVENT'LERİ YAYINLA
+    syncService.emitEvent(SYNC_EVENTS.KALEM_EKLENDİ, {
+      adisyonId: adisyonId,
+      kalem: yeniKalem,
+      toplamTutar: toplamTutar
+    });
+    
+    syncService.emitEvent(SYNC_EVENTS.FİYAT_GUNCELLENDİ, {
+      adisyonId: adisyonId,
+      toplamTutar: toplamTutar
+    });
+    
+    console.log('✅ SYNC: Kalem eklendi ve toplam güncellendi', { 
+      adisyonId, 
+      toplamTutar,
+      kalemSayisi: mevcutKalemler.length 
+    });
+    
+    return true;
+  },
+
+  // --------------------------------------------------
+  // SENKRONİZASYON İŞLEMLERİ
+  // --------------------------------------------------
   senkronizeMasalar: () => {
     console.log('🔄 SYNC: Tüm masalar senkronize ediliyor...');
     
     try {
-      const masalar = okuJSON(KEYS.MASALAR);
-      const adisyonlar = okuJSON(KEYS.ADISYONLAR);
+      const masalar = syncService.oku(MASA_KEY, []);
+      const adisyonlar = syncService.oku(ADİSYON_KEY, []);
       
-      masalar.forEach((masa, index) => {
-        // Toplam tutarı hesapla
-        let toplamTutar = 0;
-        
-        // Ana adisyon toplamı
-        if (masa.adisyonId) {
-          const anaAdisyon = adisyonlar.find(a => a.id === masa.adisyonId && !a.kapali);
-          if (anaAdisyon && anaAdisyon.kalemler) {
-            toplamTutar += anaAdisyon.kalemler.reduce((sum, k) => sum + Number(k.toplam || 0), 0);
-          }
+      // Her masa için güncelle
+      const guncellenenMasalar = masalar.map(masa => {
+        // Masa boşsa, hiçbir şey yapma
+        if (masa.durum === "BOŞ" || !masa.adisyonId) {
+          return masa;
         }
         
-        // Split adisyon toplamı
+        // Adisyonu bul
+        const adisyon = adisyonlar.find(a => a.id === masa.adisyonId);
+        if (!adisyon) {
+          console.warn(`⚠️ SYNC: Adisyon bulunamadı (Masa ${masa.no})`, masa.adisyonId);
+          return masa;
+        }
+        
+        // Yeni adisyon toplamını hesapla
+        const yeniToplam = (adisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+        
+        // Eğer split adisyon varsa, onun toplamını da ekle
+        let splitToplam = 0;
         if (masa.ayirId) {
-          const splitAdisyon = adisyonlar.find(a => a.id === masa.ayirId && !a.kapali);
-          if (splitAdisyon && splitAdisyon.kalemler) {
-            toplamTutar += splitAdisyon.kalemler.reduce((sum, k) => sum + Number(k.toplam || 0), 0);
+          const splitAdisyon = adisyonlar.find(a => a.id === masa.ayirId);
+          if (splitAdisyon) {
+            splitToplam = (splitAdisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
           }
         }
         
-        // Masa durumunu güncelle
-        masalar[index] = {
-          ...masa,
-          toplamTutar: formatFiyat(toplamTutar),
-          durum: toplamTutar > 0 ? "DOLU" : "BOŞ",
-          renk: toplamTutar > 0 ? "kırmızı" : "gri",
-          guncellemeZamani: new Date().toISOString()
-        };
+        const toplamTutar = (yeniToplam + splitToplam).toFixed(2);
+        
+        // Eğer toplam değiştiyse güncelle
+        if (masa.toplamTutar !== toplamTutar) {
+          console.log(`🔄 SYNC: Masa ${masa.no} toplamı güncelleniyor: ${masa.toplamTutar} -> ${toplamTutar}`);
+          
+          return {
+            ...masa,
+            toplamTutar: toplamTutar,
+            guncellemeZamani: new Date().toISOString()
+          };
+        }
+        
+        return masa;
       });
       
-      yazJSON(KEYS.MASALAR, masalar);
+      // Değişiklik varsa kaydet
+      const degisiklikVar = JSON.stringify(masalar) !== JSON.stringify(guncellenenMasalar);
+      if (degisiklikVar) {
+        syncService.yaz(MASA_KEY, guncellenenMasalar);
+        console.log('✅ SYNC: Masalar güncellendi');
+      }
       
+      // EVENT YAYINLA
       syncService.emitEvent(SYNC_EVENTS.SENKRONIZE_ET, {
-        masalar: masalar,
-        zaman: new Date().toISOString()
+        masalar: guncellenenMasalar,
+        zaman: new Date().toISOString(),
+        degisiklikVar: degisiklikVar
       });
       
       console.log('✅ SYNC: Tüm masalar senkronize edildi');
-      return masalar;
+      return true;
       
     } catch (error) {
-      console.error('❌ SYNC: Senkronizasyon hatası', error);
-      return [];
+      console.error('❌ SYNC: Senkronizasyon hatası:', error);
+      return false;
     }
   },
 
-  // =============== BASİT TEST FONKSİYONU ===============
-  testMasaGuncelleme: (masaNo) => {
-    console.log('🧪 SYNC: Masa güncelleme testi...');
+  // --------------------------------------------------
+  // YARDIMCI FONKSİYONLAR
+  // --------------------------------------------------
+  masaBul: (masaNum) => {
+    const normalizedMasaNo = syncService.normalizeMasaNo(masaNum);
+    const masalar = syncService.oku(MASA_KEY, []);
     
-    const masalar = okuJSON(KEYS.MASALAR);
-    const masa = masalar.find(m => Number(m.no) === Number(masaNo));
+    const masa = masalar.find(m => 
+      m.no === normalizedMasaNo || 
+      m.id === Number(normalizedMasaNo) ||
+      m.masaNo === `MASA ${normalizedMasaNo}` ||
+      m.masaNum === normalizedMasaNo
+    );
     
-    if (masa && masa.adisyonId) {
-      // Rastgele bir ürün ekle
-      const testKalem = {
-        urunId: 'test-' + Date.now(),
-        urunAdi: 'Test Ürün',
-        birimFiyat: Math.random() * 50 + 10,
-        miktar: Math.floor(Math.random() * 3) + 1
-      };
+    return masa || null;
+  },
+
+  adisyonBul: (adisyonId) => {
+    const adisyonlar = syncService.oku(ADİSYON_KEY, []);
+    return adisyonlar.find(a => a.id === adisyonId) || null;
+  },
+
+  // --------------------------------------------------
+  // BAŞLANGIÇ KONTROLÜ
+  // --------------------------------------------------
+  init: () => {
+    console.log('🚀 SYNC: SyncService başlatılıyor...');
+    
+    // Global event listener'ları kur
+    if (typeof window !== 'undefined') {
+      // Storage değişikliklerini dinle
+      window.addEventListener('storage', (event) => {
+        if (event.key && event.key.startsWith('mc_')) {
+          console.log('💾 SYNC: Storage değişti:', event.key);
+          
+          // Eğer masalar değiştiyse, senkronizasyon yap
+          if (event.key === MASA_KEY || event.key === ADİSYON_KEY) {
+            setTimeout(() => {
+              syncService.senkronizeMasalar();
+            }, 300);
+          }
+        }
+      });
       
-      return syncService.kalemEkleVeToplamGuncelle(masa.adisyonId, testKalem);
+      // Global event listener'ları kur
+      Object.values(SYNC_EVENTS).forEach(eventName => {
+        window.addEventListener(`sync:${eventName.toLowerCase()}`, (event) => {
+          console.log(`🌐 SYNC: Global event alındı: ${eventName}`, event.detail);
+        });
+      });
     }
     
-    return false;
+    console.log('✅ SYNC: SyncService başlatıldı');
+    return true;
   }
 };
 
-// Global olarak kullanılabilir yap
+// Otomatik başlat
 if (typeof window !== 'undefined') {
-  window.syncService = syncService;
+  setTimeout(() => {
+    syncService.init();
+    // Başlangıç senkronizasyonu
+    setTimeout(() => {
+      syncService.senkronizeMasalar();
+    }, 1000);
+  }, 500);
 }
 
 export default syncService;

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./Adisyon.css";
 
+// SYNC SERVICE IMPORT - EKLENDİ
+import syncService from "../../services/syncService";
+
 // LocalStorage key'leri
 const MASA_KEY = "mc_masalar";
 const ADISYON_KEY = "mc_adisyonlar";
@@ -13,6 +16,7 @@ export default function Adisyon() {
   // GENEL STATE
   // --------------------------------------------------
   const [masaNo, setMasaNo] = useState("MASA 1");
+  const [gercekMasaNo, setGercekMasaNo] = useState("1"); // Gerçek masa numarası (1, 2, 3, ...)
   const [adisyon, setAdisyon] = useState(null); // YENİ ADİSYON
   const [gecenSure, setGecenSure] = useState("00:00");
   const [indirimInput, setIndirimInput] = useState("");
@@ -53,6 +57,25 @@ export default function Adisyon() {
   const [splitAdisyon, setSplitAdisyon] = useState(null); // ESKİ ADİSYON (KİLİTLİ)
 
   // --------------------------------------------------
+  // SYNC SERVICE KONTROLÜ - YENİ EKLENDİ
+  // --------------------------------------------------
+  const [syncServiceReady, setSyncServiceReady] = useState(false);
+
+  useEffect(() => {
+    // SyncService kontrolü
+    if (window.syncService && typeof window.syncService.masaBul === 'function') {
+      setSyncServiceReady(true);
+      console.log('✅ SyncService hazır');
+    } else if (syncService && typeof syncService.masaBul === 'function') {
+      window.syncService = syncService;
+      setSyncServiceReady(true);
+      console.log('✅ SyncService import edildi ve hazır');
+    } else {
+      console.warn('⚠️ SyncService hazır değil');
+    }
+  }, []);
+
+  // --------------------------------------------------
   // LOCALSTORAGE YARDIMCI FONKSİYONLARI
   // --------------------------------------------------
   const okuJSON = (key, defaultValue) => {
@@ -69,23 +92,63 @@ export default function Adisyon() {
     localStorage.setItem(key, JSON.stringify(value));
   };
   
-  // MASA BİLGİSİNİ GÜNCELLEYEN FONKSİYON
-  const guncelMasaLocal = (masaNum, anaAdisyonId, splitAdisyonObj) => {
-    let masalar = okuJSON(MASA_KEY, []);
-    const masaNoNum = Number(masaNum.replace("MASA ", ""));
-    const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
-
-    if (masaIdx !== -1) {
-      masalar[masaIdx] = {
-        ...masalar[masaIdx],
-        adisyonId: anaAdisyonId, // Yeni adisyon ID'si
-        ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
-        ayirToplam: splitAdisyonObj ? 
-          Number(splitAdisyonObj.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0)).toFixed(2) 
-          : null,
-      };
-      yazJSON(MASA_KEY, masalar);
+  // GERÇEK MASA NO'YU BUL - DÜZELTİLDİ
+  const gercekMasaNoBul = (masaLabel) => {
+    if (!masaLabel) return "1";
+    
+    console.log('🔍 Masa label analizi:', masaLabel);
+    
+    // "MASA 1" formatından sadece sayıyı al
+    let bulunanNo = "1";
+    
+    if (typeof masaLabel === 'string') {
+      // Eğer adisyon ID'si ise, adisyondan masa numarasını bul
+      if (masaLabel.startsWith('ad_')) {
+        const adisyonlar = okuJSON(ADISYON_KEY, []);
+        const adisyon = adisyonlar.find(a => a.id === masaLabel);
+        if (adisyon) {
+          // Adisyondan masa numarasını al
+          const adisyonMasaNo = adisyon.masaNum || 
+                               (adisyon.masaNo ? adisyon.masaNo.replace('MASA ', '') : "1");
+          bulunanNo = adisyonMasaNo;
+          console.log('📌 Adisyon ID\'sinden masa bulundu:', { adisyonId: masaLabel, masaNo: bulunanNo });
+        }
+      } else {
+        // Normal masa etiketinden sayıyı çıkar
+        const numMatch = masaLabel.match(/\d+/);
+        bulunanNo = numMatch ? numMatch[0] : "1";
+      }
+    } else if (typeof masaLabel === 'number') {
+      bulunanNo = String(masaLabel);
     }
+    
+    // Bulunan no'nun geçerli bir masa olup olmadığını kontrol et
+    const masalar = okuJSON(MASA_KEY, []);
+    
+    // Önce no ile eşleşen masa ara
+    let masa = masalar.find(m => 
+      m.no === bulunanNo || 
+      m.id === Number(bulunanNo) ||
+      m.masaNo === `MASA ${bulunanNo}` ||
+      m.masaNum === bulunanNo
+    );
+    
+    if (masa) {
+      console.log('✅ Masa bulundu:', { aranan: bulunanNo, bulunan: masa.no });
+      return masa.no;
+    }
+    
+    // Eğer masa bulunamazsa, masaları kontrol et ve boş masa bul
+    for (let i = 1; i <= 30; i++) {
+      const masa = masalar.find(m => m.no === String(i) || m.id === i);
+      if (masa && masa.durum === "BOŞ") {
+        console.log('🔄 Boş masa bulundu:', i);
+        return String(i);
+      }
+    }
+    
+    console.log('⚠️ Masa bulunamadı, varsayılan 1 kullanılıyor');
+    return "1"; // Fallback
   };
 
   const odemeTipiLabel = (tip) => {
@@ -103,39 +166,87 @@ export default function Adisyon() {
     }
   };
 
+  // DÜZELTİLDİ: isBilardoMasa fonksiyonu string kontrolü eklendi
   const isBilardoMasa = (masaStr) => {
     if (!masaStr) return false;
-    const upper = masaStr.toUpperCase();
+    
+    // Eğer sayı ise string'e çevir
+    const str = typeof masaStr === 'number' ? String(masaStr) : masaStr;
+    
+    const upper = str.toUpperCase();
     return upper.includes("BİLARDO") || upper.includes("BILARDO");
   };
 
   // --------------------------------------------------
-  // URL'DEN MASA NUMARASINI AL
+  // URL'DEN MASA NUMARASINI AL ve GERÇEK MASA NO'YU BUL - DÜZELTİLDİ
   // --------------------------------------------------
   useEffect(() => {
-    const path = window.location.pathname; // /adisyon/1
+    const path = window.location.pathname; // /adisyon/ad_1765649913244
     const parts = path.split("/");
-    const masaId = parts[2] || "1";
-    const masaLabel = `MASA ${masaId}`;
-    setMasaNo(masaLabel);
+    const urlParam = parts[2] || "1";
+    
+    console.log('🔍 URL Analizi:', { path, parts, urlParam });
+    
+    // URL parametresini analiz et
+    if (urlParam.startsWith('ad_')) {
+      // Bu bir adisyon ID'si
+      const adisyonlar = okuJSON(ADISYON_KEY, []);
+      const adisyon = adisyonlar.find(a => a.id === urlParam);
+      
+      if (adisyon) {
+        // Adisyondan masa numarasını al
+        const masaLabel = adisyon.masaNo || adisyon.masaNum || "MASA 1";
+        setMasaNo(masaLabel);
+        
+        // Gerçek masa numarasını bul
+        const gercekNo = gercekMasaNoBul(urlParam); // Adisyon ID'sini gönder
+        setGercekMasaNo(gercekNo);
+        console.log('✅ Adisyondan masa bulundu:', { 
+          adisyonId: urlParam, 
+          masaLabel, 
+          gercekMasaNo: gercekNo 
+        });
+      } else {
+        // Adisyon bulunamazsa varsayılan değer
+        setMasaNo("MASA 1");
+        setGercekMasaNo("1");
+        console.log('⚠️ Adisyon bulunamadı, varsayılan masa kullanılıyor');
+      }
+    } else {
+      // Normal masa numarası (1, 2, 3, ...)
+      const masaLabel = `MASA ${urlParam}`;
+      setMasaNo(masaLabel);
+      
+      // Gerçek masa numarasını bul
+      const gercekNo = gercekMasaNoBul(masaLabel);
+      setGercekMasaNo(gercekNo);
+      console.log('📌 Normal masa numarası:', { masaLabel, gercekMasaNo: gercekNo });
+    }
   }, []);
 
   // --------------------------------------------------
-  // ADİSYON YÜKLE (Yeni ve Eski)
+  // ADİSYON YÜKLE (Yeni ve Eski) - DÜZELTİLDİ
   // --------------------------------------------------
   useEffect(() => {
-    if (!masaNo) return;
+    if (!masaNo || !gercekMasaNo) return;
+    
+    console.log('🔄 Adisyon yükleniyor:', { masaNo, gercekMasaNo });
+    
     const adisyonlar = okuJSON(ADISYON_KEY, []);
 
     // 1. Aktif Yeni Adisyonu Bul/Oluştur
     let yeniAdisyon = adisyonlar.find(
-      (a) => a.masaNo === masaNo && !a.kapali && !a.isSplit
+      (a) => 
+        (a.masaNo === masaNo || a.masaNum === gercekMasaNo) && 
+        !a.kapali && 
+        !a.isSplit
     );
 
     if (!yeniAdisyon) {
       yeniAdisyon = {
-        id: Date.now().toString(),
-        masaNo,
+        id: `ad_${Date.now().toString()}`,
+        masaNo: masaNo,
+        masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
         acilisZamani: new Date().toISOString(),
         kapanisZamani: null,
         kalemler: [],
@@ -146,18 +257,35 @@ export default function Adisyon() {
         isSplit: false, // Yeni adisyon
         parentAdisyonId: null,
         durum: "AÇIK",
+        musteriAdi: null,
+        toplamTutar: "0.00",
+        guncellemeZamani: new Date().toISOString()
       };
       adisyonlar.push(yeniAdisyon);
       yazJSON(ADISYON_KEY, adisyonlar);
+      
+      // SYNC SERVICE: Yeni adisyon için masa aç - GERÇEK MASA NO İLE
+      if (syncServiceReady && window.syncService.masaAc) {
+        console.log('🔄 SyncService.masaAc çağrılıyor:', { gercekMasaNo, adisyonId: yeniAdisyon.id });
+        window.syncService.masaAc(gercekMasaNo, yeniAdisyon.id, null);
+      }
     }
     setAdisyon(yeniAdisyon);
 
     // 2. Eski (Split) Adisyonu Bul
     const eskiAdisyon = adisyonlar.find(
-      (a) => a.masaNo === masaNo && !a.kapali && a.isSplit
+      (a) => 
+        (a.masaNo === masaNo || a.masaNum === gercekMasaNo) && 
+        !a.kapali && 
+        a.isSplit
     );
     setSplitAdisyon(eskiAdisyon || null);
-  }, [masaNo]);
+    
+    console.log('✅ Adisyon yüklendi:', { 
+      yeniAdisyonId: yeniAdisyon.id, 
+      splitAdisyon: eskiAdisyon ? eskiAdisyon.id : 'YOK' 
+    });
+  }, [masaNo, gercekMasaNo, syncServiceReady]);
 
   // --------------------------------------------------
   // GEÇEN SÜRE HESAPLA (YENİ adisyon üzerinden)
@@ -191,54 +319,6 @@ export default function Adisyon() {
   }, []);
 
   // --------------------------------------------------
-  // ÖDEME SÖZÜ POPUP KONTROLÜ
-  // --------------------------------------------------
-  useEffect(() => {
-    const borclar = okuJSON(BORC_KEY, []);
-    if (!Array.isArray(borclar) || borclar.length === 0) return;
-
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    const todayStr = `${yyyy}-${mm}-${dd}`;
-
-    const bekleyen = borclar.find(
-      (b) =>
-        b.odemeSozu &&
-        !b.hatirlatildi &&
-        b.odemeSozu <= todayStr
-    );
-
-    if (bekleyen) {
-      const musteri = (okuJSON(MUSTERI_KEY, []) || []).find(
-        (m) => m.id === bekleyen.musteriId
-      );
-      setOdemeSozuPopup({
-        borcId: bekleyen.id,
-        musteriAd: musteri ? musteri.adSoyad : "Müşteri",
-        odemeSozu: bekleyen.odemeSozu,
-      });
-    }
-  }, []);
-
-  const odemeSozuPopupKapat = () => {
-    if (!odemeSozuPopup) return;
-    const borclar = okuJSON(BORC_KEY, []);
-    const idx = borclar.findIndex((b) => b.id === odemeSozuPopup.borcId);
-    if (idx !== -1) {
-      borclar[idx].hatirlatildi = true;
-      yazJSON(BORC_KEY, borclar);
-    }
-    setOdemeSozuPopup(null);
-  };
-
-  const odemeSozuPopupDetayaGit = () => {
-    odemeSozuPopupKapat();
-    window.location.href = "/raporlar/musteri-borc";
-  };
-
-  // --------------------------------------------------
   // ADİSYON TOPLAM ve KALAN HESABI - GÜNCELLENDİ
   // --------------------------------------------------
   useEffect(() => {
@@ -268,6 +348,55 @@ export default function Adisyon() {
     // ANA panelde gösterilecek toplam
     setToplam(toplamSatir);
     setKalan(toplamKalan);
+    
+    console.log('💰 Toplam Hesaplandı:', { 
+      toplamSatir, 
+      toplamKalan, 
+      yeniSatirToplam, 
+      eskiSatirToplam 
+    });
+    
+    // =============================
+    // YENİ EKLENEN KOD: TOPLAM TUTARI MASALAR SAYFASI İÇİN KAYDET
+    // =============================
+    if (adisyon?.id && gercekMasaNo) {
+      try {
+        // 1. Ana adisyon toplamını localStorage'a kaydet
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamSatir.toString());
+        
+        // 2. Split adisyon varsa, onun da toplamını kaydet
+        if (splitAdisyon?.id) {
+          localStorage.setItem(`mc_adisyon_toplam_${splitAdisyon.id}`, eskiSatirToplam.toString());
+        }
+        
+        // 3. Masa için toplam tutarı kaydet (ana + split)
+        const masaToplamTutar = toplamSatir; // zaten yeni + eski toplamı
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        
+        // 4. Masalar sayfasını güncellemek için event gönder
+        window.dispatchEvent(new CustomEvent('adisyonGuncellendi', {
+          detail: { 
+            masaNo: gercekMasaNo, 
+            toplamTutar: masaToplamTutar,
+            adisyonId: adisyon.id,
+            splitAdisyonId: splitAdisyon?.id 
+          }
+        }));
+        
+        console.log('✅ Toplam tutar kaydedildi:', {
+          masaNo: gercekMasaNo,
+          toplamTutar: masaToplamTutar,
+          adisyonId: adisyon.id
+        });
+        
+      } catch (error) {
+        console.error('❌ Toplam tutar kaydedilemedi:', error);
+      }
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
+    
   }, [adisyon, splitAdisyon, indirim]);
 
   // --------------------------------------------------
@@ -354,7 +483,75 @@ export default function Adisyon() {
   }, [urunler, aktifKategori]);
 
   // --------------------------------------------------
-  // ADİSYONA ÜRÜN EKLEME (SADECE YENİ ADİSYONA)
+  // ADET PANEL EKLE FONKSİYONU - EKLENDİ
+  // --------------------------------------------------
+  const adetPanelEkle = () => {
+    if (!adisyon || !seciliUrun) return;
+    
+    if (seciliUrun.id === "siparis-yemek") {
+      const fiyat = Number(siparisYemekFiyat);
+      if (!fiyat || fiyat <= 0) {
+        alert("Geçerli bir fiyat giriniz.");
+        return;
+      }
+      
+      const yeniKalem = {
+        id: `kalem_${Date.now().toString()}`,
+        urunId: "siparis-yemek",
+        urunAd: "SİPARİŞ YEMEK",
+        adet: adet,
+        birimFiyat: fiyat,
+        toplam: fiyat * adet,
+        not: siparisYemekNot
+      };
+      
+      const mevcutKalemler = [...(adisyon.kalemler || [])];
+      mevcutKalemler.push(yeniKalem);
+      
+      const guncel = { ...adisyon, kalemler: mevcutKalemler };
+      setAdisyon(guncel);
+      guncelAdisyonLocal(guncel);
+      
+      // Masa güncelle
+      if (splitAdisyon) {
+        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon);
+      } else {
+        guncelMasaLocal(gercekMasaNo, adisyon.id, null);
+      }
+      
+      // =============================
+      // YENİ EKLENEN KOD: Sipariş yemek eklendiğinde masalar sayfasını güncelle
+      // =============================
+      if (gercekMasaNo && adisyon.id) {
+        setTimeout(() => {
+          const toplamTutar = (guncel.kalemler || []).reduce(
+            (sum, k) => sum + (Number(k.toplam) || 0),
+            0
+          );
+          const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+            (sum, k) => sum + (Number(k.toplam) || 0),
+            0
+          );
+          const masaToplamTutar = toplamTutar + eskiToplam;
+          
+          localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+          localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+          window.dispatchEvent(new Event('adisyonGuncellendi'));
+        }, 100);
+      }
+      // =============================
+      // YENİ EKLENEN KOD SONU
+      // =============================
+    }
+    
+    setAdetPanelAcik(false);
+    setSeciliUrun(null);
+    setSiparisYemekFiyat("");
+    setSiparisYemekNot("");
+  };
+
+  // --------------------------------------------------
+  // ADİSYONA ÜRÜN EKLEME - SYNC SERVICE ENTEGRASYONLU
   // --------------------------------------------------
   const guncelAdisyonLocal = (yeniAdisyon) => {
     const adisyonlar = okuJSON(ADISYON_KEY, []);
@@ -365,6 +562,35 @@ export default function Adisyon() {
       adisyonlar[idx] = yeniAdisyon;
     }
     yazJSON(ADISYON_KEY, adisyonlar);
+    
+    // =============================
+    // YENİ EKLENEN KOD: Kalem eklendiğinde masalar sayfasını güncelle
+    // =============================
+    if (yeniAdisyon?.id && gercekMasaNo) {
+      // Toplam tutarı hesapla
+      const toplamTutar = (yeniAdisyon.kalemler || []).reduce(
+        (sum, k) => sum + (Number(k.toplam) || 0),
+        0
+      );
+      
+      // Eski adisyon toplamını da ekle
+      const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+        (sum, k) => sum + (Number(k.toplam) || 0),
+        0
+      );
+      
+      const masaToplamTutar = toplamTutar + eskiToplam;
+      
+      // LocalStorage'a kaydet
+      localStorage.setItem(`mc_adisyon_toplam_${yeniAdisyon.id}`, toplamTutar.toString());
+      localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+      
+      // Masalar sayfasını güncelle
+      window.dispatchEvent(new Event('adisyonGuncellendi'));
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   const uruneTiklandi = (urun) => {
@@ -383,6 +609,51 @@ export default function Adisyon() {
       return;
     }
 
+    // SYNC SERVICE ile kalem ekleme
+    if (syncServiceReady && window.syncService.kalemEkleVeToplamGuncelle) {
+      console.log('➕ SyncService ile kalem ekleniyor:', urun.ad);
+      console.log('📌 Masa Bilgisi:', { gercekMasaNo, adisyonId: adisyon.id });
+      
+      const kalemData = {
+        urunId: urun.id,
+        urunAdi: urun.ad,
+        birimFiyat: Number(urun.satis || 0),
+        miktar: 1
+      };
+      
+      // TOPLAM TUTARI HESAPLA VE GÖNDER
+      const mevcutKalemler = [...(adisyon.kalemler || [])];
+      const index = mevcutKalemler.findIndex(
+        (k) => k.urunId === urun.id && Number(k.birimFiyat) === Number(urun.satis || 0)
+      );
+      
+      let yeniToplam = 0;
+      if (index === -1) {
+        yeniToplam = Number(urun.satis || 0);
+      } else {
+        const kalem = { ...mevcutKalemler[index] };
+        yeniToplam = (kalem.adet + 1) * kalem.birimFiyat;
+      }
+      
+      const success = window.syncService.kalemEkleVeToplamGuncelle(adisyon.id, kalemData, yeniToplam);
+      
+      if (success) {
+        console.log('✅ SyncService ile kalem eklendi');
+        // Adisyonu güncelle
+        setTimeout(() => {
+          const adisyonlar = okuJSON(ADISYON_KEY, []);
+          const updatedAdisyon = adisyonlar.find(a => a.id === adisyon.id);
+          if (updatedAdisyon) {
+            setAdisyon(updatedAdisyon);
+          }
+        }, 100);
+        return;
+      } else {
+        console.warn('⚠️ SyncService kalem ekleme başarısız, manuel ekleniyor');
+      }
+    }
+
+    // MANUEL ekleme (fallback)
     const mevcutKalemler = [...(adisyon.kalemler || [])];
     const index = mevcutKalemler.findIndex(
       (k) =>
@@ -410,40 +681,77 @@ export default function Adisyon() {
     const guncel = { ...adisyon, kalemler: mevcutKalemler };
     setAdisyon(guncel);
     guncelAdisyonLocal(guncel);
+    
+    // Masa güncellemesini yap - GERÇEK MASA NO İLE ve TOPLAM TUTAR İLE
+    console.log('🔄 Manuel masa güncellemesi:', { gercekMasaNo, adisyonId: adisyon.id });
+    if (splitAdisyon) {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon);
+    } else {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, null);
+    }
   };
 
-  const adetPanelEkle = () => {
-    if (!seciliUrun || !adisyon) return;
-
-    const f = Number(siparisYemekFiyat);
-    if (!f || f <= 0) {
-      alert("SİPARİŞ YEMEK için fiyat giriniz.");
+  // MASA BİLGİSİNİ GÜNCELLEYEN FONKSİYON - SYNC SERVICE ENTEGRASYONLU
+  const guncelMasaLocal = (masaNum, anaAdisyonId, splitAdisyonObj) => {
+    // GERÇEK MASA NO'YU KULLAN
+    const gercekMasaNoToUse = masaNum;
+    
+    console.log('🔄 Masa güncelleniyor:', { 
+      gercekMasaNo: gercekMasaNoToUse, 
+      anaAdisyonId, 
+      splitAdisyonObj,
+      currentGercekMasaNo: gercekMasaNo // State'deki değer
+    });
+    
+    // Toplam tutarı hesapla
+    const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+    const eskiToplam = (splitAdisyonObj?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+    const toplamTutar = yeniToplam + eskiToplam;
+    
+    console.log('💰 Toplam Tutar Hesaplandı:', { yeniToplam, eskiToplam, toplamTutar: toplamTutar.toFixed(2) });
+    
+    // SYNC SERVICE KULLAN - NORMALIZE ET
+    if (syncServiceReady && window.syncService.guncelMasa) {
+      console.log('🔄 SyncService ile masa güncelleniyor:', gercekMasaNoToUse);
+      
+      // SyncService'e toplam tutarı da gönder
+      window.syncService.guncelMasa(gercekMasaNoToUse, anaAdisyonId, splitAdisyonObj, toplamTutar.toFixed(2));
       return;
     }
+    
+    // FALLBACK: Manuel güncelleme - DETAYLI MASALAR GÜNCELLEMESİ
+    let masalar = okuJSON(MASA_KEY, []);
+    const masaNoNum = Number(gercekMasaNoToUse);
+    const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
 
-    const yeniKalem = {
-      id: Date.now().toString(),
-      urunId: seciliUrun.id,
-      urunAd: "SİPARİŞ YEMEK",
-      adet: adet,
-      birimFiyat: f,
-      toplam: f * adet,
-      not: siparisYemekNot || "",
-    };
-
-    const guncel = {
-      ...adisyon,
-      kalemler: [...(adisyon.kalemler || []), yeniKalem],
-    };
-    setAdisyon(guncel);
-    guncelAdisyonLocal(guncel);
-
-    setAdetPanelAcik(false);
-    setSeciliUrun(null);
+    if (masaIdx !== -1) {
+      masalar[masaIdx] = {
+        ...masalar[masaIdx],
+        adisyonId: anaAdisyonId,
+        ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
+        ayirToplam: splitAdisyonObj ? 
+          Number(splitAdisyonObj.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0)).toFixed(2) 
+          : null,
+        toplamTutar: toplamTutar.toFixed(2), // MASALAR SAYFASINDA GÖRÜNECEK TUTAR
+        durum: "DOLU", // DOLU OLARAK İŞARETLE
+        renk: "red", // KIRMIZI RENK
+        acilisZamani: adisyon?.acilisZamani || new Date().toISOString(),
+        guncellemeZamani: new Date().toISOString()
+      };
+      yazJSON(MASA_KEY, masalar);
+      
+      // Storage event'ini tetikle - MASALAR SAYFASININ GÜNCELLENMESİ İÇİN
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: MASA_KEY,
+        newValue: JSON.stringify(masalar)
+      }));
+      
+      console.log('✅ Manuel masa güncelleme başarılı - Toplam Tutar:', toplamTutar.toFixed(2));
+    }
   };
 
   // --------------------------------------------------
-  // SATIR SİLME ve ADET ARTIR/AZALT (SADECE YENİ ADİSYON)
+  // SATIR SİLME ve ADET ARTIR/AZALT
   // --------------------------------------------------
   const satirSil = (kalemId) => {
     if (!adisyon) return;
@@ -455,6 +763,37 @@ export default function Adisyon() {
     const guncel = { ...adisyon, kalemler: yeniKalemler };
     setAdisyon(guncel);
     guncelAdisyonLocal(guncel);
+    
+    // Masa güncellemesini yap - GERÇEK MASA NO İLE
+    if (splitAdisyon) {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon);
+    } else {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, null);
+    }
+    
+    // =============================
+    // YENİ EKLENEN KOD: Satır silindiğinde masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (guncel.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   const adetArtir = (kalemId) => {
@@ -473,6 +812,37 @@ export default function Adisyon() {
     
     setAdisyon(guncel);
     guncelAdisyonLocal(guncel);
+    
+    // Masa güncellemesini yap - GERÇEK MASA NO İLE
+    if (splitAdisyon) {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon);
+    } else {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, null);
+    }
+    
+    // =============================
+    // YENİ EKLENEN KOD: Adet artırıldığında masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (guncel.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   const adetAzalt = (kalemId) => {
@@ -497,6 +867,37 @@ export default function Adisyon() {
     const guncel = { ...adisyon, kalemler: yeniKalemler };
     setAdisyon(guncel);
     guncelAdisyonLocal(guncel);
+    
+    // Masa güncellemesini yap - GERÇEK MASA NO İLE
+    if (splitAdisyon) {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon);
+    } else {
+      guncelMasaLocal(gercekMasaNo, adisyon.id, null);
+    }
+    
+    // =============================
+    // YENİ EKLENEN KOD: Adet azaltıldığında masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (guncel.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   // --------------------------------------------------
@@ -518,6 +919,30 @@ export default function Adisyon() {
     guncelAdisyonLocal(guncel);
     
     setIndirimInput(""); // Input'u temizle
+    
+    // =============================
+    // YENİ EKLENEN KOD: İndirim uygulandığında masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (guncel.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   // --------------------------------------------------
@@ -535,6 +960,30 @@ export default function Adisyon() {
 
     setAdisyon(yeniAdisyon);
     guncelAdisyonLocal(yeniAdisyon);
+    
+    // =============================
+    // YENİ EKLENEN KOD: Ödeme silindiğinde masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (yeniAdisyon.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
   
   // --------------------------------------------------
@@ -546,6 +995,30 @@ export default function Adisyon() {
     setIndirim(0);
     setIndirimInput("");
     guncelAdisyonLocal(guncel);
+    
+    // =============================
+    // YENİ EKLENEN KOD: İndirim sıfırlandığında masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (guncel.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   // --------------------------------------------------
@@ -572,7 +1045,7 @@ export default function Adisyon() {
   }, [seciliMusteriId, hesabaYazModu, borcTutarInput]);
 
   // --------------------------------------------------
-  // ÖDEME EKLEME - GÜNCELLENDİ (SADECE YENİ ADİSYON)
+  // ÖDEME EKLEME - GÜNCELLENDİ
   // --------------------------------------------------
   const odemeEkle = () => {
     // Ödeme her zaman YENİ adisyona eklenir
@@ -580,11 +1053,11 @@ export default function Adisyon() {
 
     // Hesaba Yaz için
     if (aktifOdemeTipi === "HESABA_YAZ") {
-    console.log("🟢 HESABA_YAZ butonuna tıklandı!");
-    setHesabaYazModu(true);
-    setBorcTutarInput(String(kalan || 0));
-    return; // Bu return çok önemli!
-  }
+      console.log("🟢 HESABA_YAZ butonuna tıklandı!");
+      setHesabaYazModu(true);
+      setBorcTutarInput(String(kalan || 0));
+      return; // Bu return çok önemli!
+    }
 
     let tutar = Number(odemeInput);
     if (!tutar || tutar <= 0) {
@@ -611,6 +1084,30 @@ export default function Adisyon() {
     setAdisyon(yeniAdisyon);
     guncelAdisyonLocal(yeniAdisyon);
     setOdemeInput("");
+    
+    // =============================
+    // YENİ EKLENEN KOD: Ödeme eklendiğinde masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (yeniAdisyon.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   // --------------------------------------------------
@@ -648,7 +1145,8 @@ export default function Adisyon() {
     const yeniBorc = {
       id: Date.now().toString(),
       musteriId,
-      masaNo,
+      masaNo: `MASA ${gercekMasaNo}`,
+      masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
       adisyonId: adisyon.id, // Yeni adisyon ID'si
       tutar: borcTutar,
       acilisZamani: adisyon.acilisZamani,
@@ -660,7 +1158,7 @@ export default function Adisyon() {
           tip: "BORÇ EKLENDİ",
           tutar: borcTutar,
           tarih: new Date().toISOString(),
-          aciklama: `Hesaba Yaz - ${masaNo}`,
+          aciklama: `Hesaba Yaz - Masa ${gercekMasaNo}`,
         },
       ],
     };
@@ -690,189 +1188,327 @@ export default function Adisyon() {
     alert("Borç kaydedildi. (Hesaba Yaz) – Adisyon kapatılmadı.");
     setHesabaYazModu(false);
     setHesabaYazSonrasiMasaDon(true);
+    
+    // =============================
+    // YENİ EKLENEN KOD: Hesaba yaz kaydedildiğinde masalar sayfasını güncelle
+    // =============================
+    if (gercekMasaNo && adisyon.id) {
+      setTimeout(() => {
+        const toplamTutar = (guncelAdisyon.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
+          (sum, k) => sum + (Number(k.toplam) || 0),
+          0
+        );
+        const masaToplamTutar = toplamTutar + eskiToplam;
+        
+        localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamTutar.toString());
+        localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+      }, 100);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
   };
 
   // --------------------------------------------------
-  // HESABI AYIR (YENİ MANTIK - ESKİ ADİSYON KİLİTLİ)
-  // --------------------------------------------------
-  const hesabiAyir = () => {
-    // Eğer adisyon boşsa, hiçbir şey yapma
-    if (!adisyon || (adisyon.kalemler || []).length === 0) {
-      alert("Adisyonda ürün yok!");
-      return;
-    }
-    
-    // Eğer zaten eski adisyon varsa, uyarı ver
-    if (splitAdisyon) {
-      alert("Bu masa için zaten bir eski adisyon mevcut!");
-      return;
-    }
-
-    // Mevcut adisyonu ESKİ adisyon olarak kaydet (KİLİTLİ)
-    const eskiAdisyon = {
-      ...adisyon,
-      id: adisyon.id,
-      isSplit: true, // Artık ESKİ adisyon
-      durum: "KİLİTLİ",
-    };
-
-    // YENİ bir adisyon oluştur
-    const yeniAdisyon = {
-      id: Date.now().toString(),
-      masaNo: adisyon.masaNo,
-      acilisZamani: new Date().toISOString(),
-      kapanisZamani: null,
-      kalemler: [], // Boş başlar
-      odemeler: [], // Ödeme geçmişi sıfırlanır
-      indirim: 0,
-      hesabaYazKayitlari: [],
-      kapali: false,
-      isSplit: false, // Yeni adisyon
-      parentAdisyonId: eskiAdisyon.id, // Eski adisyonun ID'sini referans alır
-      durum: "AÇIK",
-    };
-
-    // 1. Eski adisyonu split olarak kaydet
-    setSplitAdisyon(eskiAdisyon);
-    
-    // 2. Yeni adisyonu aktif adisyon olarak ayarla
-    setAdisyon(yeniAdisyon);
-    setIndirim(0); // Yeni adisyon için indirimi sıfırla
-    setIndirimInput("");
-
-    // 3. LocalStorage'ı güncelle
-    let adisyonlar = okuJSON(ADISYON_KEY, []);
-    
-    // Eski adisyonu güncelle
-    const eskiIdx = adisyonlar.findIndex(a => a.id === eskiAdisyon.id);
-    if (eskiIdx !== -1) {
-      adisyonlar[eskiIdx] = eskiAdisyon;
-    }
-    
-    // Yeni adisyonu ekle
-    adisyonlar.push(yeniAdisyon);
-    yazJSON(ADISYON_KEY, adisyonlar);
-
-    // 4. Masa kaydını güncelle
-    guncelMasaLocal(masaNo, yeniAdisyon.id, eskiAdisyon);
-
-    alert(`Hesap ayrıldı!\n\nEski adisyon kilitleyip sadece toplam görüntülenecek.\nYeni adisyon oluşturuldu.`);
-  };
-
-// Adisyon.jsx - MASAYI KAPAT BUTONU DÜZELTİLDİ
-// ... önceki import'lar ve kodlar aynı ...
-
+// HESABI AYIR (YENİ MANTIK - ESKİ ADİSYON KİLİTLİ)
 // --------------------------------------------------
-// ADİSYON KAPAT - GÜNCELLENDİ (SYNC SERVICE EKLENDİ)
-// --------------------------------------------------
-const adisyonKapat = () => {
-  // Kalan tutar kontrolü (YENİ + ESKİ toplamı)
-  if (kalan > 0.01) {
-    alert("Kalan tutar ödenmeden adisyon kapatılamaz.");
+const hesabiAyir = () => {
+  // Eğer adisyon boşsa, hiçbir şey yapma
+  if (!adisyon || (adisyon.kalemler || []).length === 0) {
+    alert("Adisyonda ürün yok!");
+    return;
+  }
+  
+  // Eğer zaten eski adisyon varsa, uyarı ver
+  if (splitAdisyon) {
+    alert("Bu masa için zaten bir eski adisyon mevcut!");
     return;
   }
 
-  console.log('🔴 MASAYI KAPAT tıklandı - masaNo:', masaNo, 'adisyonId:', adisyon?.id);
+  // Mevcut adisyonu ESKİ adisyon olarak kaydet (KİLİTLİ)
+  const eskiAdisyon = {
+    ...adisyon,
+    id: adisyon.id,
+    isSplit: true, // Artık ESKİ adisyon
+    durum: "KİLİTLİ",
+  };
 
-  // 1. Masa numarasını doğru al (sadece numarayı al)
-  const masaNum = masaNo.replace("MASA ", "").trim();
+  // YENİ bir adisyon oluştur
+  const yeniAdisyon = {
+    id: `ad_${Date.now().toString()}`,
+    masaNo: `MASA ${gercekMasaNo}`,
+    masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
+    acilisZamani: new Date().toISOString(),
+    kapanisZamani: null,
+    kalemler: [], // Boş başlar
+    odemeler: [], // Ödeme geçmişi sıfırlanır
+    indirim: 0,
+    hesabaYazKayitlari: [],
+    kapali: false,
+    isSplit: false, // Yeni adisyon
+    parentAdisyonId: eskiAdisyon.id, // Eski adisyonun ID'sini referans alır
+    durum: "AÇIK",
+  };
+
+  // 1. Eski adisyonu split olarak kaydet
+  setSplitAdisyon(eskiAdisyon);
   
-  // 2. syncService'ten masaBosalt fonksiyonunu çağır
-  if (typeof window.syncService !== 'undefined') {
-    console.log('🔄 syncService.masaBosalt çağrılıyor:', `MASA ${masaNum}`);
-    const success = window.syncService.masaBosalt(`MASA ${masaNum}`);
-    
-    if (success) {
-      console.log('✅ syncService: Masa başarıyla temizlendi');
-    } else {
-      console.error('❌ syncService: Masa temizlenemedi');
-      alert('Masa temizlenirken bir hata oluştu!');
-      return;
-    }
-  } else {
-    console.error('❌ syncService bulunamadı');
-    // Fallback: eski yöntemle devam et
-    const masalar = okuJSON(MASA_KEY, []);
-    const masaNoNum = Number(masaNum);
-    const masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
-    
-    if (masaIdx !== -1) {
-      masalar[masaIdx] = {
-        ...masalar[masaIdx],
-        adisyonId: null,
-        ayirId: null,
-        ayirToplam: null,
-        toplamTutar: "0.00",
-        acilisZamani: null,
-        durum: "BOŞ",
-        renk: "gri",
-        musteriAdi: null,
-        kisiSayisi: null,
-        guncellemeZamani: new Date().toISOString()
-      };
-      yazJSON(MASA_KEY, masalar);
-      window.dispatchEvent(new Event('storage'));
-    }
-  }
+  // 2. Yeni adisyonu aktif adisyon olarak ayarla
+  setAdisyon(yeniAdisyon);
+  setIndirim(0); // Yeni adisyon için indirimi sıfırla
+  setIndirimInput("");
 
-  const adisyonlar = okuJSON(ADISYON_KEY, []);
-
-  // 3. YENİ adisyonu kapat
-  if (adisyon) {
-    const yeniIdx = adisyonlar.findIndex((a) => a.id === adisyon.id);
-    if (yeniIdx !== -1) {
-      const guncelYeniAdisyon = {
-        ...adisyon,
-        kapali: true,
-        kapanisZamani: new Date().toISOString(),
-        durum: "KAPALI",
-      };
-      adisyonlar[yeniIdx] = guncelYeniAdisyon;
-      setAdisyon(guncelYeniAdisyon);
-    }
-  }
-
-  // 4. ESKİ adisyonu kapat (varsa)
-  if (splitAdisyon) {
-    const eskiIdx = adisyonlar.findIndex((a) => a.id === splitAdisyon.id);
-    if (eskiIdx !== -1) {
-      const guncelEskiAdisyon = {
-        ...splitAdisyon,
-        kapali: true,
-        kapanisZamani: new Date().toISOString(),
-        durum: "KAPALI",
-      };
-      adisyonlar[eskiIdx] = guncelEskiAdisyon;
-      setSplitAdisyon(guncelEskiAdisyon);
-    }
-  }
-
-  yazJSON(ADISYON_KEY, adisyonlar);
-
-  // 5. Masa kaydını temizle (syncService zaten yaptı)
-  setKapanisMesaji(
-    `✅ Masa başarıyla kapatıldı! ${splitAdisyon ? "(Eski adisyon da kapatıldı)" : ""} Masalar sayfasına yönlendiriliyorsunuz...`
-  );
+  // 3. LocalStorage'ı güncelle
+  let adisyonlar = okuJSON(ADISYON_KEY, []); // DÜZELTİLDİ: ADİSYON_KEY → ADISYON_KEY
   
-  // 6. Kısa gecikme ve yönlendirme
-  setTimeout(() => {
-    console.log('🔄 Masalar sayfasına yönlendiriliyor...');
-    masayaDon();
-  }, 1500);
+  // Eski adisyonu güncelle
+  const eskiIdx = adisyonlar.findIndex(a => a.id === eskiAdisyon.id);
+  if (eskiIdx !== -1) {
+    adisyonlar[eskiIdx] = eskiAdisyon;
+  }
+  
+  // Yeni adisyonu ekle
+  adisyonlar.push(yeniAdisyon);
+  yazJSON(ADISYON_KEY, adisyonlar); // DÜZELTİLDİ: ADİSYON_KEY → ADISYON_KEY
+
+  // 4. Masa kaydını güncelle - GERÇEK MASA NO İLE
+  guncelMasaLocal(gercekMasaNo, yeniAdisyon.id, eskiAdisyon);
+
+  
+  // =============================
+  // YENİ EKLENEN KOD: Hesap ayrıldığında masalar sayfasını güncelle
+  // =============================
+  if (gercekMasaNo) {
+    setTimeout(() => {
+      const yeniToplam = (yeniAdisyon.kalemler || []).reduce(
+        (sum, k) => sum + (Number(k.toplam) || 0),
+        0
+      );
+      const eskiToplam = (eskiAdisyon.kalemler || []).reduce(
+        (sum, k) => sum + (Number(k.toplam) || 0),
+        0
+      );
+      const masaToplamTutar = yeniToplam + eskiToplam;
+      
+      localStorage.setItem(`mc_adisyon_toplam_${yeniAdisyon.id}`, yeniToplam.toString());
+      localStorage.setItem(`mc_adisyon_toplam_${eskiAdisyon.id}`, eskiToplam.toString());
+      localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
+      window.dispatchEvent(new Event('adisyonGuncellendi'));
+    }, 100);
+  }
+  // =============================
+  // YENİ EKLENEN KOD SONU
+  // =============================
 };
 
   // --------------------------------------------------
-  // MASAYA DÖN
+  // ADİSYON KAPAT - SYNC SERVICE ENTEGRASYONLU
+  // --------------------------------------------------
+  const adisyonKapat = () => {
+    // Kalan tutar kontrolü
+    if (kalan > 0.01) {
+      alert("Kalan tutar ödenmeden adisyon kapatılamaz.");
+      return;
+    }
+
+    console.log('🔴 MASAYI KAPAT tıklandı - adisyonId:', adisyon?.id, 'gercekMasaNo:', gercekMasaNo);
+
+    // 1. ADİSYONLARI KAPAT ÖNCE
+    // ------------------------------------------------
+    const updatedAdisyonlar = okuJSON(ADISYON_KEY, []);
+
+    // YENİ adisyonu kapat
+    let guncelYeniAdisyon = null;
+    if (adisyon) {
+      const yeniIdx = updatedAdisyonlar.findIndex((a) => a.id === adisyon.id);
+      if (yeniIdx !== -1) {
+        guncelYeniAdisyon = {
+          ...adisyon,
+          kapali: true,
+          kapanisZamani: new Date().toISOString(),
+          durum: "KAPALI",
+          toplamTutar: toplam.toFixed(2), // Toplam tutarı kaydet
+        };
+        updatedAdisyonlar[yeniIdx] = guncelYeniAdisyon;
+        setAdisyon(guncelYeniAdisyon);
+      }
+    }
+
+    // ESKİ adisyonu kapat (varsa)
+    let guncelEskiAdisyon = null;
+    if (splitAdisyon) {
+      const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === splitAdisyon.id);
+      if (eskiIdx !== -1) {
+        guncelEskiAdisyon = {
+          ...splitAdisyon,
+          kapali: true,
+          kapanisZamani: new Date().toISOString(),
+          durum: "KAPALI",
+        };
+        updatedAdisyonlar[eskiIdx] = guncelEskiAdisyon;
+        setSplitAdisyon(guncelEskiAdisyon);
+      }
+    }
+
+    yazJSON(ADISYON_KEY, updatedAdisyonlar);
+    console.log('✅ Adisyonlar kapatıldı');
+
+    // =============================
+    // YENİ EKLENEN KOD: Kapatılan adisyonun toplamını temizle
+    // =============================
+    if (adisyon?.id) {
+      localStorage.removeItem(`mc_adisyon_toplam_${adisyon.id}`);
+    }
+    if (splitAdisyon?.id) {
+      localStorage.removeItem(`mc_adisyon_toplam_${splitAdisyon.id}`);
+    }
+    if (gercekMasaNo) {
+      localStorage.removeItem(`mc_masa_toplam_${gercekMasaNo}`);
+    }
+    // =============================
+    // YENİ EKLENEN KOD SONU
+    // =============================
+
+    // 2. SYNC SERVICE İLE MASA TEMİZLEME
+    // ------------------------------------------------
+    let syncSuccess = false;
+    
+    // SYNC SERVICE KULLAN - TÜM MASAYI TEMİZLE
+    if (syncServiceReady && window.syncService.masaBosalt) {
+      console.log('🔄 SyncService.masaBosalt çağrılıyor:', gercekMasaNo);
+      
+      // GERÇEK MASA NUMARASINI KULLAN
+      syncSuccess = window.syncService.masaBosalt(gercekMasaNo);
+      
+      if (syncSuccess) {
+        console.log('✅ SyncService ile masa temizlendi');
+      } else {
+        console.error('❌ SyncService masa temizleme başarısız, manuel deneniyor');
+      }
+    }
+    
+    // FALLBACK: Manuel temizleme
+    if (!syncSuccess) {
+      console.log('🔧 Manuel masa güncelleme yapılıyor');
+      
+      const masalar = okuJSON(MASA_KEY, []);
+      const masaIdx = masalar.findIndex(m => 
+        m.no === gercekMasaNo || 
+        m.id === Number(gercekMasaNo) ||
+        m.masaNo === `MASA ${gercekMasaNo}` ||
+        m.masaNum === gercekMasaNo
+      );
+      
+      if (masaIdx !== -1) {
+        // Toplam tutarı hesapla
+        const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+        const eskiToplam = (splitAdisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+        const toplamTutar = yeniToplam + eskiToplam;
+        
+        masalar[masaIdx] = {
+          ...masalar[masaIdx],
+          adisyonId: null,
+          ayirId: null,
+          ayirToplam: null,
+          toplamTutar: toplamTutar.toFixed(2),
+          acilisZamani: null,
+          kapanisZamani: new Date().toISOString(),
+          durum: "BOŞ",
+          renk: "gri",
+          musteriAdi: null,
+          kisiSayisi: null,
+          guncellemeZamani: new Date().toISOString(),
+          sonAdisyonToplam: toplamTutar.toFixed(2)
+        };
+        yazJSON(MASA_KEY, masalar);
+        
+        // Storage event'ini tetikle
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: MASA_KEY,
+          newValue: JSON.stringify(masalar)
+        }));
+        
+        syncSuccess = true;
+        console.log('✅ Manuel masa güncelleme başarılı - Toplam Tutar:', toplamTutar.toFixed(2));
+      } else {
+        console.error('❌ Masa bulunamadı:', gercekMasaNo);
+        alert('Masa bulunamadı!');
+        return;
+      }
+    }
+    
+    if (!syncSuccess) {
+      console.error('❌ Masa temizlenemedi!');
+      alert('Masa temizlenirken bir hata oluştu!');
+      return;
+    }
+
+    // 3. KASA HAREKETİ KAYDET (İSTEĞE BAĞLI)
+    // ------------------------------------------------
+    try {
+      const kasalar = okuJSON("mc_kasalar", []);
+      const kasaHareketi = {
+        id: Date.now().toString(),
+        tarih: new Date().toISOString(),
+        masaNo: gercekMasaNo,
+        adisyonId: adisyon?.id,
+        aciklama: `Masa ${gercekMasaNo} Kapatıldı`,
+        giren: toplam,
+        cikan: 0,
+        bakiye: 0,
+        tip: "MASA_KAPATMA",
+        personel: JSON.parse(localStorage.getItem("mc_user") || "{}").adSoyad || "Bilinmiyor"
+      };
+      kasalar.push(kasaHareketi);
+      yazJSON("mc_kasalar", kasalar);
+      console.log('💰 Kasa hareketi kaydedildi');
+    } catch (error) {
+      console.warn('⚠️ Kasa hareketi kaydedilemedi:', error);
+    }
+
+    // 4. BAŞARI MESAJI VE YÖNLENDİRME
+    // ------------------------------------------------
+    setKapanisMesaji(
+      `✅ Masa ${gercekMasaNo} başarıyla kapatıldı! Toplam: ${toplam.toFixed(2)} TL\nMasalar sayfasına yönlendiriliyorsunuz...`
+    );
+    
+    // 5. MASALAR SAYFASINDA GÜNCELLEME İÇİN EK SENKRONİZASYON
+    setTimeout(() => {
+      if (window.syncService && window.syncService.senkronizeMasalar) {
+        console.log('🔄 Masalar sayfası için senkronizasyon yapılıyor...');
+        window.syncService.senkronizeMasalar();
+      }
+      
+      // Masalar sayfasını güncellemek için son bir event gönder
+      window.dispatchEvent(new Event('adisyonGuncellendi'));
+      
+      // Masalar sayfasına yönlendirmeden önce kısa bir gecikme
+      setTimeout(() => {
+        console.log('🔄 Masalar sayfasına yönlendiriliyor...');
+        masayaDon();
+      }, 1000);
+    }, 500);
+  };
+
+  // --------------------------------------------------
+  // MASAYA DÖN - DÜZELTİLDİ: masaNo yerine gercekMasaNo kullan
   // --------------------------------------------------
   const masayaDon = () => {
     const params = new URLSearchParams();
     if (hesabaYazSonrasiMasaDon) {
-      params.append("highlight", masaNo);
+      params.append("highlight", gercekMasaNo); // GERÇEK MASA NO İLE
       setHesabaYazSonrasiMasaDon(false);
     }
 
     const query = params.toString();
-    if (isBilardoMasa(masaNo)) {
+    
+    // DÜZELTİLDİ: masaNo yerine gercekMasaNo kullan
+    if (isBilardoMasa(gercekMasaNo)) {
       window.location.href = query ? `/bilardo?${query}` : "/bilardo";
     } else {
       window.location.href = query ? `/masalar?${query}` : "/masalar";
@@ -932,6 +1568,36 @@ const adisyonKapat = () => {
           >
             ÖDEMELER
           </div>
+          
+          {/* MASA BİLGİSİ */}
+          <div style={{
+            marginBottom: "10px",
+            padding: "5px",
+            borderRadius: "6px",
+            background: "#e8f5e9",
+            color: "#1e8449",
+            fontSize: "12px",
+            textAlign: "center",
+            border: "1px solid #27ae60"
+          }}>
+            Masa: Masa {gercekMasaNo} (No: {gercekMasaNo})
+          </div>
+          
+          {/* SYNC SERVICE DURUMU */}
+          {syncServiceReady && (
+            <div style={{
+              marginBottom: "10px",
+              padding: "5px",
+              borderRadius: "6px",
+              background: "#e8f8f1",
+              color: "#1e8449",
+              fontSize: "12px",
+              textAlign: "center",
+              border: "1px solid #27ae60"
+            }}>
+              ✅ SyncService Aktif
+            </div>
+          )}
           
           {/* ÖDEME LİSTESİ (SADECE YENİ ADİSYON) */}
           <div
@@ -1315,7 +1981,7 @@ const adisyonKapat = () => {
             color: "#4b2e05",
           }}
         >
-          MASA
+          MASA {gercekMasaNo}
         </div>
 
         {/* ESKİ ADİSYON GÖSTERİMİ - Sadece splitAdisyon VARKEN göster */}
@@ -1562,177 +2228,193 @@ const adisyonKapat = () => {
             </div>
           </div>
         ) : (
-// YENİ ADİSYON İÇERİĞİ - SİYAH RENK
-<div style={{ flex: 1, overflowY: "auto" }}>
-  <div
-    style={{
-      fontWeight: "bold",
-      fontSize: "18px",
-      marginBottom: "10px",
-      color: "#000000", // SİYAH
-    }}
-  >
-    ADİSYON
-  </div>
-  <table
-    style={{
-      width: "100%",
-      borderCollapse: "collapse",
-      borderRadius: "8px",
-      overflow: "hidden",
-    }}
-  >
-    <thead>
-      <tr>
-        <th
-          style={{
-            padding: "8px",
-            borderBottom: "1px solid #ecd3a5",
-            textAlign: "left",
-            color: "#000",
-          }}
-        >
-          Ürün Adı
-        </th>
-        <th
-          style={{
-            padding: "8px",
-            borderBottom: "1px solid #ecd3a5",
-            textAlign: "center",
-            color: "#000",
-          }}
-        >
-          Adet
-        </th>
-        <th
-          style={{
-            padding: "8px",
-            borderBottom: "1px solid #ecd3a5",
-            textAlign: "right",
-            color: "#000",
-          }}
-        >
-          Birim
-        </th>
-        <th
-          style={{
-            padding: "8px",
-            borderBottom: "1px solid #ecd3a5",
-            textAlign: "right",
-            color: "#000",
-          }}
-        >
-          Toplam
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      {(adisyon.kalemler || []).map((k) => (
-        <React.Fragment key={k.id}>
-          <tr>
-            <td
+          // YENİ ADİSYON İÇERİĞİ - SİYAH RENK
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <div
               style={{
-                padding: "6px 8px",
-                borderBottom: "1px solid #f4e0c2",
-                color: "#000",
+                fontWeight: "bold",
+                fontSize: "18px",
+                marginBottom: "10px",
+                color: "#000000", // SİYAH
               }}
             >
-              {k.urunAd}
-              {/* SİPARİŞ YEMEK notu varsa göster */}
-              {k.not && k.not.trim() !== "" && (
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "#666",
-                    fontStyle: "italic",
-                    marginTop: "2px",
-                    paddingLeft: "5px",
-                  }}
-                >
-                  📝 {k.not}
-                </div>
-              )}
-            </td>
-            <td
+              ADİSYON
+            </div>
+            <table
               style={{
-                padding: "6px 8px",
-                borderBottom: "1px solid #f4e0c2",
-                textAlign: "center",
-                color: "#000",
+                width: "100%",
+                borderCollapse: "collapse",
+                borderRadius: "8px",
+                overflow: "hidden",
               }}
             >
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "left",
+                      color: "#000",
+                    }}
+                  >
+                    Ürün Adı
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "center",
+                      color: "#000",
+                    }}
+                  >
+                    Adet
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "right",
+                      color: "#000",
+                    }}
+                  >
+                    Birim
+                  </th>
+                  <th
+                    style={{
+                      padding: "8px",
+                      borderBottom: "1px solid #ecd3a5",
+                      textAlign: "right",
+                      color: "#000",
+                    }}
+                  >
+                    Toplam
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(adisyon.kalemler || []).map((k) => (
+                  <React.Fragment key={k.id}>
+                    <tr>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f4e0c2",
+                          color: "#000",
+                        }}
+                      >
+                        {k.urunAd}
+                        {/* SİPARİŞ YEMEK notu varsa göster */}
+                        {k.not && k.not.trim() !== "" && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "#666",
+                              fontStyle: "italic",
+                              marginTop: "2px",
+                              paddingLeft: "5px",
+                            }}
+                          >
+                            📝 {k.not}
+                          </div>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f4e0c2",
+                          textAlign: "center",
+                          color: "#000",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                          }}
+                        >
+                          <button
+                            onClick={() => adetAzalt(k.id)}
+                            style={{
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              border: "1px solid #d0b48c",
+                              background: "#fbe9e7",
+                              cursor: "pointer",
+                              fontSize: "13px",
+                              lineHeight: "1",
+                            }}
+                          >
+                            -
+                          </button>
+                          <span>{k.adet}</span>
+                          <button
+                            onClick={() => adetArtir(k.id)}
+                            style={{
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              border: "1px solid #d0b48c",
+                              background: "#e8f5e9",
+                              cursor: "pointer",
+                              fontSize: "13px",
+                              lineHeight: "1",
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f4e0c2",
+                          textAlign: "right",
+                          color: "#000",
+                        }}
+                      >
+                        {Number(k.birimFiyat || 0).toFixed(2)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "6px 8px",
+                          borderBottom: "1px solid #f4e0c2",
+                          textAlign: "right",
+                          color: "#000",
+                        }}
+                      >
+                        <b>{Number(k.toplam || 0).toFixed(2)}</b>
+                        <button
+                          onClick={() => satirSil(k.id)}
+                          style={{
+                            marginLeft: "8px",
+                            padding: "2px 6px",
+                            border: "none",
+                            background: "transparent",
+                            color: "red",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                          }}
+                          title="Satırı Sil"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+            {adisyon.kalemler.length === 0 && (
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                }}
+                style={{ textAlign: "center", color: "#888", padding: "20px" }}
               >
-                <button
-                  onClick={() => adetAzalt(k.id)}
-                  style={{
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    border: "1px solid #d0b48c",
-                    background: "#fbe9e7",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    lineHeight: "1",
-                  }}
-                >
-                  -
-                </button>
-                <span>{k.adet}</span>
-                <button
-                  onClick={() => adetArtir(k.id)}
-                  style={{
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    border: "1px solid #d0b48c",
-                    background: "#e8f5e9",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    lineHeight: "1",
-                  }}
-                >
-                  +
-                </button>
+                Yeni adisyon üzerinde ürün bulunmamaktadır.
               </div>
-            </td>
-            <td
-              style={{
-                padding: "6px 8px",
-                borderBottom: "1px solid #f4e0c2",
-                textAlign: "right",
-                color: "#000",
-              }}
-            >
-              {Number(k.birimFiyat || 0).toFixed(2)}
-            </td>
-            <td
-              style={{
-                padding: "6px 8px",
-                borderBottom: "1px solid #f4e0c2",
-                textAlign: "right",
-                color: "#000",
-              }}
-            >
-              <b>{Number(k.toplam || 0).toFixed(2)}</b>
-            </td>
-          </tr>
-        </React.Fragment>
-      ))}
-    </tbody>
-  </table>
-  {adisyon.kalemler.length === 0 && (
-    <div
-      style={{ textAlign: "center", color: "#888", padding: "20px" }}
-    >
-      Yeni adisyon üzerinde ürün bulunmamaktadır.
-    </div>
-  )}
-</div>        )}
+            )}
+          </div>
+        )}
       </div>
 
       {/* SÜTUN 3: SAĞ 1 PANEL – MENÜ */}
