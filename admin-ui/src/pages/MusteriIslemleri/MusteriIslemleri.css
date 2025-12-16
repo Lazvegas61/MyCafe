@@ -52,12 +52,46 @@
 /* ------------------------------------------------------------
    MÜŞTERİ LİSTESİ
 ------------------------------------------------------------- */
-.panel.customers input {
-  width: 100%;
+.panel.customers .search-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.panel.customers .search-container input {
+  flex: 1;
   padding: 10px 12px;
   border-radius: 10px;
   border: 2px solid #d2b295;
-  margin-bottom: 14px;
+}
+
+.panel.customers .search-container button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 2px solid #d2b295;
+  background: #f8f3e9;
+  color: #5a3921;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.panel.customers .search-container button:hover {
+  background: #f5e8d0;
+}
+
+.panel.customers .customer-list-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.panel.customers .customer-list-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel.customers .customer-list-container::-webkit-scrollbar-thumb {
+  background: #d2b295;
+  border-radius: 4px;
 }
 
 .panel.customers ul {
@@ -69,18 +103,72 @@
 .panel.customers li {
   display: flex;
   justify-content: space-between;
-  padding: 10px 12px;
+  align-items: center;
+  padding: 12px;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
+  margin-bottom: 6px;
+  border: 1px solid #e6d6c1;
 }
 
 .panel.customers li:hover {
   background: #f5e8d0;
+  border-color: #d2b295;
 }
 
-.panel.customers strong {
+.panel.customers li.active {
+  background: #f0e4cc;
+  border: 2px solid #c79a63;
+}
+
+.panel.customers .customer-info {
+  flex: 1;
+}
+
+.panel.customers .customer-info .name {
+  font-weight: 700;
+  color: #5a3921;
+  margin-bottom: 4px;
+}
+
+.panel.customers .customer-info .phone {
+  font-size: 12px;
+  color: #8b7d70;
+}
+
+.panel.customers .debt-amount {
+  font-weight: 800;
+  font-size: 16px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  min-width: 80px;
+  text-align: right;
+}
+
+.panel.customers .debt-amount.has-debt {
   color: #8b4513;
+  background: #ffebee;
+}
+
+.panel.customers .debt-amount.no-debt {
+  color: #2e7d32;
+  background: #e8f5e9;
+}
+
+.panel.customers .delete-btn {
+  background: none;
+  border: none;
+  color: #c62828;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 8px;
+  border-radius: 4px;
+}
+
+.panel.customers .delete-btn:hover {
+  background: #ffebee;
 }
 
 .btn-add {
@@ -95,6 +183,10 @@
   cursor: pointer;
 }
 
+.btn-add:hover {
+  background: linear-gradient(135deg, #b18452, #a07548);
+}
+
 /* ------------------------------------------------------------
    MÜŞTERİ DETAY
 ------------------------------------------------------------- */
@@ -102,11 +194,97 @@
   margin: 6px 0;
 }
 
-.panel.detail .debt {
-  margin-top: 10px;
-  font-size: 18px;
+.panel.detail .debt-container {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f8f3e9;
+  border-radius: 12px;
+  border: 1px solid #d2b295;
+}
+
+.panel.detail .current-debt {
+  font-size: 24px;
   font-weight: 900;
+  color: #8b4513;
+  margin-bottom: 12px;
+}
+
+.panel.detail .discount-section {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px dashed #d2b295;
+}
+
+.panel.detail .discount-section input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #d2b295;
+}
+
+.panel.detail .discount-section button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #ff9800;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panel.detail .discount-section button:hover {
+  background: #f57c00;
+}
+
+.panel.detail .after-discount {
+  font-size: 20px;
+  font-weight: 800;
   color: #2e7d32;
+  padding-top: 12px;
+  border-top: 1px solid #e6d6c1;
+}
+
+.panel.detail .accounts-list {
+  margin-top: 16px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e6d6c1;
+}
+
+.panel.detail .account-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5e8d0;
+}
+
+.panel.detail .account-item:last-child {
+  border-bottom: none;
+}
+
+.panel.detail .account-item .account-info {
+  font-weight: 600;
+  color: #5a3921;
+}
+
+.panel.detail .account-item .account-amount {
+  font-weight: 700;
+  color: #8b4513;
+}
+
+.panel.detail .total-accounts {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid #d2b295;
+  font-weight: 800;
+  color: #5a3921;
+  text-align: right;
 }
 
 .info-box {
@@ -122,11 +300,40 @@
   padding: 10px;
   border-radius: 10px;
   border: 2px solid #d2b295;
+  margin-top: 12px;
+  resize: vertical;
 }
 
 .empty {
   color: #a1887f;
   font-style: italic;
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+}
+
+.delete-customer-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid #c62828;
+  background: #ffebee;
+  color: #c62828;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.delete-customer-btn:hover {
+  background: #ffcdd2;
+}
+
+.delete-customer-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f5f5f5;
+  border-color: #bdbdbd;
+  color: #9e9e9e;
 }
 
 /* ------------------------------------------------------------
@@ -134,9 +341,13 @@
 ------------------------------------------------------------- */
 .panel-bottom {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
   margin-bottom: 24px;
+}
+
+.panel-bottom .panel {
+  padding: 20px;
 }
 
 .panel-bottom input,
@@ -146,19 +357,33 @@
   border-radius: 10px;
   border: 2px solid #d2b295;
   margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.radio-group {
+  display: flex;
+  gap: 20px;
+  margin: 16px 0;
 }
 
 .radio-group label {
-  display: block;
-  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.radio-group input[type="radio"] {
+  accent-color: #8b4513;
 }
 
 .warning {
   background: #ffebee;
-  padding: 10px;
+  padding: 12px;
   border-radius: 10px;
   color: #c62828;
   font-weight: 700;
+  margin-bottom: 16px;
 }
 
 .btn-primary {
@@ -169,6 +394,11 @@
   background: #8b4513;
   color: white;
   font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #70380e;
 }
 
 .btn-success {
@@ -179,25 +409,107 @@
   background: linear-gradient(135deg, #4caf50, #388e3c);
   color: white;
   font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #388e3c, #2c6b2f);
+}
+
+.btn-primary:disabled,
+.btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ------------------------------------------------------------
    GEÇMİŞ TABLOSU
 ------------------------------------------------------------- */
+.panel.history {
+  overflow-x: auto;
+}
+
 .panel.history table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 800px;
 }
 
 .panel.history th,
 .panel.history td {
-  padding: 10px;
+  padding: 12px;
   border-bottom: 1px solid #e0d5c3;
   text-align: left;
 }
 
 .panel.history th {
   font-weight: 800;
+  background: #f8f3e9;
+  position: sticky;
+  top: 0;
+}
+
+.panel.history tbody tr:hover {
+  background: #f5e8d0;
+}
+
+.panel.history .payment-row {
+  background: #e8f5e9;
+}
+
+.panel.history .payment-row td:first-child {
+  font-weight: 700;
+  color: #2e7d32;
+}
+
+.panel.history .debt-row {
+  background: #fff3e0;
+}
+
+.panel.history .discount-row {
+  background: #e3f2fd;
+}
+
+.panel.history .positive-amount {
+  color: #8b4513;
+  font-weight: 700;
+}
+
+.panel.history .negative-amount {
+  color: #2e7d32;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------
+   FİLTRE BUTONLARI
+------------------------------------------------------------- */
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6d6c1;
+}
+
+.filter-buttons button {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid #d2b295;
+  background: #f8f3e9;
+  color: #5a3921;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-buttons button:hover {
+  background: #f5e8d0;
+}
+
+.filter-buttons button.active {
+  background: #8b4513;
+  color: white;
+  border-color: #8b4513;
 }
 
 /* ------------------------------------------------------------
@@ -208,4 +520,166 @@
   .panel-bottom {
     grid-template-columns: 1fr;
   }
+  
+  .radio-group {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filter-buttons {
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  
+  .filter-buttons button {
+    flex-shrink: 0;
+  }
+}
+/* ------------------------------------------------------------
+   MODAL STİLLERİ
+------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 18px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 2px solid #e6d6c1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #5a3921;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #8b4513;
+}
+
+.modal-close:hover {
+  color: #70380e;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.adisyon-info {
+  background: #f8f3e9;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.adisyon-info p {
+  margin: 8px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.adisyon-info strong {
+  color: #5a3921;
+}
+
+.urunler-listesi {
+  margin-top: 20px;
+}
+
+.urunler-listesi h4 {
+  color: #5a3921;
+  margin-bottom: 10px;
+}
+
+.urunler-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.urunler-table th,
+.urunler-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e6d6c1;
+  text-align: left;
+}
+
+.urunler-table th {
+  background: #f8f3e9;
+  color: #5a3921;
+  font-weight: 600;
+}
+
+.urunler-table tfoot tr {
+  background: #f8f3e9;
+  font-weight: bold;
+}
+
+.adisyon-not {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f0f7ff;
+  border-radius: 10px;
+  border-left: 4px solid #2196f3;
+}
+
+.adisyon-not h4 {
+  margin-top: 0;
+  color: #1976d2;
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: 2px solid #e6d6c1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-footer .btn-primary {
+  padding: 10px 30px;
+  border-radius: 10px;
+  border: none;
+  background: #8b4513;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modal-footer .btn-primary:hover {
+  background: #70380e;
+}
+
+/* MÜŞTERİ ADİSYON SAYISI */
+.panel.customers .adisyon-count {
+  font-size: 11px;
+  color: #8b7d70;
+  background: #f0e4cc;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
 }

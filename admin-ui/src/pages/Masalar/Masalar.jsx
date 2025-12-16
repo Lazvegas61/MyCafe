@@ -74,7 +74,7 @@ const getAdisyonToplam = (adisyonId) => {
   }
 };
 
-// YENİ: Masa toplamını al
+// YENİ: Masa toplamını al (AnaEkran ile uyumlu)
 const getMasaToplam = (masaNo) => {
   try {
     const key = `mc_masa_toplam_${masaNo}`;
@@ -124,7 +124,11 @@ export default function Masalar({ onOpenAdisyon }) {
         const existing = prev.find(m => m.no === rawMasa.no);
         if (existing) {
           // Var olan masayı koru, sadece adisyonId güncelle
-          return { ...existing, adisyonId: rawMasa.adisyonId || existing.adisyonId };
+          return { 
+            ...existing, 
+            adisyonId: rawMasa.adisyonId || existing.adisyonId,
+            durum: rawMasa.durum || existing.durum || "BOŞ"
+          };
         }
         // Yeni masa için normalize et
         return normalizeMasa(rawMasa, index);
@@ -182,9 +186,11 @@ export default function Masalar({ onOpenAdisyon }) {
     const anaAdisyon = adisyonlar.find(a => a.id === masa.adisyonId);
     if (!anaAdisyon) return { acik: false };
     
-    // Status kontrolü
+    // Status kontrolü - DÜZELTİLDİ
     const status = anaAdisyon.status?.toUpperCase() || anaAdisyon.durum?.toUpperCase() || "";
-    if (status === "CLOSED" || status === "KAPALI") {
+    const kapali = anaAdisyon.kapali || status === "CLOSED" || status === "KAPALI";
+    
+    if (kapali) {
       return { acik: false };
     }
     
@@ -195,28 +201,32 @@ export default function Masalar({ onOpenAdisyon }) {
     const gecenDakika = Math.floor((simdi - acilis) / 60000);
     const acilisSaati = formatTime(acilis);
     
-    // YENİ: Önce masa toplamını kontrol et, yoksa adisyon toplamlarını topla
+    // YENİ: Masa toplamını AnaEkran ile uyumlu şekilde al
     let toplamTutar = getMasaToplam(masa.no);
     
     if (toplamTutar === 0) {
-      // Masa toplamı yoksa, adisyon toplamlarını hesapla
-      toplamTutar = getAdisyonToplam(masa.adisyonId);
-      
-      // Aynı masadaki açık ayırma adisyonlarını bul
-      const ayirmaAdisyonlari = adisyonlar.filter(a => {
-        const isSameMasa = a.masaNo?.toString() === masa.no.toString() || 
-                          a.masaNum?.toString() === masa.no.toString();
-        const isDifferentId = a.id !== masa.adisyonId;
-        const aStatus = a.status?.toUpperCase() || a.durum?.toUpperCase() || "";
-        const isOpen = aStatus !== "CLOSED" && aStatus !== "KAPALI";
+      // Masa toplamı yoksa, tüm açık adisyonları topla
+      const masaAdisyonlari = adisyonlar.filter(a => {
+        const masaEslesti = 
+          a.masaNo === `MASA ${masa.no}` || 
+          a.masaNum === masa.no ||
+          a.id === masa.adisyonId;
         
-        return isSameMasa && isDifferentId && isOpen;
+        const aStatus = a.status?.toUpperCase() || a.durum?.toUpperCase() || "";
+        const aKapali = a.kapali || aStatus === "CLOSED" || aStatus === "KAPALI";
+        
+        return masaEslesti && !aKapali;
       });
       
-      // Ayırma adisyonlarının toplamını da ekle
-      ayirmaAdisyonlari.forEach(ad => {
-        toplamTutar += getAdisyonToplam(ad.id);
+      masaAdisyonlari.forEach(ad => {
+        const adToplam = (ad.kalemler || []).reduce((sum, k) => {
+          return sum + (Number(k.toplam) || 0);
+        }, 0);
+        toplamTutar += adToplam;
       });
+      
+      // Kaydet
+      localStorage.setItem(`mc_masa_toplam_${masa.no}`, toplamTutar.toFixed(2));
     }
     
     return {
@@ -225,7 +235,6 @@ export default function Masalar({ onOpenAdisyon }) {
       acilisSaati,
       toplamTutar,
       adisyon: anaAdisyon,
-      ayirmaSayisi: 0, // Basitleştirdik
     };
   }, [adisyonlar]);
 
@@ -250,6 +259,7 @@ export default function Masalar({ onOpenAdisyon }) {
       id: `masa_${nextNo}`,
       no: nextNo,
       adisyonId: null,
+      durum: "BOŞ"
     };
     
     const yeniListe = [...masalar, yeniMasa];
@@ -282,6 +292,9 @@ export default function Masalar({ onOpenAdisyon }) {
     if (seciliMasa === masaNo) {
       setSeciliMasa(null);
     }
+    
+    // LocalStorage temizle
+    localStorage.removeItem(`mc_masa_toplam_${masaNo}`);
   }, [masalar, silMasaNo, masaBilgileri, seciliMasa, saveMasalar]);
 
   // --------------------------------------------------
@@ -340,7 +353,7 @@ export default function Masalar({ onOpenAdisyon }) {
         };
       }
       
-      // Aynı masadaki ayırma adisyonlarını da güncelle
+      // Aynı masadaki diğer adisyonları da güncelle
       if ((ad.masaNo === `MASA ${sourceNo}` || ad.masaNum === sourceNo) && ad.id !== adisyonId) {
         return {
           ...ad,
@@ -355,16 +368,28 @@ export default function Masalar({ onOpenAdisyon }) {
     // Adisyonları kaydet
     saveAdisyonlar(updatedAdisyonlar);
     
-    // 2. MASALARI GÜNCELLE
+    // 2. MASALARI GÜNCELLE - DÜZELTİLDİ
     const updatedMasalar = masalar.map(m => {
-      // Kaynak masayı boşalt
+      // Kaynak masayı BOŞALT
       if (m.no === sourceNo) {
-        return { ...m, adisyonId: null };
+        return { 
+          ...m, 
+          adisyonId: null,
+          durum: "BOŞ", // ✅ DÜZELTME
+          toplamTutar: "0.00",
+          guncellemeZamani: new Date().toISOString()
+        };
       }
       
-      // Hedef masaya adisyonId'yi ata
+      // Hedef masaya adisyonId'yi ata ve DOLU yap
       if (m.no === targetMasa.no) {
-        return { ...m, adisyonId };
+        return { 
+          ...m, 
+          adisyonId: adisyonId,
+          durum: "DOLU", // ✅ DÜZELTME
+          toplamTutar: sourceToplam.toFixed(2),
+          guncellemeZamani: new Date().toISOString()
+        };
       }
       
       return m;
@@ -373,25 +398,29 @@ export default function Masalar({ onOpenAdisyon }) {
     saveMasalar(updatedMasalar);
     
     // 3. LOCALSTORAGE'DAKİ TOPLAM TUTARLARI GÜNCELLE
-    // Kaynak masa toplamını hedef masaya taşı
-    localStorage.setItem(`mc_masa_toplam_${targetMasa.no}`, sourceToplam.toString());
-    
-    // Kaynak masa toplamını temizle
+    // Kaynak masa toplamını SIFIRLA
     localStorage.removeItem(`mc_masa_toplam_${sourceNo}`);
     
-    // Adisyon toplamlarını da güncelle (masa numarası değişti)
-    const sourceAdisyonToplam = getAdisyonToplam(adisyonId);
-    localStorage.setItem(`mc_adisyon_toplam_${adisyonId}`, sourceAdisyonToplam.toString());
+    // Hedef masa toplamını kaynak toplam yap
+    localStorage.setItem(`mc_masa_toplam_${targetMasa.no}`, sourceToplam.toString());
     
-    // 4. TÜM AYIRMA ADİSYONLARINI BUL VE GÜNCELLE
-    const ayirmaAdisyonlari = adisyonlar.filter(ad => 
+    // Adisyon toplamlarını da güncelle
+    const sourceAdisyonToplam = getAdisyonToplam(adisyonId);
+    if (sourceAdisyonToplam > 0) {
+      localStorage.setItem(`mc_adisyon_toplam_${adisyonId}`, sourceAdisyonToplam.toString());
+    }
+    
+    // 4. TÜM DİĞER ADİSYONLARI BUL VE GÜNCELLE
+    const digerAdisyonlar = adisyonlar.filter(ad => 
       (ad.masaNo === `MASA ${sourceNo}` || ad.masaNum === sourceNo) && 
       ad.id !== adisyonId
     );
     
-    ayirmaAdisyonlari.forEach(ad => {
-      const ayirmaToplam = getAdisyonToplam(ad.id);
-      localStorage.setItem(`mc_adisyon_toplam_${ad.id}`, ayirmaToplam.toString());
+    digerAdisyonlar.forEach(ad => {
+      const digerToplam = getAdisyonToplam(ad.id);
+      if (digerToplam > 0) {
+        localStorage.setItem(`mc_adisyon_toplam_${ad.id}`, digerToplam.toString());
+      }
     });
     
     // 5. MASALAR SAYFASINI GÜNCELLE
@@ -444,12 +473,15 @@ export default function Masalar({ onOpenAdisyon }) {
       saveAdisyonlar(yeniAdisyonList);
       
       const yeniMasaList = masalar.map(m =>
-        m.no === masa.no ? { ...m, adisyonId } : m
+        m.no === masa.no ? { ...m, adisyonId: adisyonId, durum: "DOLU" } : m
       );
       saveMasalar(yeniMasaList);
       
       // Yeni adisyon için masa toplamını sıfırla
       localStorage.setItem(`mc_masa_toplam_${masa.no}`, "0");
+      
+      // Event tetikle
+      window.dispatchEvent(new Event('adisyonGuncellendi'));
     }
     
     // Navigate
@@ -699,7 +731,7 @@ export default function Masalar({ onOpenAdisyon }) {
                     </div>
                   </div>
 
-                  {/* TOTAL AMOUNT - DİREKT LOCALSTORAGE'DAN */}
+                  {/* TOTAL AMOUNT - AnaEkran ile uyumlu */}
                   <div
                     style={{
                       fontSize: "20px",
@@ -708,7 +740,7 @@ export default function Masalar({ onOpenAdisyon }) {
                       marginTop: "5px",
                     }}
                   >
-                    ₺ {bilgi.toplamTutar.toFixed(2)}
+                    ₺ {(bilgi.toplamTutar || 0).toFixed(2)}
                   </div>
                   
                   {/* DRAG HINT */}
@@ -744,7 +776,7 @@ export default function Masalar({ onOpenAdisyon }) {
       >
         Toplam {masalar.length} masa • {masalar.filter(m => masaBilgileri[m.no]?.acik).length} açık adisyon
         <div style={{ fontSize: "11px", marginTop: "4px", opacity: 0.7 }}>
-          Tutarlar anlık güncellenir • Masa taşıma aktif
+          Tutarlar AnaEkran ile uyumlu • Masa taşıma aktif
         </div>
       </div>
     </div>

@@ -447,12 +447,24 @@ export default function Adisyon() {
   };
 
   // --------------------------------------------------
-  // MÜŞTERİ / BORÇ VERİLERİNİ YÜKLE
+  // MÜŞTERİ / BORÇ VERİLERİNİ YÜKLE - DÜZELTİLDİ: Müşterileri yükle
   // --------------------------------------------------
   useEffect(() => {
     const mList = okuJSON(MUSTERI_KEY, []);
     setMusteriler(Array.isArray(mList) ? mList : []);
   }, []);
+
+  // --------------------------------------------------
+  // HESABA YAZ MODU AÇ/KAPA - YENİ EKLENDİ
+  // --------------------------------------------------
+  useEffect(() => {
+    // Hesaba Yaz butonuna tıklandığında modu aç
+    if (aktifOdemeTipi === "HESABA_YAZ" && !hesabaYazModu) {
+      console.log("🟢 HESABA_YAZ modu açılıyor!");
+      setHesabaYazModu(true);
+      setBorcTutarInput(String(kalan || 0)); // Varsayılan tutar = kalan
+    }
+  }, [aktifOdemeTipi, hesabaYazModu, kalan]);
 
   // --------------------------------------------------
   // ÖDEME SÖZÜ POPUP KONTROLÜ
@@ -1233,8 +1245,8 @@ export default function Adisyon() {
     // =============================
   };
 
-  // --------------------------------------------------
-  // HESABA YAZ ÖZETİ (Secili müşteri için)
+   // --------------------------------------------------
+  // HESABA YAZ ÖZETİ (Secili müşteri için) - GÜNCELLENDİ
   // --------------------------------------------------
   const mevcutBorcOzet = useMemo(() => {
     if (!seciliMusteriId) return { toplamBorc: 0, toplamOdeme: 0, kalan: 0 };
@@ -1242,11 +1254,11 @@ export default function Adisyon() {
     const musteriBorclari = borclar.filter((b) => b.musteriId === seciliMusteriId);
     
     const toplamBorc = musteriBorclari.reduce((sum, b) => 
-      sum + b.hareketler.filter(h => h.tip === "BORÇ EKLENDİ").reduce((s, h) => s + (h.tutar || 0), 0)
+      sum + (b.hareketler?.filter(h => h.tip === "BORÇ EKLENDİ").reduce((s, h) => s + (h.tutar || 0), 0) || 0)
     , 0);
     
     const toplamOdeme = musteriBorclari.reduce((sum, b) => 
-      sum + b.hareketler.filter(h => h.tip === "ÖDEME ALINDI").reduce((s, h) => s + (h.tutar || 0), 0)
+      sum + (b.hareketler?.filter(h => h.tip === "ÖDEME ALINDI").reduce((s, h) => s + (h.tutar || 0), 0) || 0)
     , 0);
 
     return {
@@ -1257,18 +1269,16 @@ export default function Adisyon() {
   }, [seciliMusteriId, hesabaYazModu, borcTutarInput]);
 
   // --------------------------------------------------
-  // ÖDEME EKLEME - GÜNCELLENDİ
+  // ÖDEME EKLEME - GÜNCELLENDİ (Hesaba Yaz kontrolü düzeltildi)
   // --------------------------------------------------
   const odemeEkle = () => {
     // Ödeme her zaman YENİ adisyona eklenir
     if (!adisyon) return;
 
-    // Hesaba Yaz için
-    if (aktifOdemeTipi === "HESABA_YAZ") {
-      console.log("🟢 HESABA_YAZ butonuna tıklandı!");
-      setHesabaYazModu(true);
-      setBorcTutarInput(String(kalan || 0));
-      return; // Bu return çok önemli!
+    // Eğer Hesaba Yaz modu açıksa, bu fonksiyon çağrılmamalı
+    if (aktifOdemeTipi === "HESABA_YAZ" && hesabaYazModu) {
+      console.log("🟢 HESABA_YAZ modu zaten açık, odemeEkle çağrılmamalı!");
+      return;
     }
 
     let tutar = Number(odemeInput);
@@ -1323,7 +1333,7 @@ export default function Adisyon() {
   };
 
   // --------------------------------------------------
-  // HESABA YAZ KAYDET (SADECE YENİ ADİSYON)
+  // HESABA YAZ KAYDET (SADECE YENİ ADİSYON) - GÜNCELLENDİ
   // --------------------------------------------------
   const hesabaYazKaydet = () => {
     if (!adisyon) return;
@@ -1334,35 +1344,64 @@ export default function Adisyon() {
       return;
     }
 
+    // TUTAR KONTROLÜ: Girilen tutar kalan tutardan fazla olamaz
+    if (borcTutar > kalan) {
+      alert(`Borç tutarı kalan tutardan (${kalan.toFixed(2)} TL) fazla olamaz!`);
+      return;
+    }
+
     let guncelMusteriler = [...musteriler];
     let musteriId = seciliMusteriId;
 
+    // YENİ MÜŞTERİ KONTROLÜ - DÜZELTİLDİ
     if (!musteriId) {
-      if (!yeniMusteriAdSoyad) {
+      if (!yeniMusteriAdSoyad.trim()) {
         alert("Yeni müşteri için Ad Soyad giriniz.");
         return;
       }
-      const yeniId = Date.now().toString();
-      const yeniMusteri = {
-        id: yeniId,
-        adSoyad: yeniMusteriAdSoyad,
-        telefon: yeniMusteriTelefon,
-        not: yeniMusteriNot,
-      };
-      guncelMusteriler.push(yeniMusteri);
-      musteriId = yeniId;
+      
+      if (!yeniMusteriTelefon.trim()) {
+        alert("Yeni müşteri için Telefon numarası giriniz.");
+        return;
+      }
+      
+      // Telefon numarası benzersiz kontrolü
+      const existingCustomer = guncelMusteriler.find(c => 
+        c.telefon === yeniMusteriTelefon.trim()
+      );
+      
+      if (existingCustomer) {
+        alert("Bu telefon numarası zaten kayıtlı!");
+        // Otomatik olarak mevcut müşteriyi seç
+        setSeciliMusteriId(existingCustomer.id);
+        musteriId = existingCustomer.id;
+      } else {
+        const yeniId = `cust_${Date.now().toString()}`;
+        const yeniMusteri = {
+          id: yeniId,
+          adSoyad: yeniMusteriAdSoyad.trim(),
+          telefon: yeniMusteriTelefon.trim(),
+          not: yeniMusteriNot.trim(),
+          created_at: new Date().toISOString(),
+          total_debt: borcTutar
+        };
+        guncelMusteriler.push(yeniMusteri);
+        musteriId = yeniId;
+        setSeciliMusteriId(yeniId);
+      }
     }
 
+    // BORÇ KAYDI OLUŞTUR
     const borclar = okuJSON(BORC_KEY, []);
     const yeniBorc = {
-      id: Date.now().toString(),
+      id: `borc_${Date.now().toString()}`,
       musteriId,
       masaNo: isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`,
       masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
       adisyonId: adisyon.id, // Yeni adisyon ID'si
       tutar: borcTutar,
-      acilisZamani: adisyon.acilisZamani,
-      kapanisZamani: adisyon.kapanisZamani,
+      acilisZamani: new Date().toISOString(),
+      kapanisZamani: null,
       odemeSozu: null,
       hatirlatildi: false,
       hareketler: [
@@ -1370,13 +1409,17 @@ export default function Adisyon() {
           tip: "BORÇ EKLENDİ",
           tutar: borcTutar,
           tarih: new Date().toISOString(),
-          aciklama: `Hesaba Yaz - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo}`,
+          aciklama: `Hesaba Yaz - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
         },
       ],
+      remainingAmount: borcTutar, // Kalan ödenecek tutar
+      isCollected: false,
+      collectedAmount: 0
     };
     borclar.push(yeniBorc);
     yazJSON(BORC_KEY, borclar);
 
+    // ÖDEME KAYDI OLUŞTUR (Sadece adisyon içinde)
     const yeniOdeme = {
       id: `hy_${Date.now().toString()}`,
       tip: "HESABA_YAZ",
@@ -1391,15 +1434,40 @@ export default function Adisyon() {
       ],
       odemeler: [...(adisyon.odemeler || []), yeniOdeme],
     };
+    
     setAdisyon(guncelAdisyon);
     guncelAdisyonLocal(guncelAdisyon);
 
-    yazJSON(MUSTERI_KEY, guncelMusteriler);
-    setMusteriler(guncelMusteriler);
+    // MÜŞTERİYİ GÜNCELLE
+    if (musteriId) {
+      const updatedCustomers = guncelMusteriler.map(c => {
+        if (c.id === musteriId) {
+          return {
+            ...c,
+            total_debt: (c.total_debt || 0) + borcTutar,
+            debt: (c.debt || 0) + borcTutar
+          };
+        }
+        return c;
+      });
+      
+      yazJSON(MUSTERI_KEY, updatedCustomers);
+      setMusteriler(updatedCustomers);
+    }
+
+    alert(`Borç kaydedildi! ${borcTutar.toFixed(2)} TL müşteri hesabına yazıldı.\nAdisyon kapatılmadı - kalan: ${(kalan - borcTutar).toFixed(2)} TL`);
     
-    alert("Borç kaydedildi. (Hesaba Yaz) – Adisyon kapatılmadı.");
+    // HESABA YAZ MODUNU KAPAT
     setHesabaYazModu(false);
+    setAktifOdemeTipi("NAKIT"); // Ödeme tipini sıfırla
     setHesabaYazSonrasiMasaDon(true);
+    
+    // FORM ALANLARINI TEMİZLE
+    setSeciliMusteriId(null);
+    setYeniMusteriAdSoyad("");
+    setYeniMusteriTelefon("");
+    setYeniMusteriNot("");
+    setBorcTutarInput("");
     
     // =============================
     // YENİ EKLENEN KOD: Hesaba yaz kaydedildiğinde masalar sayfasını güncelle
@@ -1424,6 +1492,20 @@ export default function Adisyon() {
     // =============================
     // YENİ EKLENEN KOD SONU
     // =============================
+  };
+
+  // --------------------------------------------------
+  // HESABA YAZ İPTAL - YENİ EKLENDİ
+  // --------------------------------------------------
+  const hesabaYazIptal = () => {
+    setHesabaYazModu(false);
+    setAktifOdemeTipi("NAKIT"); // Ödeme tipini sıfırla
+    setSeciliMusteriId(null);
+    setYeniMusteriAdSoyad("");
+    setYeniMusteriTelefon("");
+    setYeniMusteriNot("");
+    setBorcTutarInput("");
+    console.log("🔴 HESABA_YAZ modu iptal edildi!");
   };
 
   // --------------------------------------------------
@@ -2121,7 +2203,7 @@ export default function Adisyon() {
             </div>
           </div>
 
-          {/* ÖDEME TİPİ SEÇİMİ */}
+          {/* ÖDEME TİPİ SEÇİMİ - GÜNCELLENDİ: HESABA_YAZ seçildiğinde işlem yapma */}
           <div
             style={{
               marginTop: "14px",
@@ -2138,7 +2220,19 @@ export default function Adisyon() {
             ].map((o) => (
               <button
                 key={o.tip}
-                onClick={() => setAktifOdemeTipi(o.tip)}
+                onClick={() => {
+                  setAktifOdemeTipi(o.tip);
+                  if (o.tip === "HESABA_YAZ") {
+                    console.log("🟢 HESABA_YAZ seçildi, mod açılıyor!");
+                    setHesabaYazModu(true);
+                    setBorcTutarInput(String(kalan || 0));
+                  } else {
+                    // Diğer ödeme tiplerinde Hesaba Yaz modunu kapat
+                    if (hesabaYazModu) {
+                      setHesabaYazModu(false);
+                    }
+                  }
+                }}
                 style={{
                   padding: "8px 12px",
                   borderRadius: "20px",
@@ -2146,10 +2240,13 @@ export default function Adisyon() {
                     aktifOdemeTipi === o.tip
                       ? "2px solid #c57f3e"
                       : "1px solid #bfa37d",
-                  background: aktifOdemeTipi === o.tip ? "#f7d9a8" : "#ffffff",
+                  background: aktifOdemeTipi === o.tip 
+                    ? (o.tip === "HESABA_YAZ" ? "#2980b9" : "#f7d9a8") 
+                    : "#ffffff",
                   cursor: "pointer",
                   fontSize: "15px",
                   fontWeight: "500",
+                  color: aktifOdemeTipi === o.tip && o.tip === "HESABA_YAZ" ? "white" : "inherit",
                 }}
               >
                 {o.etiket}
@@ -2157,9 +2254,10 @@ export default function Adisyon() {
             ))}
           </div>
 
-          {/* ÖDEME TUTARI */}
-          {aktifOdemeTipi !== "HESABA_YAZ" && (
+          {/* HESABA YAZ MODU DEĞİLSE NORMAL ÖDEME ALANLARI */}
+          {!hesabaYazModu && aktifOdemeTipi !== "HESABA_YAZ" && (
             <>
+              {/* ÖDEME TUTARI */}
               <div style={{ marginTop: "10px" }}>
                 <label>Tutar</label>
                 <input
@@ -2201,38 +2299,40 @@ export default function Adisyon() {
           )}
 
           {/* İNDİRİM */}
-          <div style={{ marginTop: "14px" }}>
-            <label>İndirim (Enter ile uygula)</label>
-            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-              <input
-                type="number"
-                value={indirimInput}
-                onChange={(e) => setIndirimInput(e.target.value)}
-                onKeyDown={indirimEnter}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  borderRadius: "8px",
-                  border: "1px solid #bfa37d",
-                  fontSize: "15px",
-                  background: "#fff",
-                }}
-              />
-              <button
-                onClick={indirimSifirla}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #bfa37d",
-                  background: "#fdf4e4",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                Sıfırla
-              </button>
+          {!hesabaYazModu && (
+            <div style={{ marginTop: "14px" }}>
+              <label>İndirim (Enter ile uygula)</label>
+              <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                <input
+                  type="number"
+                  value={indirimInput}
+                  onChange={(e) => setIndirimInput(e.target.value)}
+                  onKeyDown={indirimEnter}
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #bfa37d",
+                    fontSize: "15px",
+                    background: "#fff",
+                  }}
+                />
+                <button
+                  onClick={indirimSifirla}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #bfa37d",
+                    background: "#fdf4e4",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Sıfırla
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ALT BUTONLAR */}
@@ -2365,7 +2465,7 @@ export default function Adisyon() {
           </div>
         )}
 
-        {/* YENİ ADİSYON GÖSTERİMİ */}
+        {/* HESABA YAZ MODU AÇIKSA HESABA YAZ PANELİ */}
         {hesabaYazModu ? (
           // HESABA YAZ MODU
           <div style={{ flex: 1, padding: "12px", boxSizing: "border-box" }}>
@@ -2375,10 +2475,12 @@ export default function Adisyon() {
                 fontSize: "24px",
                 marginBottom: "20px",
                 textAlign: "center",
-                color: "#4b2e05",
+                color: "#2980b9", // MAVİ RENK
+                borderBottom: "2px solid #2980b9",
+                paddingBottom: "10px"
               }}
             >
-              HESABA YAZ (VERESİYE)
+              🏦 HESABA YAZ (VERESİYE)
             </div>
 
             <div
@@ -2396,64 +2498,90 @@ export default function Adisyon() {
                   </div>
                   <select
                     value={seciliMusteriId || ""}
-                    onChange={(e) => setSeciliMusteriId(e.target.value || null)}
+                    onChange={(e) => {
+                      setSeciliMusteriId(e.target.value || null);
+                      // Eğer mevcut müşteri seçildiyse, yeni müşteri formunu temizle
+                      if (e.target.value) {
+                        setYeniMusteriAdSoyad("");
+                        setYeniMusteriTelefon("");
+                        setYeniMusteriNot("");
+                      }
+                    }}
                     style={{
                       width: "100%",
-                      padding: "8px",
+                      padding: "10px",
                       borderRadius: "8px",
-                      border: "1px solid #bfa37d",
+                      border: "2px solid #bfa37d",
                       marginTop: "4px",
+                      fontSize: "14px",
+                      background: "#fff"
                     }}
                   >
-                    <option value="">Seçiniz</option>
+                    <option value="">Müşteri Seçiniz</option>
                     {musteriler.map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.adSoyad}
+                        {m.adSoyad} - {m.telefon} (Borç: {(m.total_debt || m.debt || 0).toFixed(2)} TL)
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div style={{ marginBottom: "8px" }}>
-                  <div style={{ fontWeight: "500", marginBottom: "4px" }}>
-                    Yeni Müşteri
+                  <div style={{ fontWeight: "500", marginBottom: "8px", color: "#c57f3e" }}>
+                    YENİ MÜŞTERİ EKLE
                   </div>
                   <input
                     type="text"
-                    placeholder="Ad Soyad"
+                    placeholder="Ad Soyad *"
                     value={yeniMusteriAdSoyad}
-                    onChange={(e) => setYeniMusteriAdSoyad(e.target.value)}
+                    onChange={(e) => {
+                      setYeniMusteriAdSoyad(e.target.value);
+                      // Yeni müşteri girildiğinde mevcut müşteri seçimini temizle
+                      if (e.target.value.trim()) {
+                        setSeciliMusteriId(null);
+                      }
+                    }}
                     style={{
                       width: "100%",
-                      padding: "8px",
+                      padding: "10px",
                       borderRadius: "8px",
-                      border: "1px solid #bfa37d",
-                      marginBottom: "6px",
+                      border: "2px solid #bfa37d",
+                      marginBottom: "10px",
+                      fontSize: "14px"
                     }}
                   />
                   <input
-                    type="text"
-                    placeholder="Telefon"
+                    type="tel"
+                    placeholder="Telefon *"
                     value={yeniMusteriTelefon}
-                    onChange={(e) => setYeniMusteriTelefon(e.target.value)}
+                    onChange={(e) => {
+                      setYeniMusteriTelefon(e.target.value);
+                      // Yeni müşteri girildiğinde mevcut müşteri seçimini temizle
+                      if (e.target.value.trim()) {
+                        setSeciliMusteriId(null);
+                      }
+                    }}
                     style={{
                       width: "100%",
-                      padding: "8px",
+                      padding: "10px",
                       borderRadius: "8px",
-                      border: "1px solid #bfa37d",
-                      marginBottom: "6px",
+                      border: "2px solid #bfa37d",
+                      marginBottom: "10px",
+                      fontSize: "14px"
                     }}
                   />
-                  <input
-                    type="text"
-                    placeholder="Not"
+                  <textarea
+                    placeholder="Not (opsiyonel)"
                     value={yeniMusteriNot}
                     onChange={(e) => setYeniMusteriNot(e.target.value)}
+                    rows={3}
                     style={{
                       width: "100%",
-                      padding: "8px",
+                      padding: "10px",
                       borderRadius: "8px",
-                      border: "1px solid #bfa37d",
+                      border: "2px solid #bfa37d",
+                      fontSize: "14px",
+                      resize: "vertical"
                     }}
                   />
                 </div>
@@ -2461,19 +2589,39 @@ export default function Adisyon() {
 
               {/* Sağ: Borç özeti ve tutar */}
               <div>
-                <div style={{ marginBottom: "8px" }}>
-                  <label>Borç Tutarı</label>
+                <div style={{ marginBottom: "20px" }}>
+                  <div style={{ fontWeight: "500", marginBottom: "4px", fontSize: "16px" }}>
+                    Borç Tutarı (Maks: {kalan.toFixed(2)} TL)
+                  </div>
                   <input
                     type="number"
                     value={borcTutarInput}
-                    onChange={(e) => setBorcTutarInput(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Maksimum kalan tutarı geçemez
+                      const maxTutar = Number(kalan.toFixed(2));
+                      const enteredTutar = Number(value);
+                      
+                      if (enteredTutar > maxTutar) {
+                        setBorcTutarInput(maxTutar.toString());
+                        alert(`Maksimum borç tutarı: ${maxTutar.toFixed(2)} TL`);
+                      } else {
+                        setBorcTutarInput(value);
+                      }
+                    }}
+                    max={kalan}
+                    min="0.01"
+                    step="0.01"
                     style={{
                       width: "100%",
-                      padding: "8px",
+                      padding: "12px",
                       borderRadius: "8px",
-                      border: "1px solid #bfa37d",
+                      border: "2px solid #2980b9",
                       marginTop: "4px",
-                      fontSize: "15px",
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                      background: "#f0f8ff"
                     }}
                   />
                 </div>
@@ -2482,26 +2630,29 @@ export default function Adisyon() {
                   <div
                     style={{
                       marginTop: "15px",
-                      padding: "10px",
+                      padding: "15px",
                       borderRadius: "8px",
-                      background: "#e8d8c3",
-                      border: "1px solid #bfa37d",
+                      background: "#e8f4fc",
+                      border: "1px solid #1a5fb4",
                     }}
                   >
                     <div
                       style={{
                         fontWeight: "bold",
-                        marginBottom: "6px",
+                        marginBottom: "10px",
                         textAlign: "center",
+                        color: "#1a5fb4",
+                        fontSize: "16px"
                       }}
                     >
-                      Mevcut Borç Özeti
+                      📊 MÜŞTERİ BORÇ ÖZETİ
                     </div>
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
                         fontSize: "14px",
+                        marginBottom: "8px"
                       }}
                     >
                       <span>Toplam Borç:</span>
@@ -2512,27 +2663,27 @@ export default function Adisyon() {
                         display: "flex",
                         justifyContent: "space-between",
                         fontSize: "14px",
-                        marginBottom: "4px",
+                        marginBottom: "8px"
                       }}
                     >
                       <span>Toplam Ödeme:</span>
-                      <b>{mevcutBorcOzet.toplamOdeme.toFixed(2)} TL</b>
+                      <b style={{color: "green"}}>{mevcutBorcOzet.toplamOdeme.toFixed(2)} TL</b>
                     </div>
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        borderTop: "1px solid #bfa37d",
-                        paddingTop: "6px",
-                        marginTop: "6px",
+                        borderTop: "1px solid #1a5fb4",
+                        paddingTop: "10px",
+                        marginTop: "10px",
+                        fontSize: "16px",
+                        fontWeight: "bold"
                       }}
                     >
-                      <span style={{ fontWeight: "bold" }}>Net Borç:</span>
+                      <span>Net Borç:</span>
                       <span
                         style={{
-                          fontWeight: "bold",
-                          color:
-                            mevcutBorcOzet.kalan > 0 ? "darkred" : "darkgreen",
+                          color: mevcutBorcOzet.kalan > 0 ? "darkred" : "darkgreen",
                         }}
                       >
                         {mevcutBorcOzet.kalan.toFixed(2)} TL
@@ -2543,48 +2694,62 @@ export default function Adisyon() {
 
                 <button
                   onClick={hesabaYazKaydet}
-                  disabled={!seciliMusteriId && !yeniMusteriAdSoyad}
+                  disabled={(!seciliMusteriId && !yeniMusteriAdSoyad.trim()) || !borcTutarInput || Number(borcTutarInput) <= 0}
                   style={{
                     marginTop: "20px",
                     width: "100%",
-                    padding: "10px",
+                    padding: "15px",
                     borderRadius: "10px",
                     border: "none",
-                    background:
-                      !seciliMusteriId && !yeniMusteriAdSoyad
-                        ? "#95a5a6"
-                        : "#2980b9",
+                    background: (!seciliMusteriId && !yeniMusteriAdSoyad.trim()) || !borcTutarInput || Number(borcTutarInput) <= 0
+                      ? "#95a5a6"
+                      : "#2980b9",
                     color: "#fff",
-                    cursor:
-                      !seciliMusteriId && !yeniMusteriAdSoyad
-                        ? "not-allowed"
-                        : "pointer",
+                    cursor: (!seciliMusteriId && !yeniMusteriAdSoyad.trim()) || !borcTutarInput || Number(borcTutarInput) <= 0
+                      ? "not-allowed"
+                      : "pointer",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    boxShadow: "0 4px 8px rgba(0,0,0,0.2)"
+                  }}
+                >
+                  ✅ BORCU HESABA YAZ
+                </button>
+                <button
+                  onClick={hesabaYazIptal}
+                  style={{
+                    marginTop: "10px",
+                    width: "100%",
+                    padding: "12px",
+                    borderRadius: "10px",
+                    border: "2px solid #bfa37d",
+                    background: "#fff",
+                    cursor: "pointer",
                     fontSize: "16px",
                     fontWeight: "bold",
                   }}
                 >
-                  BORCU KAYDET
+                  ❌ İPTAL
                 </button>
-                <button
-                  onClick={() => setHesabaYazModu(false)}
-                  style={{
-                    marginTop: "10px",
-                    width: "100%",
-                    padding: "10px",
-                    borderRadius: "10px",
-                    border: "1px solid #bfa37d",
-                    background: "#fff",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                  }}
-                >
-                  İPTAL
-                </button>
+                
+                {/* BİLGİ MESAJI */}
+                <div style={{
+                  marginTop: "15px",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  background: "#fff3cd",
+                  border: "1px solid #ffeaa7",
+                  fontSize: "13px",
+                  color: "#856404"
+                }}>
+                  ⓘ <strong>Önemli:</strong> Hesaba Yaz işlemi borç kaydı oluşturur, 
+                  adisyonu <strong>kapatmaz</strong>. Kalan tutar ödenene kadar adisyon açık kalır.
+                </div>
               </div>
             </div>
           </div>
         ) : (
-          // YENİ ADİSYON İÇERİĞİ - SİYAH RENK
+          // YENİ ADİSYON İÇERİĞİ - SİYAH RENK (Normal mod)
           <div style={{ flex: 1, overflowY: "auto" }}>
             <div
               style={{

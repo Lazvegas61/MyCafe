@@ -80,24 +80,12 @@ export default function AnaEkran() {
       
       let totalAmount = 0;
       let normalCount = 0;
-      let bilardoCount = 0;
-      let normalTotal = 0;
-      let bilardoTotal = 0;
       let totalDuration = 0;
       
       openTables.forEach(masa => {
         const amount = parseFloat(masa.toplamTutar) || 0;
         totalAmount += amount;
-        
-        // Masa türünü belirle (bilardo veya normal)
-        const isBilardo = masa.no > 20; // 20'den büyükse bilardo
-        if (isBilardo) {
-          bilardoCount++;
-          bilardoTotal += amount;
-        } else {
-          normalCount++;
-          normalTotal += amount;
-        }
+        normalCount++;
         
         // Süreyi hesapla
         const duration = calculateDuration(masa.acilisZamani);
@@ -111,16 +99,16 @@ export default function AnaEkran() {
       return {
         totalAmount,
         normalCount,
-        bilardoCount,
-        normalTotal,
-        bilardoTotal,
+        bilardoCount: 0,
+        normalTotal: totalAmount,
+        bilardoTotal: 0,
         avgDuration,
         tableCount: openTables.length
       };
     };
   }, []);
 
-  // Dashboard verilerini güncelle
+  // Dashboard verilerini güncelle - DÜZELTİLDİ
   useEffect(() => {
     const updateDashboardData = () => {
       try {
@@ -152,22 +140,106 @@ export default function AnaEkran() {
           (parseInt(u.stock) || 0) <= (parseInt(u.critical) || 10)
         );
 
-        // Açık adisyonlar
+        // AÇIK ADİSYONLARI HESAPLA - YENİ MANTIK (DÜZELTİLDİ)
         const masalar = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
-        const openTables = masalar.filter(m => String(m.durum).toUpperCase() === "DOLU");
+        const allAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
         
-        // Açık adisyon özetini hesapla
-        const summary = calculateOpenTablesSummary(openTables);
+        // 1. ÖNCE TÜM DOLU MASALARI İŞLE
+        const openTablesWithTotals = masalar.map(masa => {
+          if (masa.durum?.toUpperCase() !== "DOLU" || !masa.adisyonId) {
+            return null;
+          }
+          
+          // BU MASAYA AİT TÜM AÇIK ADİSYONLARI BUL
+          const masaAdisyonlari = allAdisyonlar.filter(ad => {
+            // Masa eşleşmesi
+            const masaEslesti = 
+              ad.masaNo === `MASA ${masa.no}` || 
+              ad.masaNum === masa.no ||
+              ad.masaNo === masa.masaNo ||
+              ad.id === masa.adisyonId;
+            
+            // Açık mı kontrol et (KAPALI veya KİLİTLİ değilse)
+            const durum = (ad.durum || ad.status || "").toUpperCase();
+            const kapali = ad.kapali || 
+                          durum === "CLOSED" || 
+                          durum === "KAPALI" ||
+                          durum === "KİLİTLİ";
+            
+            return masaEslesti && !kapali;
+          });
+          
+          if (masaAdisyonlari.length === 0) {
+            return null;
+          }
+          
+          // 2. TOPLAM TUTARI HESAPLA (Adisyon.jsx'teki TOPLAM değeri)
+          let toplamTutar = 0;
+          
+          // ÖNCE LOCALSTORAGE'DAN DENE (Adisyon.jsx'in kaydettiği gibi)
+          const storedTotal = localStorage.getItem(`mc_masa_toplam_${masa.no}`);
+          if (storedTotal) {
+            toplamTutar = parseFloat(storedTotal) || 0;
+          } else {
+            // YOKSA MANUEL HESAPLA
+            masaAdisyonlari.forEach(ad => {
+              const adToplam = (ad.kalemler || []).reduce((sum, k) => {
+                return sum + (Number(k.toplam) || 0);
+              }, 0);
+              toplamTutar += adToplam;
+            });
+            
+            // KAYDET
+            localStorage.setItem(`mc_masa_toplam_${masa.no}`, toplamTutar.toFixed(2));
+          }
+          
+          // 3. MASA BİLGİLERİNİ HAZIRLA
+          const anaAdisyon = masaAdisyonlari.find(ad => !ad.isSplit) || masaAdisyonlari[0];
+          
+          return {
+            ...masa,
+            id: masa.id || `masa_${masa.no}`,
+            no: String(masa.no),
+            toplamTutar: toplamTutar,
+            urunSayisi: masaAdisyonlari.reduce((sum, ad) => {
+              return sum + (ad.kalemler?.length || 0);
+            }, 0),
+            musteriAdi: anaAdisyon?.musteriAdi || null,
+            acilisZamani: anaAdisyon?.acilisZamani || masa.acilisZamani
+          };
+        }).filter(Boolean); // null'ları temizle
+
+        // 4. TEKİL MASALAR (HESAP AYIRMA SORUNU ÇÖZÜMÜ)
+        const uniqueTables = [];
+        const seenMasaNos = new Set();
+
+        openTablesWithTotals.forEach(masa => {
+          if (!seenMasaNos.has(masa.no)) {
+            seenMasaNos.add(masa.no);
+            uniqueTables.push(masa);
+          } else {
+            // Aynı masa numarası varsa, daha yüksek toplamlı olanı al
+            const existingIndex = uniqueTables.findIndex(m => m.no === masa.no);
+            if (existingIndex !== -1 && masa.toplamTutar > uniqueTables[existingIndex].toplamTutar) {
+              uniqueTables[existingIndex] = masa;
+            }
+          }
+        });
+
+        // 5. Açık adisyon özetini hesapla
+        const summary = calculateOpenTablesSummary(uniqueTables);
         setOpenTablesSummary(summary);
 
+        // 6. Dashboard verilerini güncelle
         setDashboardData({
           dailySales: todaySales.toFixed(2),
           totalDebt: totalDebt.toFixed(2),
           dailyExpenses: todayExpenses.toFixed(2),
           criticalCount: criticalProducts.length,
-          openTables: openTables,
+          openTables: uniqueTables,
           criticalProducts: criticalProducts.slice(0, 5)
         });
+
       } catch (error) {
         console.error("Dashboard veri yükleme hatası:", error);
         setDashboardData({
@@ -201,10 +273,12 @@ export default function AnaEkran() {
     const interval = setInterval(updateDashboardData, 30000);
     
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('adisyonGuncellendi', handleStorageChange);
     
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('adisyonGuncellendi', handleStorageChange);
     };
   }, [calculateOpenTablesSummary]);
 
@@ -294,7 +368,7 @@ export default function AnaEkran() {
                     <div 
                       className={`masa-karti ${isBilardo ? 'bilardo' : 'normal'}`} 
                       key={masa.id}
-                      onClick={() => goToTableDetail(masa.id)}
+                      onClick={() => goToTableDetail(masa.no)}
                       title="Detaylar için tıkla"
                     >
                       <div className="masa-karti-header">
