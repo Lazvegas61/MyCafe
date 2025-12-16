@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import BilardoLogo from "../assets/mc-bilardo-small.png";  // LOGO
+import BilardoLogo from "../assets/mc-bilardo-small.png";
 
 const RENK = {
   arka: "#4b2e05",
@@ -9,11 +9,8 @@ const RENK = {
   yazi: "#ffffff",
 };
 
-/* -----------------------------------------------------------
-     📌 MENÜ YAPISI (AYARLAR ALTINA ALT MENÜ EKLENDİ)
------------------------------------------------------------ */
 const menuItems = [
-  { key: "ana", label: "Ana Sayfa", path: "/ana", icon: "🏠" },
+  { key: "ana", label: "Ana Sayfa", path: "/", icon: "🏠" },
   { key: "masalar", label: "Masalar", path: "/masalar", icon: "🍽️" },
   { key: "bilardo", label: "Bilardo", path: "/bilardo", icon: "🎱" },
   { key: "musteri", label: "Müşteri İşlemleri", path: "/musteri-islemleri", icon: "👥" },
@@ -21,15 +18,8 @@ const menuItems = [
   { key: "giderler", label: "Giderler", path: "/giderler", icon: "💸" },
   { key: "raporlar", label: "Raporlar", path: "/raporlar", icon: "📊" },
   { key: "personel", label: "Personel / Kullanıcı", path: "/personel", icon: "🧑‍🍳" },
-
-  /* ---------------------------
-       📌 ANA AYARLAR MENÜSÜ
-  ---------------------------- */
   { key: "ayarlar", label: "Ayarlar", path: "/ayarlar", icon: "⚙️" },
-
-
 ];
-
 
 export default function Sidebar() {
   const location = useLocation();
@@ -48,8 +38,8 @@ export default function Sidebar() {
   };
 
   const isActive = (path) => {
-    if (path === "/ana") {
-      return location.pathname === "/ana" || location.pathname === "/";
+    if (path === "/") {
+      return location.pathname === "/" || location.pathname === "/ana";
     }
     return location.pathname.startsWith(path);
   };
@@ -79,14 +69,12 @@ export default function Sidebar() {
         transition: "transform 0.35s ease-out",
       }}
     >
-      {/* ------- LOGO ------- */}
       <div
         style={{
           marginBottom: 25,
           padding: 12,
           borderRadius: 16,
-          background:
-            "linear-gradient(135deg, rgba(245,208,133,0.95), rgba(228,184,110,0.9))",
+          background: "linear-gradient(135deg, rgba(245,208,133,0.95), rgba(228,184,110,0.9))",
           boxShadow: "0 6px 14px rgba(0,0,0,0.35)",
           display: "flex",
           justifyContent: "center",
@@ -103,7 +91,6 @@ export default function Sidebar() {
         />
       </div>
 
-      {/* ------- MENÜ ------- */}
       <div style={{ flex: 1 }}>
         {menuItems.map((item) => {
           const active = isActive(item.path);
@@ -115,7 +102,7 @@ export default function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: 14,
-                  padding: item.key.startsWith("ayar_") ? "8px 14px 8px 32px" : "14px 14px",
+                  padding: "14px 14px",
                   marginBottom: 8,
                   borderRadius: 14,
                   cursor: "pointer",
@@ -126,9 +113,7 @@ export default function Sidebar() {
                   color: active ? RENK.secili : RENK.yazi,
                   fontWeight: active ? 800 : 550,
                   transition: "all 0.14s ease",
-
-                  /* 📌 ALT MENÜ İÇİN FONT KÜÇÜK */
-                  fontSize: item.key.startsWith("ayar_") ? 16 : 18,
+                  fontSize: 18,
                 }}
                 onMouseEnter={(e) => {
                   if (!active) e.currentTarget.style.background = RENK.hover;
@@ -150,7 +135,6 @@ export default function Sidebar() {
         })}
       </div>
 
-      {/* ------- ÇIKIŞ ------- */}
       <button
         onClick={handleLogout}
         style={{

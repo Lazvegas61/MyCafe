@@ -663,69 +663,82 @@ export default function Masalar({ onOpenAdisyon }) {
               </div>
 
               {/* TABLE STATUS */}
-              {!acik ? (
-                <div
-                  style={{
-                    fontSize: "22px",
-                    opacity: 0.85,
-                    marginTop: "10px",
-                    fontWeight: 700,
-                    color: "#b8b8b8",
-                  }}
-                >
-                  BOŞ
-                </div>
-              ) : (
-                <div>
-                  {/* TIME INFO */}
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      marginBottom: "8px",
-                      opacity: 0.9,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "0 5px",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span>⏰</span>
-                      <span>{bilgi.acilisSaati}</span>
-                    </div>
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span>⏱️</span>
-                      <span>{formatSure(bilgi.gecenDakika)}</span>
-                    </div>
-                  </div>
+{!acik ? (
+  <div
+    style={{
+      fontSize: "22px",
+      opacity: 0.85,
+      marginTop: "10px",
+      fontWeight: 700,
+      color: "#b8b8b8",
+    }}
+  >
+    BOŞ
+  </div>
+) : (
+  <div>
+    {/* TIME INFO */}
+    <div
+      style={{
+        fontSize: "14px",
+        marginBottom: "8px",
+        opacity: 0.9,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "0 5px",
+      }}
+    >
+      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+        <span>⏰</span>
+        <span>{bilgi.acilisSaati}</span>
+      </div>
+      <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+        <span>⏱️</span>
+        <span>{formatSure(bilgi.gecenDakika)}</span>
+      </div>
+    </div>
 
-                  {/* TOTAL AMOUNT - DİREKT LOCALSTORAGE'DAN */}
-                  <div
-                    style={{
-                      fontSize: "20px",
-                      fontWeight: 800,
-                      color: RENK.altin,
-                      marginTop: "5px",
-                    }}
-                  >
-                    ₺ {bilgi.toplamTutar.toFixed(2)}
-                  </div>
-                  
-                  {/* DRAG HINT */}
-                  {acik && (
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        opacity: 0.6,
-                        marginTop: "8px",
-                        fontWeight: 500,
-                      }}
-                    >
-                      📍 Sürükleyerek taşıyabilirsiniz
-                    </div>
-                  )}
-                </div>
-              )}
+    {/* TOTAL AMOUNT - SADECE 0'DAN BÜYÜKSE GÖSTER */}
+    {bilgi.toplamTutar > 0 ? (
+      <div
+        style={{
+          fontSize: "20px",
+          fontWeight: 800,
+          color: RENK.altin,
+          marginTop: "5px",
+        }}
+      >
+        ₺ {bilgi.toplamTutar.toFixed(2)}
+      </div>
+    ) : (
+      <div
+        style={{
+          fontSize: "18px",
+          fontWeight: 700,
+          color: "#b8b8b8",
+          marginTop: "10px",
+        }}
+      >
+        BOŞ ADİSYON
+      </div>
+    )}
+    
+    {/* DRAG HINT */}
+    {acik && (
+      <div
+        style={{
+          fontSize: "11px",
+          opacity: 0.6,
+          marginTop: "8px",
+          fontWeight: 500,
+        }}
+      >
+        📍 Sürükleyerek taşıyabilirsiniz
+      </div>
+    )}
+  </div>
+)}
             </div>
           );
         })}

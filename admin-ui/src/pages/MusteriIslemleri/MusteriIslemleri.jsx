@@ -1,161 +1,139 @@
-/* ------------------------------------------------------------
-   📌 MusteriIslemleri.jsx — FINAL
-   Açıklama:
-   - Müşteri bazlı borç ve tahsilat yönetimi
-   - Inline tahsilat (popup yok)
-   - Kasa raporu ile uyumlu
-   - localStorage tabanlı (DEMO)
-------------------------------------------------------------- */
+/* ============================================================
+   📄 DOSYA: MusteriIslemleri.jsx
+   📌 AMAÇ:
+   MyCafe — Müşteri İşlemleri (Hesaba Yaz & Tahsilat) sayfası.
+   Hafızada kayıtlı tüm iş kurallarına birebir uygun JSX iskeletidir.
+   - Admin / Garson yetki ayrımı destekler
+   - Bej–Kahve tema varsayılır
+   - API entegrasyonu daha sonra eklenir
+============================================================ */
 
-import React, { useEffect, useMemo, useState } from "react";
-import "./MusteriIslemleri.css";
-
-const MUSTERI_KEY = "mc_musteriler";
-const BORC_KEY = "mc_borclar";
-const KASA_KEY = "mc_kasa";
+import React, { useState } from "react";
 
 export default function MusteriIslemleri() {
-  const [musteriler, setMusteriler] = useState([]);
-  const [borclar, setBorclar] = useState([]);
-  const [seciliMusteriId, setSeciliMusteriId] = useState(null);
-  const [odemeTutar, setOdemeTutar] = useState("");
-  const [odemeTur, setOdemeTur] = useState("NAKIT");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [role] = useState("ADMIN"); // ADMIN | GARSON
 
-  // -----------------------------
-  // LOAD
-  // -----------------------------
-  useEffect(() => {
-    setMusteriler(JSON.parse(localStorage.getItem(MUSTERI_KEY)) || []);
-    setBorclar(JSON.parse(localStorage.getItem(BORC_KEY)) || []);
-  }, []);
+  const customers = [
+    { id: 1, name: "Ahmet Yılmaz", phone: "05xx xxx xx xx", debt: 1250 },
+    { id: 2, name: "Mehmet Kaya", phone: "05xx xxx xx xx", debt: 450 },
+    { id: 3, name: "Ayşe Demir", phone: "05xx xxx xx xx", debt: 780 }
+  ];
 
-  // -----------------------------
-  // HESAPLAMALAR
-  // -----------------------------
-  const musteriOzetleri = useMemo(() => {
-    return musteriler.map((m) => {
-      const hareketler = borclar.filter(b => b.musteriId === m.id);
+  const transactions = [
+    { id: 1, date: "20.11.2025", type: "BORÇ EKLENDİ", amount: "+750 ₺", desc: "Masa 12" },
+    { id: 2, date: "22.11.2025", type: "TAHSİLAT", amount: "-250 ₺", desc: "Garson aldı" },
+    { id: 3, date: "25.11.2025", type: "TAHSİLAT", amount: "-300 ₺", desc: "Admin" }
+  ];
 
-      const toplamBorc = hareketler
-        .filter(h => h.tip === "BORC")
-        .reduce((t, h) => t + h.tutar, 0);
-
-      const toplamTahsilat = hareketler
-        .filter(h => h.tip === "TAHSILAT")
-        .reduce((t, h) => t + h.tutar, 0);
-
-      return {
-        ...m,
-        toplamBorc,
-        toplamTahsilat,
-        kalan: toplamBorc - toplamTahsilat,
-        hareketler
-      };
-    });
-  }, [musteriler, borclar]);
-
-  // -----------------------------
-  // TAHSILAT
-  // -----------------------------
-  const tahsilatYap = (musteri) => {
-    const tutar = Number(odemeTutar);
-    if (!tutar || tutar <= 0) return alert("Geçerli tutar girin.");
-
-    const yeniHareket = {
-      id: Date.now(),
-      musteriId: musteri.id,
-      tip: "TAHSILAT",
-      tutar,
-      odemeTur,
-      tarih: new Date().toISOString()
-    };
-
-    const yeniBorclar = [...borclar, yeniHareket];
-    setBorclar(yeniBorclar);
-    localStorage.setItem(BORC_KEY, JSON.stringify(yeniBorclar));
-
-    // Kasa kaydı
-    const kasa = JSON.parse(localStorage.getItem(KASA_KEY)) || [];
-    kasa.push({
-      id: Date.now(),
-      tip: "TAHSILAT",
-      musteri: musteri.adSoyad,
-      tutar,
-      odemeTur,
-      tarih: new Date().toISOString()
-    });
-    localStorage.setItem(KASA_KEY, JSON.stringify(kasa));
-
-    setOdemeTutar("");
-    setSeciliMusteriId(null);
-  };
-
-  // -----------------------------
-  // RENDER
-  // -----------------------------
   return (
-    <div className="musteri-islemleri">
-      <h2>Müşteri İşlemleri</h2>
+    <div className="musteri-islemleri-container">
 
-      <table className="musteri-table">
-        <thead>
-          <tr>
-            <th>Müşteri</th>
-            <th>Toplam Borç</th>
-            <th>Toplam Tahsilat</th>
-            <th>Kalan</th>
-            <th>İşlem</th>
-          </tr>
-        </thead>
+      {/* BAŞLIK */}
+      <h1 className="page-title">MÜŞTERİ İŞLEMLERİ</h1>
 
-        <tbody>
-          {musteriOzetleri.map((m) => (
-            <React.Fragment key={m.id}>
-              <tr className={m.kalan > 0 ? "borclu" : ""}>
-                <td>{m.adSoyad}</td>
-                <td>{m.toplamBorc.toLocaleString()} ₺</td>
-                <td>{m.toplamTahsilat.toLocaleString()} ₺</td>
-                <td>{m.kalan.toLocaleString()} ₺</td>
-                <td>
-                  {m.kalan > 0 && (
-                    <button onClick={() => setSeciliMusteriId(m.id)}>
-                      Tahsilat Yap
-                    </button>
-                  )}
-                </td>
+      {/* ÜST PANEL */}
+      <div className="panel-top">
+
+        {/* MÜŞTERİ LİSTESİ */}
+        <div className="panel customers">
+          <h2>MÜŞTERİ LİSTESİ</h2>
+          <input type="text" placeholder="Ara..." />
+
+          <ul>
+            {customers.map(c => (
+              <li key={c.id} onClick={() => setSelectedCustomer(c)}>
+                <span>{c.name}</span>
+                <strong>{c.debt} ₺</strong>
+              </li>
+            ))}
+          </ul>
+
+          <button className="btn-add">+ YENİ MÜŞTERİ EKLE</button>
+        </div>
+
+        {/* MÜŞTERİ DETAY */}
+        <div className="panel detail">
+          {selectedCustomer ? (
+            <>
+              <h2>MÜŞTERİ DETAYI</h2>
+              <p><strong>Ad Soyad:</strong> {selectedCustomer.name}</p>
+              <p><strong>Telefon:</strong> {selectedCustomer.phone}</p>
+              <p className="debt"><strong>Mevcut Borç:</strong> {selectedCustomer.debt} ₺</p>
+
+              <div className="info-box">
+                <p><strong>Masa No:</strong> 12</p>
+                <p><strong>Adisyon Açılış:</strong> 18:42</p>
+                <p><strong>Adisyon Kapanış:</strong> 20:10</p>
+              </div>
+
+              <textarea placeholder="Not (opsiyonel)" />
+            </>
+          ) : (
+            <p className="empty">Müşteri seçiniz</p>
+          )}
+        </div>
+      </div>
+
+      {/* ALT PANEL */}
+      <div className="panel-bottom">
+
+        {/* BORÇ EKLE */}
+        <div className="panel">
+          <h2>BORÇ EKLE</h2>
+          <input type="number" placeholder="Borç Tutarı ₺" />
+          <input type="date" />
+          <textarea placeholder="Not (opsiyonel)" />
+          <button className="btn-primary">BORÇ EKLE</button>
+        </div>
+
+        {/* TAHSİLAT */}
+        <div className="panel">
+          <h2>TAHSİLAT AL</h2>
+          {role !== "ADMIN" && (
+            <p className="warning">Sadece ADMIN tahsilat alabilir</p>
+          )}
+
+          {role === "ADMIN" && (
+            <>
+              <input type="number" placeholder="Ödeme Tutarı ₺" />
+              <div className="radio-group">
+                <label><input type="radio" name="pay" /> Nakit</label>
+                <label><input type="radio" name="pay" /> Nakit + Kart</label>
+                <label><input type="radio" name="pay" /> Havale / EFT</label>
+                <label><input type="radio" name="pay" /> Parçalı</label>
+              </div>
+              <button className="btn-success">TAHSİLAT AL</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* GEÇMİŞ */}
+      <div className="panel history">
+        <h2>BORÇ & ÖDEME GEÇMİŞİ</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>İşlem</th>
+              <th>Tutar</th>
+              <th>Açıklama</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.map(t => (
+              <tr key={t.id}>
+                <td>{t.date}</td>
+                <td>{t.type}</td>
+                <td>{t.amount}</td>
+                <td>{t.desc}</td>
               </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-              {seciliMusteriId === m.id && (
-                <tr className="tahsilat-row">
-                  <td colSpan="5">
-                    <div className="tahsilat-panel">
-                      <input
-                        type="number"
-                        placeholder="Tutar"
-                        value={odemeTutar}
-                        onChange={(e) => setOdemeTutar(e.target.value)}
-                      />
-
-                      <select
-                        value={odemeTur}
-                        onChange={(e) => setOdemeTur(e.target.value)}
-                      >
-                        <option value="NAKIT">Nakit</option>
-                        <option value="KART">Kart</option>
-                        <option value="HAVALE">Havale</option>
-                      </select>
-
-                      <button onClick={() => tahsilatYap(m)}>
-                        Onayla
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

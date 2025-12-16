@@ -36,12 +36,11 @@ function loadInitialData() {
   localStorage.setItem("mc_urunler", JSON.stringify(productsData));
   localStorage.setItem("mc_data_updated", "1");
   
-  // İlk masa verilerini oluştur - MASA NUMARALARI 1'DEN 30'A KADAR
   const initialMasalar = [];
   for (let i = 1; i <= 30; i++) {
     initialMasalar.push({
       id: i,
-      no: i.toString(),  // Masa numarası string olarak (1, 2, 3, ... 30)
+      no: i.toString(),
       adisyonId: null,
       ayirId: null,
       ayirToplam: null,
@@ -55,10 +54,32 @@ function loadInitialData() {
     });
   }
   
-  localStorage.setItem("mc_masalar", JSON.stringify(initialMasalar));
+  // BİLARDO MASALARI EKLENDİ
+  const bilardoMasalari = [];
+  for (let i = 1; i <= 10; i++) {
+    bilardoMasalari.push({
+      id: 100 + i, // 101-110 arası ID'ler
+      no: `B${i}`,
+      adisyonId: null,
+      ayirId: null,
+      ayirToplam: null,
+      toplamTutar: "0.00",
+      acilisZamani: null,
+      durum: "BOŞ",
+      renk: "gri",
+      musteriAdi: null,
+      kisiSayisi: null,
+      guncellemeZamani: new Date().toISOString(),
+      tur: "BİLARDO"
+    });
+  }
+  
+  localStorage.setItem("mc_masalar", JSON.stringify([...initialMasalar, ...bilardoMasalari]));
   localStorage.setItem("mc_adisyonlar", JSON.stringify([]));
+  localStorage.setItem("mc_bilardo_adisyonlar", JSON.stringify([]));
   localStorage.setItem("mc_musteriler", JSON.stringify([]));
   localStorage.setItem("mc_borclar", JSON.stringify([]));
+  localStorage.setItem("mc_giderler", JSON.stringify([]));
 }
 loadInitialData();
 
@@ -71,7 +92,6 @@ function autoFixCategoryAndProducts() {
 
   let changed = false;
 
-  // CATEGORY FIX
   cats = cats.map((c, index) => {
     let updated = { ...c };
 
@@ -92,7 +112,6 @@ function autoFixCategoryAndProducts() {
     return updated;
   });
 
-  // PRODUCT FIX
   prods = prods.map((p, index) => {
     let updated = { ...p };
 
@@ -130,32 +149,11 @@ autoFixCategoryAndProducts();
 /* ------------------------------------------------------------
    🔧 SYNC SERVICE ENTEGRASYONU
 ------------------------------------------------------------ */
-
-// SyncService'i global olarak yükle
 if (typeof window !== 'undefined') {
   window.syncService = syncService;
   console.log('🌟 SyncService global olarak yüklendi');
-  
-  // Test fonksiyonlarını ekle
-  window.testSyncService = () => {
-    if (window.syncService) {
-      console.log('🧪 SyncService Test Fonksiyonları:');
-      console.log('1. Masa temizleme:', window.syncService.masaBosalt ? '✅ VAR' : '❌ YOK');
-      console.log('2. Kalem ekleme:', window.syncService.kalemEkleVeToplamGuncelle ? '✅ VAR' : '❌ YOK');
-      console.log('3. Senkronizasyon:', window.syncService.senkronizeMasalar ? '✅ VAR' : '❌ YOK');
-      
-      // Tüm masaları senkronize et
-      if (window.syncService.senkronizeMasalar) {
-        window.syncService.senkronizeMasalar();
-      }
-      return true;
-    }
-    console.error('❌ SyncService bulunamadı!');
-    return false;
-  };
 }
 
-// SyncService initializasyonu - useRef ile takip edelim
 let syncServiceInitialized = false;
 
 function initializeSyncService() {
@@ -171,7 +169,6 @@ function initializeSyncService() {
     return;
   }
   
-  // Event listener'ları kur
   if (window.syncService.on) {
     window.syncService.on(SYNC_EVENTS.MASA_GUNCELLENDI, (data) => {
       console.log('📢 SyncService: Masa güncellendi', data?.masaNo || data?.masaNum || data);
@@ -196,7 +193,6 @@ function initializeSyncService() {
     syncServiceInitialized = true;
     console.log('✅ SyncService başlatıldı ve event listener\'lar kuruldu');
     
-    // Uygulama başladığında tüm masaları senkronize et
     setTimeout(() => {
       if (window.syncService.senkronizeMasalar) {
         window.syncService.senkronizeMasalar();
@@ -210,24 +206,19 @@ function initializeSyncService() {
 /* ------------------------------------------------------------
    📌 SAYFA IMPORTLARI — DÜZELTİLDİ
 ------------------------------------------------------------ */
-
-// ANA SAYFALAR
-import Login from "./pages/Login.jsx";
+import Login from "./pages/Login/Login.jsx";
 import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
 import Masalar from "./pages/Masalar/Masalar.jsx";
 import Adisyon from "./pages/Adisyon/Adisyon.jsx";
 import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx";
+import './pages/MusteriIslemleri/MusteriIslemleri.css';
 import UrunStokYonetimi from "./pages/UrunStokYonetimi.jsx";
 import Giderler from "./pages/Giderler.jsx";
 import Personel from "./pages/Personel/Personel.jsx";
-
-// AYARLAR
 import Ayarlar from "./pages/Ayarlar/Ayarlar.jsx";
-
-// BİLARDO
-import Bilardo from "./pages/Bilardo/Bilardo.jsx";
-
-// RAPORLAR
+import Bilardo from "./pages/Bilardo/Bilardo";
+import BilardoAdisyon from "./pages/Bilardo/BilardoAdisyon.jsx";
+// BİLARDO ADİSYON DETAY - GEÇİCİ OLARAK NORMAL ADİSYON
 import ReportsIndex from "./pages/reports/ReportsIndex.jsx";
 import KategoriBazli from "./pages/reports/KategoriBazli.jsx";
 import UrunBazli from "./pages/reports/UrunBazli.jsx";
@@ -235,11 +226,7 @@ import KasaRaporu from "./pages/reports/KasaRaporu.jsx";
 import MusteriBorcRaporu from "./pages/reports/MusteriBorcRaporu.jsx";
 import GiderRaporu from "./pages/reports/GiderRaporu.jsx";
 import MasaDetayRaporu from "./pages/reports/MasaDetayRaporu.jsx";
-
-// MASA DETAY
 import MasaDetay from "./pages/Masalar/MasaDetay.jsx";
-
-// HATA YAKALAYICI
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 /* ------------------------------------------------------------
@@ -292,7 +279,6 @@ function Layout({ children }) {
   const hideSidebar = path === "/login";
   const initializedRef = useRef(false);
 
-  // SyncService'i başlat - sadece bir kez
   useEffect(() => {
     if (!hideSidebar && window.syncService && !initializedRef.current) {
       initializeSyncService();
@@ -335,14 +321,11 @@ export default function App() {
   useEffect(() => {
     ensureDemoAdmin();
     
-    // Sadece bir kez başlat
     if (!syncInitializedRef.current) {
-      // SyncService global event listener'larını kur
       const handleStorageChange = (event) => {
         if (event.key && event.key.startsWith('mc_')) {
           console.log('💾 Storage değişti:', event.key);
           
-          // Storage değişikliğinde senkronizasyon tetikle
           if (window.syncService && window.syncService.senkronizeMasalar) {
             setTimeout(() => {
               window.syncService.senkronizeMasalar();
@@ -353,7 +336,6 @@ export default function App() {
       
       window.addEventListener('storage', handleStorageChange);
       
-      // Uygulama başlangıç senkronizasyonu - gecikmeli
       setTimeout(() => {
         if (window.syncService && window.syncService.senkronizeMasalar) {
           console.log('🔄 Uygulama başlangıç senkronizasyonu yapılıyor...');
@@ -373,181 +355,39 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-          {/* ANA SAYFA */}
-          <Route
-            path="/"
-            element={
-              <Layout>
-                <AnaEkran />
-              </Layout>
-            }
-          />
-
-          {/* LOGIN */}
-          <Route
-            path="/login"
-            element={
-              <Layout>
-                <Login />
-              </Layout>
-            }
-          />
-
-          {/* MASALAR */}
-          <Route
-            path="/masalar"
-            element={
-              <Layout>
-                <Masalar />
-              </Layout>
-            }
-          />
-
-          {/* ADİSYON */}
-          <Route
-            path="/adisyon/:id"
-            element={
-              <Layout>
-                <Adisyon />
-              </Layout>
-            }
-          />
-
-          {/* MÜŞTERİ */}
-          <Route
-            path="/musteri-islemleri"
-            element={
-              <Layout>
-                <MusteriIslemleri />
-              </Layout>
-            }
-          />
-
-          {/* ÜRÜN & STOK */}
-          <Route
-            path="/urun-stok"
-            element={
-              <Layout>
-                <UrunStokYonetimi />
-              </Layout>
-            }
-          />
-
-          {/* GİDERLER */}
-          <Route
-            path="/giderler"
-            element={
-              <Layout>
-                <Giderler />
-              </Layout>
-            }
-          />
-
-          {/* RAPORLAR */}
-          <Route
-            path="/raporlar"
-            element={
-              <Layout>
-                <ReportsIndex />
-              </Layout>
-            }
-          />
-
-          <Route
-            path="/raporlar/kategori-satis"
-            element={
-              <Layout>
-                <KategoriBazli />
-              </Layout>
-            }
-          />
-
-          <Route
-            path="/raporlar/urun-satis"
-            element={
-              <Layout>
-                <UrunBazli />
-              </Layout>
-            }
-          />
-
-          <Route
-            path="/raporlar/kasa"
-            element={
-              <Layout>
-                <KasaRaporu />
-              </Layout>
-            }
-          />
-
-          <Route
-            path="/raporlar/musteri-borc"
-            element={
-              <Layout>
-                <MusteriBorcRaporu />
-              </Layout>
-            }
-          />
-
-          <Route
-            path="/raporlar/gider-raporu"
-            element={
-              <Layout>
-                <GiderRaporu />
-              </Layout>
-            }
-          />
-
-          <Route
-            path="/raporlar/masa-detay"
-            element={
-              <Layout>
-                <MasaDetayRaporu />
-              </Layout>
-            }
-          />
-
-          {/* MASA DETAY */}
-          <Route
-            path="/masa-detay/:id"
-            element={
-              <Layout>
-                <MasaDetay />
-              </Layout>
-            }
-          />
-
-          {/* PERSONEL */}
-          <Route
-            path="/personel"
-            element={
-              <Layout>
-                <Personel />
-              </Layout>
-            }
-          />
-
-          {/* AYARLAR */}
-          <Route
-            path="/ayarlar"
-            element={
-              <Layout>
-                <Ayarlar />
-              </Layout>
-            }
-          />
-
-          {/* BİLARDO */}
-          <Route
-            path="/bilardo"
-            element={
-              <Layout>
-                <Bilardo />
-              </Layout>
-            }
-          />
-
-          {/* 404 - SAYFA BULUNAMADI */}
+          {/* 1. ÖZEL ROUTE'LAR */}
+          <Route path="/login" element={<Layout><Login /></Layout>} />
+          
+          {/* 2. PARAMETRELİ ROUTE'LAR */}
+          <Route path="/adisyon/:id" element={<Layout><Adisyon /></Layout>} />
+          <Route path="/masa-detay/:id" element={<Layout><MasaDetay /></Layout>} />
+          
+          {/* BİLARDO ADİSYON DETAY - ÇİFT TIKLAMA İLE GELECEK YER */}
+          {/* BİLARDO MASA ID'LERİ: 101-110 ARASI */}
+          <Route path="/bilardo-adisyon/:id" element={<Layout><Adisyon /></Layout>} />
+          
+          {/* RAPOR ALT SAYFALARI */}
+          <Route path="/raporlar/kategori-satis" element={<Layout><KategoriBazli /></Layout>} />
+          <Route path="/raporlar/urun-satis" element={<Layout><UrunBazli /></Layout>} />
+          <Route path="/raporlar/kasa" element={<Layout><KasaRaporu /></Layout>} />
+          <Route path="/raporlar/musteri-borc" element={<Layout><MusteriBorcRaporu /></Layout>} />
+          <Route path="/raporlar/gider-raporu" element={<Layout><GiderRaporu /></Layout>} />
+          <Route path="/raporlar/masa-detay" element={<Layout><MasaDetayRaporu /></Layout>} />
+          
+          {/* 3. ANA SAYFALAR */}
+          <Route path="/" element={<Layout><AnaEkran /></Layout>} />
+          <Route path="/ana" element={<Layout><AnaEkran /></Layout>} />
+          <Route path="/masalar" element={<Layout><Masalar /></Layout>} />
+          <Route path="/musteri-islemleri" element={<Layout><MusteriIslemleri /></Layout>} />
+          <Route path="/urun-stok" element={<Layout><UrunStokYonetimi /></Layout>} />
+          <Route path="/giderler" element={<Layout><Giderler /></Layout>} />
+          <Route path="/raporlar" element={<Layout><ReportsIndex /></Layout>} />
+          <Route path="/personel" element={<Layout><Personel /></Layout>} />
+          <Route path="/ayarlar" element={<Layout><Ayarlar /></Layout>} />
+          <Route path="/bilardo" element={<Layout><Bilardo /></Layout>} />
+          <Route path="/bilardo-adisyon" element={<Layout><BilardoAdisyon /></Layout>} />
+          
+          {/* 4. 404 - EN ALTA */}
           <Route
             path="*"
             element={
