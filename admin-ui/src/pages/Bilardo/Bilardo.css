@@ -848,3 +848,79 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Ürün tablosu için ek stil */
+.bilardo-urun-tablosu {
+  margin-top: 20px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.bilardo-urun-baslik {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  background: #f5e8d0;
+  padding: 12px 15px;
+  font-weight: 800;
+  color: #5a3921;
+  border-bottom: 2px solid #d2b295;
+}
+
+.bilardo-urun-liste {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Responsive düzenleme */
+@media (max-width: 1200px) {
+  .bilardo-adisyon-container > div:first-child {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .bilardo-adisyon-container > div:first-child {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Bilardo.css dosyasının sonuna ekleyin: */
+
+/* Ürün tablosu için ek stil */
+.bilardo-urun-tablosu {
+  margin-top: 20px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.bilardo-urun-baslik {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  background: #f5e8d0;
+  padding: 12px 15px;
+  font-weight: 800;
+  color: #5a3921;
+  border-bottom: 2px solid #d2b295;
+}
+
+.bilardo-urun-liste {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Responsive düzenleme */
+@media (max-width: 1200px) {
+  .bilardo-adisyon-container > div:first-child {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .bilardo-adisyon-container > div:first-child {
+    grid-template-columns: 1fr;
+  }
+}

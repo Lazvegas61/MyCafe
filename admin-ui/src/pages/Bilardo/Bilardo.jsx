@@ -1,21 +1,17 @@
 // admin-ui/src/pages/Bilardo/Bilardo.jsx
 /* ------------------------------------------------------------
-   📌 Bilardo.jsx — MODERN V13 (Görsel Tasarımlı)
-   
-   DEĞİŞİKLİKLER:
-   1. Görseldeki gibi modern tasarım
-   2. "Masaya Aktar" butonu güncellendi
-   3. Çift tıklama ile adisyona gitme - DÜZELTİLDİ
-   4. Toplam tutar gösterimi (ek ürünlerle)
-   5. Premium bilardo ikonu
+   📌 Bilardo.jsx — GÜNCELLENMİŞ ve TAM ÇALIŞAN
+   - Anlık ücret hesaplama ve yansıtma
+   - Açık adisyon senkronizasyonu
+   - Hata düzeltmeleri
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // EKLE
+import { useNavigate } from "react-router-dom";
 import "./Bilardo.css";
 
 export default function Bilardo() {
-  const navigate = useNavigate(); // EKLE
+  const navigate = useNavigate();
   
   // ANA STATE'LER
   const [masalar, setMasalar] = useState([]);
@@ -53,20 +49,20 @@ export default function Bilardo() {
   );
 
   /* ============================================================
-     📌 1. LOCALSTORAGE İŞLEMLERİ
+     📌 1. LOCALSTORAGE İŞLEMLERİ ve ANLIK HESAPLAMA
   ============================================================ */
   
   useEffect(() => {
-    const loadData = () => {
+    const loadAndCalculate = () => {
       // 1. Bilardo masalarını yükle
-      const bilardoData = JSON.parse(localStorage.getItem("bilardo") || "[]");
+      let bilardoData = JSON.parse(localStorage.getItem("bilardo") || "[]");
       
       // Eğer bilardo masaları boşsa, oluştur
       if (bilardoData.length === 0) {
         const yeniMasalar = [];
         for (let i = 1; i <= 10; i++) {
           yeniMasalar.push({
-            id: 100 + i, // 101-110
+            id: 100 + i,
             no: `B${i}`,
             acik: false,
             durum: "KAPALI",
@@ -76,85 +72,143 @@ export default function Bilardo() {
             aktifAdisyonId: null
           });
         }
+        bilardoData = yeniMasalar;
         localStorage.setItem("bilardo", JSON.stringify(yeniMasalar));
-        setMasalar(yeniMasalar);
-      } else {
-        setMasalar(bilardoData);
       }
       
-      // 2. Ücret ayarlarını yükle
-      const saved = JSON.parse(localStorage.getItem("bilardo_ucretleri"));
-      if (saved) {
-        setUcretAyarlari(saved);
-      } else {
-        const defaultAyarlar = {
-          bilardo30dk: 80,
-          bilardo1saat: 120,
-          bilardoDakikaUcreti: 2
+      // 2. Bilardo adisyonlarını yükle
+      const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+      
+      // 3. Ücret ayarları
+      const ayarlar = JSON.parse(localStorage.getItem("bilardo_ucretleri")) || {
+        bilardo30dk: 80,
+        bilardo1saat: 120,
+        bilardoDakikaUcreti: 2
+      };
+      setUcretAyarlari(ayarlar);
+      
+      // 4. Masaları güncelle ve anlık ücretleri hesapla
+      const updatedMasalar = bilardoData.map(masa => {
+        const masaAdisyonu = adisyonlar.find(a => a.id === masa.aktifAdisyonId);
+        
+        if (masaAdisyonu && masaAdisyonu.durum === "ACIK") {
+          const now = Date.now();
+          const gecenDakika = masaAdisyonu.acilisZamani ? 
+            Math.floor((now - masaAdisyonu.acilisZamani) / 60000) : 0;
+          
+          // ANLIK ÜCRET HESAPLA
+          let anlikUcret = 0;
+          const bilardo30dk = ayarlar.bilardo30dk || 80;
+          const bilardo1saat = ayarlar.bilardo1saat || 120;
+          const bilardoDakikaUcreti = ayarlar.bilardoDakikaUcreti || 2;
+          
+          switch(masaAdisyonu.sureTipi) {
+            case "30dk":
+              anlikUcret = bilardo30dk;
+              break;
+            case "1saat":
+              anlikUcret = bilardo1saat;
+              break;
+            case "suresiz":
+              if (gecenDakika <= 30) {
+                anlikUcret = bilardo30dk;
+              } else {
+                const ekDakika = gecenDakika - 30;
+                anlikUcret = bilardo30dk + (Math.ceil(ekDakika) * bilardoDakikaUcreti);
+              }
+              break;
+            default:
+              anlikUcret = 0;
+          }
+          
+          // Ek ürünlerin toplamını hesapla
+          const ekUrunToplam = (masaAdisyonu.ekUrunler || []).reduce((sum, u) => 
+            sum + (u.fiyat * u.adet), 0);
+          
+          const toplamTutar = anlikUcret + ekUrunToplam;
+          
+          // AÇIK ADİSYONLARA EKLE (Ana Sayfa için)
+          updateAcikAdisyonlar(masaAdisyonu, anlikUcret, ekUrunToplam, gecenDakika);
+          
+          return {
+            ...masa,
+            acik: true,
+            durum: "ACIK",
+            sureTipi: masaAdisyonu.sureTipi,
+            acilisSaati: masaAdisyonu.acilisZamani,
+            aktifAdisyonId: masaAdisyonu.id,
+            ucret: anlikUcret,
+            ekUrunToplam: ekUrunToplam,
+            toplamTutar: toplamTutar,
+            gecenDakika: gecenDakika,
+            ekUrunSayisi: (masaAdisyonu.ekUrunler || []).length
+          };
+        }
+        
+        return {
+          ...masa,
+          ekUrunToplam: 0,
+          toplamTutar: 0,
+          gecenDakika: 0,
+          ekUrunSayisi: 0
         };
-        setUcretAyarlari(defaultAyarlar);
-        localStorage.setItem("bilardo_ucretleri", JSON.stringify(defaultAyarlar));
-      }
-      
-      // 3. Normal masaları yükle (aktarım için)
-      const normalMasaData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
-      const bosMasalar = normalMasaData.filter(m => {
-        const durum = m.durum || "";
-        return durum === "BOŞ" || !m.adisyonId;
       });
+      
+      setMasalar(updatedMasalar);
+      kontrolSureBitti(updatedMasalar);
     };
     
-    loadData();
+    loadAndCalculate();
     
-    // Süre kontrolü için interval
-    const sureInterval = setInterval(() => {
-      kontrolSureBitti();
-    }, 30000);
+    const interval = setInterval(loadAndCalculate, 5000); // 5 saniyede bir güncelle
     
-    // Veri güncelleme için interval
-    const dataInterval = setInterval(loadData, 60000);
-    
-    return () => {
-      clearInterval(sureInterval);
-      clearInterval(dataInterval);
-    };
+    return () => clearInterval(interval);
   }, []);
   
-  // LocalStorage'a kaydet
-  const saveMasalar = (arr) => {
-    setMasalar(arr);
-    localStorage.setItem("bilardo", JSON.stringify(arr));
-  };
-  
-  // Bilardo adisyonunu getir
-  const getBilardoAdisyon = (adisyonId) => {
-    const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-    return adisyonlar.find(a => a.id === adisyonId) || null;
-  };
-  
-  // Toplam tutarı hesapla (bilardo + ek ürünler)
-  const toplamTutarHesapla = (masa) => {
-    if (!masa.aktifAdisyonId) return masa.ucret || 0;
-    
-    const adisyon = getBilardoAdisyon(masa.aktifAdisyonId);
-    if (!adisyon) return masa.ucret || 0;
-    
-    const bilardoUcret = adisyon.hesaplananUcret || 0;
-    const ekUrunToplam = (adisyon.ekUrunler || []).reduce((sum, u) => sum + (u.fiyat * u.adet), 0);
-    
-    return bilardoUcret + ekUrunToplam;
+  // AÇIK ADİSYONLARI GÜNCELLE (Ana Sayfa için)
+  const updateAcikAdisyonlar = (adisyon, bilardoUcret, ekUrunToplam, gecenDakika) => {
+    try {
+      const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
+      
+      const bilardoAdisyonu = {
+        id: adisyon.id,
+        masaNo: adisyon.bilardoMasaNo,
+        tur: "BİLARDO",
+        sureTipi: adisyon.sureTipi,
+        gecenDakika: gecenDakika,
+        bilardoUcret: bilardoUcret,
+        ekUrunToplam: ekUrunToplam,
+        toplamTutar: bilardoUcret + ekUrunToplam,
+        acilisZamani: adisyon.acilisZamani,
+        durum: "ACIK",
+        updatedAt: Date.now()
+      };
+      
+      // Var mı kontrol et
+      const existingIndex = acikAdisyonlar.findIndex(a => a.id === adisyon.id);
+      
+      if (existingIndex !== -1) {
+        acikAdisyonlar[existingIndex] = bilardoAdisyonu;
+      } else {
+        acikAdisyonlar.push(bilardoAdisyonu);
+      }
+      
+      localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
+    } catch (error) {
+      console.error("Açık adisyon güncelleme hatası:", error);
+    }
   };
 
   /* ============================================================
-     📌 2. ÜCRET HESAPLAMA
+     📌 2. ÜCRET HESAPLAMA FONKSİYONLARI
   ============================================================ */
   
   const ucretHesapla = (sureTipi, dakika) => {
     if (!ucretAyarlari) return 0;
     
-    const bilardo30dk = ucretAyarlari.bilardo30dk || ucretAyarlari.ilk40 || 80;
-    const bilardo1saat = ucretAyarlari.bilardo1saat || ucretAyarlari.u60 || 120;
-    const bilardoDakikaUcreti = ucretAyarlari.bilardoDakikaUcreti || ucretAyarlari.dk2 || 2;
+    const bilardo30dk = ucretAyarlari.bilardo30dk || 80;
+    const bilardo1saat = ucretAyarlari.bilardo1saat || 120;
+    const bilardoDakikaUcreti = ucretAyarlari.bilardoDakikaUcreti || 2;
     
     switch(sureTipi) {
       case "30dk":
@@ -172,15 +226,9 @@ export default function Bilardo() {
         return 0;
     }
   };
-  
-  const dakikaHesapla = (acilisSaati) => {
-    if (!acilisSaati) return 0;
-    const now = Date.now();
-    return Math.floor((now - acilisSaati) / 60000);
-  };
 
   /* ============================================================
-     📌 3. MASA İŞLEMLERİ - DÜZELTİLDİ
+     📌 3. MASA İŞLEMLERİ
   ============================================================ */
   
   const masaEkle = () => {
@@ -195,7 +243,9 @@ export default function Bilardo() {
       aktifAdisyonId: null
     };
     
-    saveMasalar([...masalar, yeniMasa]);
+    const yeniMasalar = [...masalar, yeniMasa];
+    setMasalar(yeniMasalar);
+    localStorage.setItem("bilardo", JSON.stringify(yeniMasalar));
   };
   
   const masaNoIleSil = () => {
@@ -233,7 +283,8 @@ export default function Bilardo() {
       no: `B${index + 1}`
     }));
     
-    saveMasalar(numberedMasalar);
+    setMasalar(numberedMasalar);
+    localStorage.setItem("bilardo", JSON.stringify(numberedMasalar));
     setSilMasaNo("");
     
     alert(`Bilardo Masa ${masaNo} başarıyla silindi.`);
@@ -242,9 +293,9 @@ export default function Bilardo() {
   const masaAc = (masa, tip, index) => {
     // Yeni bilardo adisyonu oluştur
     const yeniAdisyon = {
-      id: `bilardo_ad_${Date.now()}`,
+      id: `bilardo_${Date.now()}`,
       bilardoMasaId: masa.id,
-      bilardoMasaNo: `BİLARDO ${index + 1}`,
+      bilardoMasaNo: `B${index + 1}`,
       sureTipi: tip,
       acilisZamani: Date.now(),
       kapanisZamani: null,
@@ -277,24 +328,33 @@ export default function Bilardo() {
         : m
     );
     
-    saveMasalar(updated);
+    setMasalar(updated);
+    localStorage.setItem("bilardo", JSON.stringify(updated));
+    
+    // Açık adisyonlara ekle
+    updateAcikAdisyonlar(yeniAdisyon, ucretHesapla(tip, 0), 0, 0);
+    
+    // Yönlendirme yap (istemci isterse)
+    setTimeout(() => {
+      if (window.confirm("Bilardo adisyonuna gitmek ister misiniz?")) {
+        navigate(`/bilardo-adisyon/${yeniAdisyon.id}`);
+      }
+    }, 300);
   };
   
-  // ÇİFT TIKLAMA: Bilardo adisyonuna git - DÜZELTİLDİ
+  // ÇİFT TIKLAMA: Bilardo adisyonuna git
   const handleCardDoubleClick = (masa) => {
     if (!masa.aktifAdisyonId) {
       alert("Bu masa için henüz adisyon oluşturulmamış!");
       return;
     }
     
-    // REACT ROUTER İLE yönlendir
     navigate(`/bilardo-adisyon/${masa.aktifAdisyonId}`);
   };
   
   // TEK TIKLAMA: Ödeme yap
-  const handleCardClick = (masa, index) => {
-    if (masa.acik) {
-      // REACT ROUTER İLE yönlendir
+  const handleCardClick = (masa) => {
+    if (masa.acik && masa.aktifAdisyonId) {
       navigate(`/bilardo-adisyon/${masa.aktifAdisyonId}`);
     }
   };
@@ -310,7 +370,7 @@ export default function Bilardo() {
     const normalMasaData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
     const bosMasalar = normalMasaData.filter(m => {
       const durum = m.durum || "";
-      return durum === "BOŞ" || !m.adisyonId;
+      return (durum === "BOŞ" || durum === "TEMİZ") && !m.adisyonId;
     });
     
     setAktarimModal({
@@ -330,23 +390,30 @@ export default function Bilardo() {
     }
     
     // Bilardo adisyonunu normal masaya aktar
-    const adisyon = getBilardoAdisyon(bilardoMasa.aktifAdisyonId);
+    const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+    const adisyon = adisyonlar.find(a => a.id === bilardoMasa.aktifAdisyonId);
+    
     if (!adisyon) {
       alert("Bilardo adisyonu bulunamadı!");
       return;
     }
     
+    // Toplam tutarı hesapla
+    const bilardoUcret = bilardoMasa.ucret || 0;
+    const ekUrunToplam = bilardoMasa.ekUrunToplam || 0;
+    const toplamTutar = bilardoUcret + ekUrunToplam;
+    
     // Normal masayı güncelle
     const masalarData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
     const updatedMasalar = masalarData.map(m => {
-      if (m.id === seciliMasa.id || m.no === seciliMasa.no) {
+      if (m.id === seciliMasa.id) {
         return {
           ...m,
           durum: "DOLU",
           adisyonId: `bilardo_transfer_${Date.now()}`,
-          toplamTutar: toplamTutarHesapla(bilardoMasa).toFixed(2),
+          toplamTutar: toplamTutar.toFixed(2),
           acilisZamani: new Date().toISOString(),
-          musteriAdi: `Bilardo Masa ${bilardoMasa.index + 1} Transfer`,
+          musteriAdi: `Bilardo Masa ${bilardoMasa.no} Transfer`,
           guncellemeZamani: new Date().toISOString()
         };
       }
@@ -370,7 +437,21 @@ export default function Bilardo() {
         : m
     );
     
-    saveMasalar(updatedBilardoMasalar);
+    setMasalar(updatedBilardoMasalar);
+    localStorage.setItem("bilardo", JSON.stringify(updatedBilardoMasalar));
+    
+    // Bilardo adisyonunu kapat
+    const adisyonIndex = adisyonlar.findIndex(a => a.id === bilardoMasa.aktifAdisyonId);
+    if (adisyonIndex !== -1) {
+      adisyonlar[adisyonIndex].durum = "KAPANDI";
+      adisyonlar[adisyonIndex].kapanisZamani = Date.now();
+      localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
+    }
+    
+    // Açık adisyonlardan kaldır
+    const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
+    const filteredAcikAdisyonlar = acikAdisyonlar.filter(a => a.id !== bilardoMasa.aktifAdisyonId);
+    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(filteredAcikAdisyonlar));
     
     alert(`Bilardo adisyonu MASA ${seciliMasa.no}'ya başarıyla aktarıldı!`);
     setAktarimModal({ acik: false, bilardoMasa: null, seciliMasa: null });
@@ -380,25 +461,25 @@ export default function Bilardo() {
      📌 5. SÜRE TAKİBİ ve POPUP
   ============================================================ */
   
-  const kontrolSureBitti = () => {
+  const kontrolSureBitti = (currentMasalar = masalar) => {
     const now = Date.now();
     let yeniPopup = null;
     
-    masalar.forEach(masa => {
+    currentMasalar.forEach(masa => {
       if (masa.acik && masa.acilisSaati) {
         const gecenDakika = Math.floor((now - masa.acilisSaati) / 60000);
         
         if (masa.sureTipi === "30dk" && gecenDakika >= 30) {
           yeniPopup = {
             masaId: masa.id,
-            masaNo: masalar.findIndex(m => m.id === masa.id) + 1,
+            masaNo: masa.no,
             mesaj: "30 dakika süresi doldu!",
             timestamp: now
           };
         } else if (masa.sureTipi === "1saat" && gecenDakika >= 60) {
           yeniPopup = {
             masaId: masa.id,
-            masaNo: masalar.findIndex(m => m.id === masa.id) + 1,
+            masaNo: masa.no,
             mesaj: "1 saat süresi doldu!",
             timestamp: now
           };
@@ -423,15 +504,8 @@ export default function Bilardo() {
     setSureBittiPopup(null);
     
     const masaIndex = masalar.findIndex(m => m.id === sureBittiPopup.masaId);
-    if (masaIndex !== -1) {
-      const cardElement = document.querySelector(`[data-masa-id="${sureBittiPopup.masaId}"]`);
-      if (cardElement) {
-        cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        cardElement.style.boxShadow = '0 0 0 3px #ff0000';
-        setTimeout(() => {
-          if (cardElement) cardElement.style.boxShadow = '';
-        }, 2000);
-      }
+    if (masaIndex !== -1 && masalar[masaIndex].aktifAdisyonId) {
+      navigate(`/bilardo-adisyon/${masalar[masaIndex].aktifAdisyonId}`);
     }
   };
 
@@ -452,7 +526,7 @@ export default function Bilardo() {
             BİLARDO {sureBittiPopup.masaNo}: {sureBittiPopup.mesaj}
           </div>
           <div className="bilardo-popup-not">
-            Tıklayarak masaya gidin...
+            Tıklayarak adisyona gidin...
           </div>
         </div>
       )}
@@ -502,18 +576,18 @@ export default function Bilardo() {
         <div className="bilardo-ucret-banner">
           <div className="bilardo-ucret-item">
             <span>30 Dakika</span>
-            <strong>{ucretAyarlari.bilardo30dk || ucretAyarlari.ilk40 || 80}₺</strong>
+            <strong>{ucretAyarlari.bilardo30dk || 80}₺</strong>
             <small>30dk'dan önce kapanırsa da aynı</small>
           </div>
           <div className="bilardo-ucret-item">
             <span>1 Saat</span>
-            <strong>{ucretAyarlari.bilardo1saat || ucretAyarlari.u60 || 120}₺</strong>
+            <strong>{ucretAyarlari.bilardo1saat || 120}₺</strong>
             <small>Saatlik ücret</small>
           </div>
           <div className="bilardo-ucret-item">
             <span>Süresiz</span>
-            <strong>{ucretAyarlari.bilardo30dk || ucretAyarlari.ilk40 || 80}₺</strong>
-            <small>+ {ucretAyarlari.bilardoDakikaUcreti || ucretAyarlari.dk2 || 2}₺/dk (30dk sonrası)</small>
+            <strong>{ucretAyarlari.bilardo30dk || 80}₺</strong>
+            <small>+ {ucretAyarlari.bilardoDakikaUcreti || 2}₺/dk (30dk sonrası)</small>
           </div>
         </div>
       )}
@@ -521,18 +595,17 @@ export default function Bilardo() {
       {/* MODERN MASA GRID */}
       <div className="bilardo-grid">
         {masalar.map((masa, index) => {
-          const dakika = dakikaHesapla(masa.acilisSaati);
-          const bilardoUcret = masa.acik ? ucretHesapla(masa.sureTipi, dakika) : masa.ucret || 0;
-          const toplamTutar = toplamTutarHesapla(masa);
-          const adisyon = masa.aktifAdisyonId ? getBilardoAdisyon(masa.aktifAdisyonId) : null;
-          const ekUrunSayisi = adisyon ? (adisyon.ekUrunler || []).length : 0;
+          const toplamTutar = masa.toplamTutar || 0;
+          const bilardoUcret = masa.ucret || 0;
+          const ekUrunSayisi = masa.ekUrunSayisi || 0;
+          const ekUrunToplam = masa.ekUrunToplam || 0;
           
           return (
             <div 
               key={masa.id} 
               className={`bilardo-card ${masa.durum === "ACIK" ? "acik" : "kapali"}`}
               data-masa-id={masa.id}
-              onClick={() => handleCardClick(masa, index)}
+              onClick={() => handleCardClick(masa)}
               onDoubleClick={() => handleCardDoubleClick(masa)}
               title={masa.acik ? "Çift tıkla: Adisyona git | Tek tıkla: Ödeme yap" : ""}
             >
@@ -543,25 +616,25 @@ export default function Bilardo() {
                   <div className="bilardo-card-icon">
                     <BilardoIkon size={32} />
                   </div>
-                  <span className="bilardo-card-name">BİLARDO {masa.no || index + 1}</span>
+                  <span className="bilardo-card-name">BİLARDO {masa.no || `B${index + 1}`}</span>
                 </div>
                 <span className={`bilardo-card-durum ${masa.durum}`}>
                   {masa.durum === "ACIK" ? "AÇIK" : "KAPALI"}
                 </span>
               </div>
               
-              {/* TAHMİNİ ÜCRET */}
+              {/* ANLIK ÜCRET GÖSTERİMİ */}
               <div className="bilardo-card-ucret">
                 <div className="aciklama">
-                  {masa.acik ? "TAHMİNİ ÜCRET" : "SON ÜCRET"}
+                  {masa.acik ? "ANLIK ÜCRET" : "SON ÜCRET"}
                 </div>
-                <div className="tutar">{bilardoUcret}₺</div>
+                <div className="tutar">{bilardoUcret.toFixed(2)}₺</div>
               </div>
               
-              {/* TOPLAM TUTAR (Ek ürünler varsa) */}
-              {toplamTutar > bilardoUcret && (
+              {/* TOPLAM TUTAR (Bilardo + Ek Ürünler) */}
+              {masa.acik && toplamTutar > bilardoUcret && (
                 <div className="bilardo-toplam-tutar">
-                  <span>TOPLAM TUTAR (Ürünlerle):</span>
+                  <span>TOPLAM TUTAR:</span>
                   <span>{toplamTutar.toFixed(2)}₺</span>
                 </div>
               )}
@@ -580,7 +653,24 @@ export default function Bilardo() {
                   alignItems: "center"
                 }}>
                   <span>📦 {ekUrunSayisi} ek ürün</span>
-                  <span>+{(toplamTutar - bilardoUcret).toFixed(2)}₺</span>
+                  <span>+{ekUrunToplam.toFixed(2)}₺</span>
+                </div>
+              )}
+              
+              {/* GEÇEN SÜRE */}
+              {masa.acik && masa.gecenDakika > 0 && (
+                <div style={{
+                  margin: "10px 0",
+                  padding: "8px 12px",
+                  background: "linear-gradient(135deg, #e3f2fd, #bbdefb)",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  color: "#1565c0",
+                  textAlign: "center",
+                  fontWeight: "600",
+                  border: "1px solid #90caf9"
+                }}>
+                  ⏱️ {masa.gecenDakika} dakika geçti
                 </div>
               )}
               
@@ -592,7 +682,7 @@ export default function Bilardo() {
                     onClick={(e) => { e.stopPropagation(); masaAc(masa, "30dk", index); }}
                   >
                     <span>30 DAKİKA</span>
-                    <span>{ucretAyarlari?.bilardo30dk || ucretAyarlari?.ilk40 || 80}₺</span>
+                    <span>{ucretAyarlari?.bilardo30dk || 80}₺</span>
                   </button>
                   
                   <button
@@ -600,7 +690,7 @@ export default function Bilardo() {
                     onClick={(e) => { e.stopPropagation(); masaAc(masa, "1saat", index); }}
                   >
                     <span>1 SAAT</span>
-                    <span>{ucretAyarlari?.bilardo1saat || ucretAyarlari?.u60 || 120}₺</span>
+                    <span>{ucretAyarlari?.bilardo1saat || 120}₺</span>
                   </button>
                   
                   <button
@@ -608,7 +698,7 @@ export default function Bilardo() {
                     onClick={(e) => { e.stopPropagation(); masaAc(masa, "suresiz", index); }}
                   >
                     <span>SÜRESİZ</span>
-                    <span>İlk 30dk: {ucretAyarlari?.bilardo30dk || ucretAyarlari?.ilk40 || 80}₺</span>
+                    <span>İlk 30dk: {ucretAyarlari?.bilardo30dk || 80}₺</span>
                   </button>
                 </div>
               ) : (
@@ -624,7 +714,7 @@ export default function Bilardo() {
                     
                     <div className="bilardo-bilgi-item">
                       <span>Geçen Süre</span>
-                      <strong>{dakika} dakika</strong>
+                      <strong>{masa.gecenDakika || 0} dakika</strong>
                     </div>
                     
                     <div className="bilardo-bilgi-item">
@@ -638,17 +728,25 @@ export default function Bilardo() {
                   
                   {/* ÜCRET AÇIKLAMASI */}
                   <div className="bilardo-ucret-aciklama">
-                    {masa.sureTipi === "30dk" && `30 dakika ücreti: ${ucretAyarlari?.bilardo30dk || ucretAyarlari?.ilk40 || 80}₺`}
-                    {masa.sureTipi === "1saat" && `1 saat ücreti: ${ucretAyarlari?.bilardo1saat || ucretAyarlari?.u60 || 120}₺`}
+                    {masa.sureTipi === "30dk" && `30 dakika ücreti: ${ucretAyarlari?.bilardo30dk || 80}₺`}
+                    {masa.sureTipi === "1saat" && `1 saat ücreti: ${ucretAyarlari?.bilardo1saat || 120}₺`}
                     {masa.sureTipi === "suresiz" && 
-                      `İlk 30dk: ${ucretAyarlari?.bilardo30dk || ucretAyarlari?.ilk40 || 80}₺ + Sonrası: ${ucretAyarlari?.bilardoDakikaUcreti || ucretAyarlari?.dk2 || 2}₺/dk`}
+                      `İlk 30dk: ${ucretAyarlari?.bilardo30dk || 80}₺ + Sonrası: ${ucretAyarlari?.bilardoDakikaUcreti || 2}₺/dk`}
                   </div>
                   
                   {/* AKTARIM BUTONLARI */}
                   <div className="bilardo-aktarim-buttons">
                     <button
                       className="bilardo-oyun-bitir-btn"
-                      onClick={(e) => { e.stopPropagation(); handleCardClick(masa, index); }}
+                      onClick={(e) => { e.stopPropagation(); handleCardClick(masa); }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #7f3131, #6a2828)';
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #9a3e3e, #7f3131)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
                     >
                       💳 ÖDEME YAP
                     </button>
@@ -656,6 +754,14 @@ export default function Bilardo() {
                     <button
                       className="bilardo-masa-aktar-btn"
                       onClick={(e) => masaAktarModalAc(masa, index, e)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #3a5a8c, #2b497a)';
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'linear-gradient(135deg, #4a6fa5, #3a5a8c)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
                     >
                       ↪️ MASAYA AKTAR
                     </button>
@@ -681,6 +787,16 @@ export default function Bilardo() {
                     key={masa.id || masa.no}
                     className={`bilardo-masa-secim-btn ${aktarimModal.seciliMasa?.id === masa.id ? 'secili' : ''}`}
                     onClick={() => setAktarimModal({...aktarimModal, seciliMasa: masa})}
+                    onMouseEnter={(e) => {
+                      if (aktarimModal.seciliMasa?.id !== masa.id) {
+                        e.currentTarget.style.background = '#f5e8d0';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (aktarimModal.seciliMasa?.id !== masa.id) {
+                        e.currentTarget.style.background = 'white';
+                      }
+                    }}
                   >
                     MASA {masa.no}
                   </button>
@@ -702,6 +818,14 @@ export default function Bilardo() {
               <button 
                 className="bilardo-modal-btn iptal"
                 onClick={() => setAktarimModal({ acik: false, bilardoMasa: null, seciliMasa: null, normalMasalar: [] })}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #e0e0e0, #d0d0d0)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f0f0f0, #e0e0e0)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
               >
                 İptal
               </button>
@@ -709,6 +833,16 @@ export default function Bilardo() {
                 className="bilardo-modal-btn onay"
                 onClick={masaAktar}
                 disabled={!aktarimModal.seciliMasa}
+                onMouseEnter={(e) => {
+                  if (!aktarimModal.seciliMasa) return;
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #3a5a8c, #2b497a)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!aktarimModal.seciliMasa) return;
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #4a6fa5, #3a5a8c)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
               >
                 MASAYA AKTAR
               </button>

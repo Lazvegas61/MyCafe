@@ -1,8 +1,9 @@
+// App.jsx - GÜNCELLENMİŞ VERSİYON
 /* ------------------------------------------------------------
-   📌 App.jsx — MyCafe (FULL FINAL – SYNC SERVICE ENTEGRASYONLU)
+   📌 App.jsx — MyCafe (FULL FINAL – GLOBAL POPUP ve BİLARDO SENKRONİZASYONU)
 ------------------------------------------------------------ */
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -11,6 +12,7 @@ import {
 } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
+import GlobalSureBittiPopup from "./components/GlobalSureBittiPopup"; // YENİ EKLENDİ
 import syncService from "./services/syncService";
 
 /* ------------------------------------------------------------
@@ -58,7 +60,7 @@ function loadInitialData() {
   const bilardoMasalari = [];
   for (let i = 1; i <= 10; i++) {
     bilardoMasalari.push({
-      id: 100 + i, // 101-110 arası ID'ler
+      id: 100 + i,
       no: `B${i}`,
       adisyonId: null,
       ayirId: null,
@@ -74,12 +76,37 @@ function loadInitialData() {
     });
   }
   
-  localStorage.setItem("mc_masalar", JSON.stringify([...initialMasalar, ...bilardoMasalari]));
+  const tumMasalar = [...initialMasalar, ...bilardoMasalari];
+  localStorage.setItem("mc_masalar", JSON.stringify(tumMasalar));
   localStorage.setItem("mc_adisyonlar", JSON.stringify([]));
-  localStorage.setItem("mc_bilardo_adisyonlar", JSON.stringify([]));
+  
+  // BİLARDO VERİLERİNİ OLUŞTUR
+  const bilardoVerileri = [];
+  for (let i = 1; i <= 10; i++) {
+    bilardoVerileri.push({
+      id: 100 + i,
+      no: `B${i}`,
+      acik: false,
+      durum: "KAPALI",
+      sureTipi: null,
+      acilisSaati: null,
+      ucret: 0,
+      aktifAdisyonId: null
+    });
+  }
+  localStorage.setItem("bilardo", JSON.stringify(bilardoVerileri));
+  
+  localStorage.setItem("bilardo_adisyonlar", JSON.stringify([]));
   localStorage.setItem("mc_musteriler", JSON.stringify([]));
   localStorage.setItem("mc_borclar", JSON.stringify([]));
   localStorage.setItem("mc_giderler", JSON.stringify([]));
+  
+  // BİLARDO ÜCRET AYARLARI
+  localStorage.setItem("bilardo_ucretleri", JSON.stringify({
+    bilardo30dk: 80,
+    bilardo1saat: 120,
+    bilardoDakikaUcreti: 2
+  }));
 }
 loadInitialData();
 
@@ -218,7 +245,6 @@ import Personel from "./pages/Personel/Personel.jsx";
 import Ayarlar from "./pages/Ayarlar/Ayarlar.jsx";
 import Bilardo from "./pages/Bilardo/Bilardo";
 import BilardoAdisyon from "./pages/Bilardo/BilardoAdisyon.jsx";
-// BİLARDO ADİSYON DETAY - GEÇİCİ OLARAK NORMAL ADİSYON
 import ReportsIndex from "./pages/reports/ReportsIndex.jsx";
 import KategoriBazli from "./pages/reports/KategoriBazli.jsx";
 import UrunBazli from "./pages/reports/UrunBazli.jsx";
@@ -317,14 +343,68 @@ function Layout({ children }) {
 ------------------------------------------------------------ */
 export default function App() {
   const syncInitializedRef = useRef(false);
+  const [globalSureBittiPopup, setGlobalSureBittiPopup] = useState(null);
 
   useEffect(() => {
     ensureDemoAdmin();
     
+    // BİLARDO SÜRE KONTROLÜ INTERVAL'I
+    const checkBilardoSuresi = () => {
+      try {
+        const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+        const aktifAdisyonlar = bilardoAdisyonlar.filter(a => a.durum === "ACIK");
+        
+        let yeniPopup = null;
+        const now = Date.now();
+        
+        aktifAdisyonlar.forEach(adisyon => {
+          if (adisyon.acilisZamani) {
+            const gecenDakika = Math.floor((now - adisyon.acilisZamani) / 60000);
+            
+            if (adisyon.sureTipi === "30dk" && gecenDakika >= 30) {
+              yeniPopup = {
+                type: "BİLARDO",
+                masaNo: adisyon.bilardoMasaNo,
+                mesaj: "30 dakika süresi doldu!",
+                adisyonId: adisyon.id,
+                timestamp: now
+              };
+            } else if (adisyon.sureTipi === "1saat" && gecenDakika >= 60) {
+              yeniPopup = {
+                type: "BİLARDO",
+                masaNo: adisyon.bilardoMasaNo,
+                mesaj: "1 saat süresi doldu!",
+                adisyonId: adisyon.id,
+                timestamp: now
+              };
+            }
+          }
+        });
+        
+        if (yeniPopup && (!globalSureBittiPopup || globalSureBittiPopup.adisyonId !== yeniPopup.adisyonId)) {
+          setGlobalSureBittiPopup(yeniPopup);
+          
+          // 30 saniye sonra kapat
+          setTimeout(() => {
+            setGlobalSureBittiPopup(prev => 
+              prev?.adisyonId === yeniPopup.adisyonId ? null : prev
+            );
+          }, 30000);
+        }
+      } catch (error) {
+        console.error("Bilardo süre kontrol hatası:", error);
+      }
+    };
+    
+    const bilardoInterval = setInterval(checkBilardoSuresi, 15000);
+    
     if (!syncInitializedRef.current) {
       const handleStorageChange = (event) => {
-        if (event.key && event.key.startsWith('mc_')) {
+        if (event.key && event.key.startsWith('mc_') || event.key === 'bilardo_adisyonlar') {
           console.log('💾 Storage değişti:', event.key);
+          
+          // Açık adisyonları senkronize et
+          syncAcikAdisyonlar();
           
           if (window.syncService && window.syncService.senkronizeMasalar) {
             setTimeout(() => {
@@ -347,13 +427,53 @@ export default function App() {
       
       return () => {
         window.removeEventListener('storage', handleStorageChange);
+        clearInterval(bilardoInterval);
       };
     }
-  }, []);
+  }, [globalSureBittiPopup]);
+  
+  // AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
+  const syncAcikAdisyonlar = () => {
+    try {
+      // Normal adisyonlar
+      const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
+      const acikNormalAdisyonlar = normalAdisyonlar.filter(a => a.durum === "ACIK");
+      
+      // Bilardo adisyonları
+      const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+      const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => a.durum === "ACIK");
+      
+      // Tüm açık adisyonları birleştir
+      const tumAcikAdisyonlar = [
+        ...acikNormalAdisyonlar.map(a => ({
+          ...a,
+          tur: "NORMAL",
+          masaNo: a.masaNo || "Bilinmiyor"
+        })),
+        ...acikBilardoAdisyonlar.map(a => ({
+          ...a,
+          tur: "BİLARDO",
+          masaNo: a.bilardoMasaNo || "Bilinmiyor"
+        }))
+      ];
+      
+      localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(tumAcikAdisyonlar));
+    } catch (error) {
+      console.error("Açık adisyon senkronizasyon hatası:", error);
+    }
+  };
 
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        {/* GLOBAL SÜRE BİTTİ POPUP'ı */}
+        {globalSureBittiPopup && (
+          <GlobalSureBittiPopup
+            data={globalSureBittiPopup}
+            onClose={() => setGlobalSureBittiPopup(null)}
+          />
+        )}
+        
         <Routes>
           {/* 1. ÖZEL ROUTE'LAR */}
           <Route path="/login" element={<Layout><Login /></Layout>} />
@@ -362,9 +482,8 @@ export default function App() {
           <Route path="/adisyon/:id" element={<Layout><Adisyon /></Layout>} />
           <Route path="/masa-detay/:id" element={<Layout><MasaDetay /></Layout>} />
           
-          {/* BİLARDO ADİSYON DETAY - ÇİFT TIKLAMA İLE GELECEK YER */}
-          {/* BİLARDO MASA ID'LERİ: 101-110 ARASI */}
-          <Route path="/bilardo-adisyon/:id" element={<Layout><Adisyon /></Layout>} />
+          {/* BİLARDO ADİSYON */}
+          <Route path="/bilardo-adisyon/:id" element={<Layout><BilardoAdisyon /></Layout>} />
           
           {/* RAPOR ALT SAYFALARI */}
           <Route path="/raporlar/kategori-satis" element={<Layout><KategoriBazli /></Layout>} />
@@ -385,7 +504,6 @@ export default function App() {
           <Route path="/personel" element={<Layout><Personel /></Layout>} />
           <Route path="/ayarlar" element={<Layout><Ayarlar /></Layout>} />
           <Route path="/bilardo" element={<Layout><Bilardo /></Layout>} />
-          <Route path="/bilardo-adisyon" element={<Layout><BilardoAdisyon /></Layout>} />
           
           {/* 4. 404 - EN ALTA */}
           <Route

@@ -63,7 +63,7 @@ export default function AnaEkran() {
     }
   };
 
-  // Açık Adisyonlar Toplamını Hesapla
+  // Açık Adisyonlar Toplamını Hesapla (BİLARDO DAHİL)
   const calculateOpenTablesSummary = useMemo(() => {
     return (openTables) => {
       if (!openTables || openTables.length === 0) {
@@ -80,12 +80,25 @@ export default function AnaEkran() {
       
       let totalAmount = 0;
       let normalCount = 0;
+      let bilardoCount = 0;
+      let normalTotal = 0;
+      let bilardoTotal = 0;
       let totalDuration = 0;
       
       openTables.forEach(masa => {
         const amount = parseFloat(masa.toplamTutar) || 0;
         totalAmount += amount;
-        normalCount++;
+        
+        // Bilardo kontrolü (masa no > 20 ise bilardo)
+        const isBilardo = parseInt(masa.no) > 20;
+        
+        if (isBilardo) {
+          bilardoCount++;
+          bilardoTotal += amount;
+        } else {
+          normalCount++;
+          normalTotal += amount;
+        }
         
         // Süreyi hesapla
         const duration = calculateDuration(masa.acilisZamani);
@@ -99,67 +112,74 @@ export default function AnaEkran() {
       return {
         totalAmount,
         normalCount,
-        bilardoCount: 0,
-        normalTotal: totalAmount,
-        bilardoTotal: 0,
+        bilardoCount,
+        normalTotal,
+        bilardoTotal,
         avgDuration,
         tableCount: openTables.length
       };
     };
   }, []);
 
-  // Dashboard verilerini güncelle - DÜZELTİLDİ
+  // Dashboard verilerini güncelle - BİLARDO DAHİL
   useEffect(() => {
     const updateDashboardData = () => {
       try {
         // Günlük satış hesapla
         const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-        const today = new Date().toLocaleDateString('tr-TR').split('.')[0];
+        const today = new Date().toLocaleDateString('tr-TR');
+        const todayStr = today.split('.')[0]; // Sadece gün
         
         const todaySales = adisyonlar
-          .filter(a => String(a.odendi).toLowerCase() === 'true' && 
-                      a.kapatmaZamani && 
-                      a.kapatmaZamani.includes(today))
-          .reduce((sum, a) => sum + (Math.abs(parseFloat(a.toplamTutar)) || 0), 0);
+          .filter(a => {
+            const odendi = String(a.odendi || "").toLowerCase() === 'true';
+            const kapatmaVar = a.kapatmaZamani;
+            const bugunKapandi = kapatmaVar && a.kapatmaZamani.includes(todayStr);
+            return odendi && bugunKapandi;
+          })
+          .reduce((sum, a) => sum + (Math.abs(parseFloat(a.toplamTutar || 0)) || 0), 0);
 
         // Hesaba Yaz (Borçlar)
         const borclar = JSON.parse(localStorage.getItem("mc_borclar") || "[]");
         const totalDebt = borclar
-          .filter(b => String(b.odendi).toLowerCase() === 'false')
-          .reduce((sum, b) => sum + (Math.abs(parseFloat(b.tutar)) || 0), 0);
+          .filter(b => String(b.odendi || "").toLowerCase() === 'false')
+          .reduce((sum, b) => sum + (Math.abs(parseFloat(b.tutar || 0)) || 0), 0);
 
         // Giderler
         const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
         const todayExpenses = giderler
-          .filter(g => g.tarih && g.tarih.includes(today))
-          .reduce((sum, g) => sum + (Math.abs(parseFloat(g.tutar)) || 0), 0);
+          .filter(g => g.tarih && g.tarih.includes(todayStr))
+          .reduce((sum, g) => sum + (Math.abs(parseFloat(g.tutar || 0)) || 0), 0);
 
         // Kritik stok
         const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
         const criticalProducts = urunler.filter(u => 
-          (parseInt(u.stock) || 0) <= (parseInt(u.critical) || 10)
+          (parseInt(u.stock || 0) || 0) <= (parseInt(u.critical || 10) || 10)
         );
 
-        // AÇIK ADİSYONLARI HESAPLA - YENİ MANTIK (DÜZELTİLDİ)
+        // AÇIK ADİSYONLARI HESAPLA - BİLARDO DAHİL
         const masalar = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
         const allAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
         
-        // 1. ÖNCE TÜM DOLU MASALARI İŞLE
-        const openTablesWithTotals = masalar.map(masa => {
-          if (masa.durum?.toUpperCase() !== "DOLU" || !masa.adisyonId) {
-            return null;
-          }
+        // 1. TÜM MASALARI İŞLE (NORMAL + BİLARDO)
+        const allOpenTables = [];
+
+        // Normal ve bilardo masalarını işle
+        masalar.forEach(masa => {
+          // DOLU olmayan masaları atla
+          if (masa.durum?.toUpperCase() !== "DOLU") return;
           
-          // BU MASAYA AİT TÜM AÇIK ADİSYONLARI BUL
+          // Bu masa için adisyon ara
           const masaAdisyonlari = allAdisyonlar.filter(ad => {
             // Masa eşleşmesi
             const masaEslesti = 
               ad.masaNo === `MASA ${masa.no}` || 
               ad.masaNum === masa.no ||
               ad.masaNo === masa.masaNo ||
-              ad.id === masa.adisyonId;
+              ad.id === masa.adisyonId ||
+              ad.masaId === masa.id;
             
-            // Açık mı kontrol et (KAPALI veya KİLİTLİ değilse)
+            // Açık mı kontrol et
             const durum = (ad.durum || ad.status || "").toUpperCase();
             const kapali = ad.kapali || 
                           durum === "CLOSED" || 
@@ -169,34 +189,49 @@ export default function AnaEkran() {
             return masaEslesti && !kapali;
           });
           
-          if (masaAdisyonlari.length === 0) {
-            return null;
-          }
+          if (masaAdisyonlari.length === 0) return;
           
-          // 2. TOPLAM TUTARI HESAPLA (Adisyon.jsx'teki TOPLAM değeri)
+          // Toplam tutarı hesapla
           let toplamTutar = 0;
           
-          // ÖNCE LOCALSTORAGE'DAN DENE (Adisyon.jsx'in kaydettiği gibi)
+          // Önce localStorage'dan masa toplamını al
           const storedTotal = localStorage.getItem(`mc_masa_toplam_${masa.no}`);
           if (storedTotal) {
             toplamTutar = parseFloat(storedTotal) || 0;
           } else {
-            // YOKSA MANUEL HESAPLA
+            // Manuel hesapla
             masaAdisyonlari.forEach(ad => {
-              const adToplam = (ad.kalemler || []).reduce((sum, k) => {
-                return sum + (Number(k.toplam) || 0);
-              }, 0);
+              // Adisyon toplamı
+              let adToplam = 0;
+              
+              // Kalemlerden toplam
+              if (ad.kalemler && ad.kalemler.length > 0) {
+                adToplam = ad.kalemler.reduce((sum, k) => {
+                  return sum + (Number(k.toplam) || 0);
+                }, 0);
+              }
+              
+              // Bilardo ücreti varsa ekle
+              if (ad.bilardoUcreti) {
+                adToplam += (Number(ad.bilardoUcreti) || 0);
+              }
+              
+              // Özel ücret varsa ekle
+              if (ad.ozelUcret) {
+                adToplam += (Number(ad.ozelUcret) || 0);
+              }
+              
               toplamTutar += adToplam;
             });
             
-            // KAYDET
+            // Kaydet
             localStorage.setItem(`mc_masa_toplam_${masa.no}`, toplamTutar.toFixed(2));
           }
           
-          // 3. MASA BİLGİLERİNİ HAZIRLA
+          // Masa bilgilerini hazırla
           const anaAdisyon = masaAdisyonlari.find(ad => !ad.isSplit) || masaAdisyonlari[0];
           
-          return {
+          allOpenTables.push({
             ...masa,
             id: masa.id || `masa_${masa.no}`,
             no: String(masa.no),
@@ -205,15 +240,16 @@ export default function AnaEkran() {
               return sum + (ad.kalemler?.length || 0);
             }, 0),
             musteriAdi: anaAdisyon?.musteriAdi || null,
-            acilisZamani: anaAdisyon?.acilisZamani || masa.acilisZamani
-          };
-        }).filter(Boolean); // null'ları temizle
+            acilisZamani: anaAdisyon?.acilisZamani || masa.acilisZamani,
+            isBilardo: parseInt(masa.no) > 20
+          });
+        });
 
-        // 4. TEKİL MASALAR (HESAP AYIRMA SORUNU ÇÖZÜMÜ)
+        // 2. TEKİL MASALAR (HESAP AYIRMA SORUNU ÇÖZÜMÜ)
         const uniqueTables = [];
         const seenMasaNos = new Set();
 
-        openTablesWithTotals.forEach(masa => {
+        allOpenTables.forEach(masa => {
           if (!seenMasaNos.has(masa.no)) {
             seenMasaNos.add(masa.no);
             uniqueTables.push(masa);
@@ -226,17 +262,17 @@ export default function AnaEkran() {
           }
         });
 
-        // 5. Açık adisyon özetini hesapla
+        // 3. Açık adisyon özetini hesapla (BİLARDO DAHİL)
         const summary = calculateOpenTablesSummary(uniqueTables);
         setOpenTablesSummary(summary);
 
-        // 6. Dashboard verilerini güncelle
+        // 4. Dashboard verilerini güncelle
         setDashboardData({
           dailySales: todaySales.toFixed(2),
           totalDebt: totalDebt.toFixed(2),
           dailyExpenses: todayExpenses.toFixed(2),
           criticalCount: criticalProducts.length,
-          openTables: uniqueTables,
+          openTables: uniqueTables.sort((a, b) => parseInt(a.no) - parseInt(b.no)),
           criticalProducts: criticalProducts.slice(0, 5)
         });
 
@@ -269,16 +305,18 @@ export default function AnaEkran() {
       updateDashboardData();
     };
     
-    // Her 30 saniyede bir verileri güncelle
-    const interval = setInterval(updateDashboardData, 30000);
+    // Her 10 saniyede bir verileri güncelle
+    const interval = setInterval(updateDashboardData, 10000);
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('adisyonGuncellendi', handleStorageChange);
+    window.addEventListener('masaGuncellendi', handleStorageChange);
     
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('adisyonGuncellendi', handleStorageChange);
+      window.removeEventListener('masaGuncellendi', handleStorageChange);
     };
   }, [calculateOpenTablesSummary]);
 
@@ -361,7 +399,7 @@ export default function AnaEkran() {
               {dashboardData.openTables.length > 0 ? (
                 dashboardData.openTables.map((masa) => {
                   const duration = calculateDuration(masa.acilisZamani);
-                  const isBilardo = masa.no > 20;
+                  const isBilardo = parseInt(masa.no) > 20;
                   const amount = parseFloat(masa.toplamTutar) || 0;
                   
                   return (
