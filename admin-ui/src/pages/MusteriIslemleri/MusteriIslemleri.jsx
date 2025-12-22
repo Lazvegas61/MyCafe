@@ -19,6 +19,7 @@ const ADISYON_KEY = "mc_adisyonlar";
 const TAHBILAT_KEY = "mc_tahbilat";
 const USER_KEY = "mc_user";
 const MASALAR_KEY = "mc_masalar";
+const BORC_KEY = "mc_borclar"; // ADISYONDAN GELEN BORÇLAR İÇİN
 
 export default function MusteriIslemleri() {
   // --------------------------------------------------
@@ -70,7 +71,7 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // İNİTİAL LOAD
+  // İNİTİAL LOAD - GÜNCELLENDİ: ADISYON ve BORC_KEY BİRLİKTE OKU
   // --------------------------------------------------
   useEffect(() => {
     const user = okuJSON(USER_KEY, {});
@@ -80,39 +81,84 @@ export default function MusteriIslemleri() {
     
     // Borçları hesapla ve sırala
     const musterilerBorclu = musteriler.map(musteri => {
+      // 1. ADİSYON_KEY'den borçları hesapla (eski sistem)
       const adisyonlar = okuJSON(ADISYON_KEY, []).filter(a => a.musteriId === musteri.id);
-      const tahsilatlar = okuJSON(TAHBILAT_KEY, []).filter(t => t.musteriId === musteri.id);
       
-      let toplamBorc = 0;
-      let toplamIndirim = 0;
+      // 2. BORC_KEY'den borçları hesapla (Adisyon.jsx'ten gelen yeni sistem)
+      const borclar = okuJSON(BORC_KEY, []).filter(b => b.musteriId === musteri.id);
+      
+      let toplamBorcAdisyon = 0;
+      let toplamBorcYeni = 0;
+      let toplamOdemeYeni = 0;
       
       // Adisyonlardan borç hesapla - HESABA YAZ yapılmış kısımlar
       adisyonlar.forEach(adisyon => {
         if (adisyon.hesabaYazilanTutar) {
-          toplamBorc += adisyon.hesabaYazilanTutar;
+          toplamBorcAdisyon += adisyon.hesabaYazilanTutar;
         }
       });
       
-      // Tahsilatları düş
-      tahsilatlar.forEach(tahsilat => {
-        toplamBorc -= tahsilat.tutar || 0;
+      // Yeni borç sisteminden hesapla
+      borclar.forEach(borc => {
+        // Toplam borç
+        toplamBorcYeni += Number(borc.tutar || 0);
+        
+        // Ödenen kısım
+        if (borc.hareketler) {
+          borc.hareketler.forEach(h => {
+            if (h.tip === "ÖDEME ALINDI") {
+              toplamOdemeYeni += Number(h.tutar || 0);
+            }
+          });
+        }
       });
       
+      // Eski tahsilatları düş (ADISYON sistemi için)
+      const tahsilatlar = okuJSON(TAHBILAT_KEY, []).filter(t => t.musteriId === musteri.id);
+      const toplamTahsilat = tahsilatlar.reduce((sum, t) => sum + (t.tutar || 0), 0);
+      
+      // TOPLAM BORÇ = İki sistemden gelen borçlar
+      const toplamBorc = toplamBorcAdisyon + toplamBorcYeni;
+      
+      // TOPLAM ÖDEME = İki sistemden gelen ödemeler
+      const toplamOdeme = toplamTahsilat + toplamOdemeYeni;
+      
       // İndirimleri kontrol et
+      let toplamIndirim = 0;
       if (musteri.indirimler) {
         toplamIndirim = musteri.indirimler.reduce((sum, i) => sum + (i.tutar || 0), 0);
       }
       
-      const netBorc = Math.max(0, toplamBorc - toplamIndirim);
+      const netBorc = Math.max(0, toplamBorc - toplamIndirim - toplamOdeme);
+      
+      // Tüm adisyonları birleştir
+      const tumAdisyonlar = [
+        ...adisyonlar,
+        ...borclar.map(borc => ({
+          ...borc,
+          id: borc.id,
+          masaNo: borc.masaNo || "-",
+          tarih: borc.acilisZamani,
+          toplamTutar: borc.tutar,
+          hesabaYazilanTutar: borc.tutar,
+          urunler: borc.urunler || [],
+          not: borc.hareketler?.[0]?.aciklama || "",
+          isBorcKey: true // İşaretleyici
+        }))
+      ];
       
       return {
         ...musteri,
         toplamBorc: toplamBorc,
         indirim: toplamIndirim,
         netBorc: netBorc,
-        adisyonSayisi: adisyonlar.length,
+        adisyonSayisi: tumAdisyonlar.length,
         sonIslemTarihi: musteri.sonIslemTarihi || musteri.created_at,
-        aktifAdisyonlar: adisyonlar.filter(a => a.isActive && a.hesabaYazilanTutar > 0)
+        aktifAdisyonlar: tumAdisyonlar.filter(a => 
+          (a.hesabaYazilanTutar > 0 || a.tutar > 0) && 
+          (!a.kapali && a.kapali !== true)
+        ),
+        tumAdisyonlar: tumAdisyonlar // Tüm adisyonları sakla
       };
     });
     
@@ -153,43 +199,62 @@ export default function MusteriIslemleri() {
   }, [searchTerm, filterType, customers]);
 
   // --------------------------------------------------
-  // ADİSYON İÇERİĞİ GÖRÜNTÜLE
+  // ADİSYON İÇERİĞİ GÖRÜNTÜLE - GÜNCELLENDİ
   // --------------------------------------------------
   const handleShowAdisyonDetay = (adisyon) => {
-    setSelectedAdisyon(adisyon);
+    // Eğer bu BORC_KEY'den gelen bir adisyonsa
+    if (adisyon.isBorcKey) {
+      setSelectedAdisyon({
+        ...adisyon,
+        masaNo: adisyon.masaNo || "-",
+        tarih: adisyon.tarih || adisyon.acilisZamani,
+        toplamTutar: adisyon.tutar || adisyon.hesabaYazilanTutar || 0,
+        hesabaYazilanTutar: adisyon.tutar || adisyon.hesabaYazilanTutar || 0,
+        urunler: adisyon.urunler || [],
+        not: adisyon.not || adisyon.hareketler?.[0]?.aciklama || ""
+      });
+    } else {
+      // Normal ADISYON_KEY'den gelen adisyon
+      setSelectedAdisyon(adisyon);
+    }
     setAdisyonDetayModal(true);
   };
 
   // --------------------------------------------------
-  // MÜŞTERİ SEÇİMİ
+  // MÜŞTERİ SEÇİMİ - GÜNCELLENDİ
   // --------------------------------------------------
   const handleCustomerSelect = (customer) => {
     setSelectedCustomer(customer);
     setMusteriNotu(customer.not || "");
     
-    // Müşterinin adisyon ve tahsilat geçmişini yükle
+    // Müşterinin tüm işlem geçmişini yükle
     const adisyonlar = okuJSON(ADISYON_KEY, [])
       .filter(a => a.musteriId === customer.id)
-      .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+      .sort((a, b) => new Date(b.tarih || b.acilisZamani) - new Date(a.tarih || a.acilisZamani));
     
     const tahsilatlar = okuJSON(TAHBILAT_KEY, [])
       .filter(t => t.musteriId === customer.id)
       .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
     
+    // BORC_KEY'den işlemleri al
+    const borclar = okuJSON(BORC_KEY, [])
+      .filter(b => b.musteriId === customer.id)
+      .sort((a, b) => new Date(b.acilisZamani) - new Date(a.acilisZamani));
+    
     const tumIslemler = [];
     
-    // Adisyonları ekle
+    // 1. ADİSYON_KEY'den gelen adisyonları ekle
     adisyonlar.forEach(adisyon => {
       if (adisyon.hesabaYazilanTutar > 0) {
         tumIslemler.push({
           id: `adisyon_${adisyon.id}`,
-          tarih: new Date(adisyon.tarih).toLocaleDateString('tr-TR'),
+          tarih: new Date(adisyon.tarih || adisyon.acilisZamani).toLocaleDateString('tr-TR'),
           masaNo: adisyon.masaNo || "-",
-          aciklama: adisyon.urunler?.map(u => u.ad).slice(0, 3).join(", ") + (adisyon.urunler?.length > 3 ? "..." : ""),
+          aciklama: adisyon.urunler?.map(u => u.ad || u.urunAd).slice(0, 3).join(", ") + (adisyon.urunler?.length > 3 ? "..." : ""),
           tutar: `+${adisyon.hesabaYazilanTutar.toFixed(2)} ₺`,
           odemeYontemi: "Adisyon",
           tahsilatTutari: "-",
-          kalanBorc: calculateRemainingDebtUpTo(adisyon.tarih, customer.id),
+          kalanBorc: calculateRemainingDebtUpTo(adisyon.tarih || adisyon.acilisZamani, customer.id),
           type: "ADISYON",
           adisyonId: adisyon.id,
           adisyonData: adisyon
@@ -197,7 +262,52 @@ export default function MusteriIslemleri() {
       }
     });
     
-    // Tahsilatları ekle
+    // 2. BORC_KEY'den gelen borç kayıtlarını ekle
+    borclar.forEach(borc => {
+      if (borc.tutar > 0) {
+        tumIslemler.push({
+          id: `borc_${borc.id}`,
+          tarih: new Date(borc.acilisZamani).toLocaleDateString('tr-TR'),
+          masaNo: borc.masaNo || "-",
+          aciklama: borc.hareketler?.[0]?.aciklama || "Hesaba Yazılan Borç",
+          tutar: `+${borc.tutar.toFixed(2)} ₺`,
+          odemeYontemi: "Hesaba Yaz",
+          tahsilatTutari: "-",
+          kalanBorc: calculateRemainingDebtUpTo(borc.acilisZamani, customer.id),
+          type: "BORC",
+          adisyonId: borc.id,
+          adisyonData: {
+            ...borc,
+            masaNo: borc.masaNo || "-",
+            toplamTutar: borc.tutar,
+            hesabaYazilanTutar: borc.tutar,
+            urunler: borc.urunler || [],
+            not: borc.hareketler?.[0]?.aciklama || ""
+          }
+        });
+        
+        // Borçtan yapılan ödemeleri ekle
+        if (borc.hareketler) {
+          borc.hareketler.forEach((hareket, index) => {
+            if (hareket.tip === "ÖDEME ALINDI") {
+              tumIslemler.push({
+                id: `borc_odeme_${borc.id}_${index}`,
+                tarih: new Date(hareket.tarih).toLocaleDateString('tr-TR'),
+                masaNo: "-",
+                aciklama: "BORÇ ÖDEMESİ",
+                tutar: `-${hareket.tutar.toFixed(2)} ₺`,
+                odemeYontemi: hareket.odemeTipi || "Nakit",
+                tahsilatTutari: `${hareket.tutar.toFixed(2)} ₺`,
+                kalanBorc: calculateRemainingDebtUpTo(hareket.tarih, customer.id),
+                type: "TAHSILAT"
+              });
+            }
+          });
+        }
+      }
+    });
+    
+    // 3. Eski TAHSİLAT_KEY'den gelen tahsilatları ekle
     tahsilatlar.forEach(tahsilat => {
       tumIslemler.push({
         id: `tahsilat_${tahsilat.id}`,
@@ -212,7 +322,7 @@ export default function MusteriIslemleri() {
       });
     });
     
-    // İndirimleri ekle
+    // 4. İndirimleri ekle
     if (customer.indirimler) {
       customer.indirimler.forEach((indirim, index) => {
         tumIslemler.push({
@@ -231,7 +341,7 @@ export default function MusteriIslemleri() {
     
     // Tarihe göre sırala
     tumIslemler.sort((a, b) => new Date(b.tarih.split('.').reverse().join('-')) - 
-                               new Date(a.tarih.split('.').reverse().join('-')));
+                             new Date(a.tarih.split('.').reverse().join('-')));
     
     setTransactions(tumIslemler);
     
@@ -240,28 +350,56 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // KALAN BORÇ HESAPLAMA (belirli tarihe kadar)
+  // KALAN BORÇ HESAPLAMA (belirli tarihe kadar) - GÜNCELLENDİ
   // --------------------------------------------------
   const calculateRemainingDebtUpTo = (tarih, musteriId) => {
     const customer = customers.find(c => c.id === musteriId);
     if (!customer) return 0;
     
+    // Tarih formatını düzelt
+    const targetDate = new Date(tarih);
+    
+    // ADİSYON_KEY'den borçlar
     const adisyonlar = okuJSON(ADISYON_KEY, [])
       .filter(a => a.musteriId === musteriId && 
-              new Date(a.tarih) <= new Date(tarih) &&
-              a.hesabaYazilanTutar > 0);
+              new Date(a.tarih || a.acilisZamani) <= targetDate &&
+              (a.hesabaYazilanTutar > 0));
     
+    // BORC_KEY'den borçlar
+    const borclar = okuJSON(BORC_KEY, [])
+      .filter(b => b.musteriId === musteriId && 
+              new Date(b.acilisZamani) <= targetDate);
+    
+    // TAHSİLAT_KEY'den ödemeler
     const tahsilatlar = okuJSON(TAHBILAT_KEY, [])
-      .filter(t => t.musteriId === musteriId && new Date(t.tarih) <= new Date(tarih));
+      .filter(t => t.musteriId === musteriId && new Date(t.tarih) <= targetDate);
     
-    let toplamBorc = adisyonlar.reduce((sum, a) => sum + (a.hesabaYazilanTutar || 0), 0);
-    const toplamTahsilat = tahsilatlar.reduce((sum, t) => sum + (t.tutar || 0), 0);
+    let toplamBorc = 0;
+    
+    // Adisyon borçlarını ekle
+    toplamBorc += adisyonlar.reduce((sum, a) => sum + (a.hesabaYazilanTutar || 0), 0);
+    
+    // Yeni borç sistemini ekle
+    toplamBorc += borclar.reduce((sum, b) => sum + (b.tutar || 0), 0);
+    
+    // Toplam tahsilatı hesapla
+    let toplamTahsilat = tahsilatlar.reduce((sum, t) => sum + (t.tutar || 0), 0);
+    
+    // BORC_KEY'den gelen ödemeleri de ekle
+    borclar.forEach(borc => {
+      if (borc.hareketler) {
+        const borcOdemeleri = borc.hareketler
+          .filter(h => h.tip === "ÖDEME ALINDI" && new Date(h.tarih) <= targetDate)
+          .reduce((sum, h) => sum + (h.tutar || 0), 0);
+        toplamTahsilat += borcOdemeleri;
+      }
+    });
     
     // İndirimleri düş
     const customerData = customers.find(c => c.id === musteriId);
     if (customerData && customerData.indirimler) {
       const indirimlerBuTariheKadar = customerData.indirimler.filter(
-        i => new Date(i.tarih) <= new Date(tarih)
+        i => new Date(i.tarih) <= targetDate
       );
       const toplamIndirim = indirimlerBuTariheKadar.reduce((sum, i) => sum + (i.tutar || 0), 0);
       toplamBorc -= toplamIndirim;
@@ -306,7 +444,8 @@ export default function MusteriIslemleri() {
       netBorc: 0,
       indirimler: [],
       adisyonSayisi: 0,
-      aktifAdisyonlar: []
+      aktifAdisyonlar: [],
+      tumAdisyonlar: []
     };
     
     const updatedCustomers = [...customers, newCustomer];
@@ -399,7 +538,7 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // TAHSİLAT AL
+  // TAHSİLAT AL - GÜNCELLENDİ: BORC_KEY'E DE ÖDEME KAYDET
   // --------------------------------------------------
   const handleCollectPayment = () => {
     if (!selectedCustomer) {
@@ -418,7 +557,7 @@ export default function MusteriIslemleri() {
       return;
     }
     
-    // Tahsilat kaydı oluştur
+    // 1. TAHSİLAT_KEY'e kaydet (eski sistem)
     const yeniTahsilat = {
       id: `tah_${Date.now()}`,
       musteriId: selectedCustomer.id,
@@ -434,7 +573,36 @@ export default function MusteriIslemleri() {
     mevcutTahsilatlar.push(yeniTahsilat);
     yazJSON(TAHBILAT_KEY, mevcutTahsilatlar);
     
-    // Müşterinin net borcunu güncelle
+    // 2. BORC_KEY'e de ödeme kaydet (yeni sistem)
+    const borclar = okuJSON(BORC_KEY, []);
+    const musteriBorclari = borclar.filter(b => b.musteriId === selectedCustomer.id);
+    
+    if (musteriBorclari.length > 0) {
+      // En son borcu bul
+      const sonBorc = musteriBorclari[musteriBorclari.length - 1];
+      const borcIndex = borclar.findIndex(b => b.id === sonBorc.id);
+      
+      if (borcIndex !== -1) {
+        // Borca ödeme hareketi ekle
+        borclar[borcIndex] = {
+          ...borclar[borcIndex],
+          hareketler: [
+            ...(borclar[borcIndex].hareketler || []),
+            {
+              tip: "ÖDEME ALINDI",
+              tutar: tutar,
+              tarih: new Date().toISOString(),
+              aciklama: "Müşteri İşlemleri sayfasından tahsilat",
+              odemeTipi: tahsilatTipi
+            }
+          ]
+        };
+        
+        yazJSON(BORC_KEY, borclar);
+      }
+    }
+    
+    // 3. Müşterinin net borcunu güncelle
     const updatedCustomers = customers.map(c => {
       if (c.id === selectedCustomer.id) {
         const yeniNetBorc = Math.max(0, c.netBorc - tutar);
@@ -528,51 +696,34 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // MÜŞTERİ ADİSYONLARINI GETİR
+  // MÜŞTERİ ADİSYONLARINI GETİR - GÜNCELLENDİ
   // --------------------------------------------------
   const getCustomerAdisyonlar = (customerId) => {
-    return okuJSON(ADISYON_KEY, [])
+    // ADİSYON_KEY'den al
+    const adisyonlar = okuJSON(ADISYON_KEY, [])
       .filter(a => a.musteriId === customerId && a.hesabaYazilanTutar > 0)
+      .sort((a, b) => new Date(b.tarih || b.acilisZamani) - new Date(a.tarih || a.acilisZamani));
+    
+    // BORC_KEY'den de al
+    const borclar = okuJSON(BORC_KEY, [])
+      .filter(b => b.musteriId === customerId)
+      .map(borc => ({
+        id: borc.id,
+        masaNo: borc.masaNo || "-",
+        tarih: borc.acilisZamani,
+        toplamTutar: borc.tutar,
+        hesabaYazilanTutar: borc.tutar,
+        urunler: borc.urunler || [],
+        not: borc.hareketler?.[0]?.aciklama || "",
+        isBorcKey: true // İşaretleyici
+      }))
       .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+    
+    return [...adisyonlar, ...borclar];
   };
 
   // --------------------------------------------------
-  // ADİSYON TAMAMEN HESABA YAZILDI MI KONTROL ET
-  // --------------------------------------------------
-  const checkAndCloseMasaIfNeeded = () => {
-    if (!selectedAdisyon) return;
-    
-    const adisyonlar = okuJSON(ADISYON_KEY, []);
-    const updatedAdisyonlar = adisyonlar.map(a => {
-      if (a.id === selectedAdisyon.id) {
-        // Eğer adisyonun tamamı hesaba yazıldıysa
-        if (a.hesabaYazilanTutar && a.hesabaYazilanTutar >= a.toplamTutar) {
-          // Masa kapat
-          const masalar = okuJSON(MASALAR_KEY, []);
-          const masaIndex = masalar.findIndex(m => m.id === a.masaId);
-          
-          if (masaIndex !== -1) {
-            masalar[masaIndex].durum = "BOŞ";
-            masalar[masaIndex].kapanisZamani = new Date().toISOString();
-            yazJSON(MASALAR_KEY, masalar);
-          }
-          
-          // Adisyonu pasif yap
-          return {
-            ...a,
-            isActive: false,
-            kapanisZamani: new Date().toISOString()
-          };
-        }
-      }
-      return a;
-    });
-    
-    yazJSON(ADISYON_KEY, updatedAdisyonlar);
-  };
-
-  // --------------------------------------------------
-  // ADİSYON DETAY MODALI
+  // ADİSYON DETAY MODALI - GÜNCELLENDİ
   // --------------------------------------------------
   const renderAdisyonDetayModal = () => {
     if (!adisyonDetayModal || !selectedAdisyon) return null;
@@ -592,53 +743,57 @@ export default function MusteriIslemleri() {
           
           <div className="modal-body">
             <div className="adisyon-info">
-              <p><strong>Masa No:</strong> {selectedAdisyon.masaNo}</p>
-              <p><strong>Tarih:</strong> {new Date(selectedAdisyon.tarih).toLocaleDateString('tr-TR')}</p>
-              <p><strong>Toplam Tutar:</strong> {selectedAdisyon.toplamTutar?.toFixed(2)} ₺</p>
-              <p><strong>Hesaba Yazılan:</strong> {selectedAdisyon.hesabaYazilanTutar?.toFixed(2)} ₺</p>
-              <p><strong>Kalan:</strong> {(selectedAdisyon.toplamTutar - (selectedAdisyon.hesabaYazilanTutar || 0)).toFixed(2)} ₺</p>
+              <p><strong>Masa No:</strong> {selectedAdisyon.masaNo || "-"}</p>
+              <p><strong>Tarih:</strong> {new Date(selectedAdisyon.tarih || selectedAdisyon.acilisZamani).toLocaleDateString('tr-TR')}</p>
+              <p><strong>Toplam Tutar:</strong> {(selectedAdisyon.toplamTutar || selectedAdisyon.tutar || 0).toFixed(2)} ₺</p>
+              <p><strong>Hesaba Yazılan:</strong> {(selectedAdisyon.hesabaYazilanTutar || selectedAdisyon.tutar || 0).toFixed(2)} ₺</p>
+              {selectedAdisyon.toplamTutar && (
+                <p><strong>Kalan:</strong> {(selectedAdisyon.toplamTutar - (selectedAdisyon.hesabaYazilanTutar || 0)).toFixed(2)} ₺</p>
+              )}
             </div>
             
-            <div className="urunler-listesi">
-              <h4>Ürünler</h4>
-              <table className="urunler-table">
-                <thead>
-                  <tr>
-                    <th>Ürün</th>
-                    <th>Adet</th>
-                    <th>Birim Fiyat</th>
-                    <th>Toplam</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedAdisyon.urunler?.map((urun, index) => (
-                    <tr key={index}>
-                      <td>{urun.ad}</td>
-                      <td>{urun.adet}</td>
-                      <td>{urun.birimFiyat?.toFixed(2)} ₺</td>
-                      <td>{(urun.birimFiyat * urun.adet).toFixed(2)} ₺</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan="3"><strong>Toplam:</strong></td>
-                    <td><strong>{selectedAdisyon.toplamTutar?.toFixed(2)} ₺</strong></td>
-                  </tr>
-                  {selectedAdisyon.hesabaYazilanTutar > 0 && (
+            {selectedAdisyon.urunler && selectedAdisyon.urunler.length > 0 && (
+              <div className="urunler-listesi">
+                <h4>Ürünler</h4>
+                <table className="urunler-table">
+                  <thead>
                     <tr>
-                      <td colSpan="3"><strong>Hesaba Yazılan:</strong></td>
-                      <td><strong style={{color: "#8b4513"}}>{selectedAdisyon.hesabaYazilanTutar?.toFixed(2)} ₺</strong></td>
+                      <th>Ürün</th>
+                      <th>Adet</th>
+                      <th>Birim Fiyat</th>
+                      <th>Toplam</th>
                     </tr>
-                  )}
-                </tfoot>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {selectedAdisyon.urunler.map((urun, index) => (
+                      <tr key={index}>
+                        <td>{urun.ad || urun.urunAd}</td>
+                        <td>{urun.adet || urun.miktar || 1}</td>
+                        <td>{(urun.birimFiyat || urun.fiyat || 0).toFixed(2)} ₺</td>
+                        <td>{((urun.birimFiyat || urun.fiyat || 0) * (urun.adet || urun.miktar || 1)).toFixed(2)} ₺</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="3"><strong>Toplam:</strong></td>
+                      <td><strong>{(selectedAdisyon.toplamTutar || selectedAdisyon.tutar || 0).toFixed(2)} ₺</strong></td>
+                    </tr>
+                    {selectedAdisyon.hesabaYazilanTutar > 0 && (
+                      <tr>
+                        <td colSpan="3"><strong>Hesaba Yazılan:</strong></td>
+                        <td><strong style={{color: "#8b4513"}}>{(selectedAdisyon.hesabaYazilanTutar || selectedAdisyon.tutar || 0).toFixed(2)} ₺</strong></td>
+                      </tr>
+                    )}
+                  </tfoot>
+                </table>
+              </div>
+            )}
             
-            {selectedAdisyon.not && (
+            {(selectedAdisyon.not || selectedAdisyon.hareketler?.[0]?.aciklama) && (
               <div className="adisyon-not">
                 <h4>Not</h4>
-                <p>{selectedAdisyon.not}</p>
+                <p>{selectedAdisyon.not || selectedAdisyon.hareketler?.[0]?.aciklama}</p>
               </div>
             )}
           </div>
@@ -646,10 +801,7 @@ export default function MusteriIslemleri() {
           <div className="modal-footer">
             <button 
               className="btn-primary"
-              onClick={() => {
-                checkAndCloseMasaIfNeeded();
-                setAdisyonDetayModal(false);
-              }}
+              onClick={() => setAdisyonDetayModal(false)}
             >
               Kapat
             </button>
@@ -852,33 +1004,40 @@ export default function MusteriIslemleri() {
                 <div className="accounts-list">
                   <h4 style={{marginBottom: "10px", color: "#5a3921"}}>HESABA YAZILAN ADİSYONLAR</h4>
                   {getCustomerAdisyonlar(selectedCustomer.id)
-                    .filter(a => a.hesabaYazilanTutar > 0)
+                    .filter(a => a.hesabaYazilanTutar > 0 || a.tutar > 0)
                     .map(adisyon => (
                       <div key={adisyon.id} className="account-item" 
                         onClick={() => handleShowAdisyonDetay(adisyon)}
                         style={{cursor: 'pointer'}}>
                         <div className="account-info">
-                          <div style={{fontWeight: 'bold'}}>Masa {adisyon.masaNo}</div>
+                          <div style={{fontWeight: 'bold'}}>
+                            {adisyon.isBorcKey ? '📋 ' : ''}Masa {adisyon.masaNo || "-"}
+                          </div>
                           <div style={{fontSize: '12px', color: '#666'}}>
-                            {new Date(adisyon.tarih).toLocaleDateString('tr-TR')}
+                            {new Date(adisyon.tarih || adisyon.acilisZamani).toLocaleDateString('tr-TR')}
                           </div>
                           <div style={{fontSize: '12px', color: '#888'}}>
-                            {adisyon.urunler?.slice(0, 2).map(u => u.ad).join(", ")}
+                            {adisyon.urunler?.slice(0, 2).map(u => u.ad || u.urunAd).join(", ")}
                             {adisyon.urunler?.length > 2 ? "..." : ""}
+                            {!adisyon.urunler && adisyon.not && (
+                              <div>{adisyon.not.substring(0, 30)}...</div>
+                            )}
                           </div>
                         </div>
                         <div className="account-amount">
                           <div style={{fontWeight: 'bold'}}>
-                            {adisyon.hesabaYazilanTutar?.toFixed(2)} ₺
+                            {(adisyon.hesabaYazilanTutar || adisyon.tutar || 0).toFixed(2)} ₺
                           </div>
-                          <div style={{fontSize: '11px', color: '#666'}}>
-                            Adisyon: {adisyon.toplamTutar?.toFixed(2)} ₺
-                          </div>
+                          {adisyon.toplamTutar && (
+                            <div style={{fontSize: '11px', color: '#666'}}>
+                              Adisyon: {adisyon.toplamTutar.toFixed(2)} ₺
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
                   }
-                  {getCustomerAdisyonlar(selectedCustomer.id).filter(a => a.hesabaYazilanTutar > 0).length === 0 && (
+                  {getCustomerAdisyonlar(selectedCustomer.id).filter(a => a.hesabaYazilanTutar > 0 || a.tutar > 0).length === 0 && (
                     <div style={{textAlign: "center", color: "#888", padding: "10px"}}>
                       Hesaba yazılan adisyon bulunmuyor
                     </div>
@@ -1013,21 +1172,22 @@ export default function MusteriIslemleri() {
                 <tr 
                   key={t.id} 
                   className={`${t.type === "TAHSILAT" ? "payment-row" : 
-                             t.type === "INDIRIM" ? "discount-row" : "debt-row"}`}
-                  onClick={() => t.type === "ADISYON" && t.adisyonData && handleShowAdisyonDetay(t.adisyonData)}
-                  style={t.type === "ADISYON" ? {cursor: 'pointer'} : {}}
+                             t.type === "INDIRIM" ? "discount-row" : 
+                             t.type === "BORC" ? "debt-row" : "debt-row"}`}
+                  onClick={() => t.adisyonData && handleShowAdisyonDetay(t.adisyonData)}
+                  style={t.adisyonData ? {cursor: 'pointer'} : {}}
                 >
                   <td>{t.tarih}</td>
                   <td>{t.masaNo}</td>
                   <td>
                     {t.aciklama}
-                    {t.type === "ADISYON" && (
+                    {t.adisyonData && (
                       <div style={{fontSize: '11px', color: '#666', marginTop: '2px'}}>
                         📋 Detay için tıklayın
                       </div>
                     )}
                   </td>
-                  <td className={t.type === "ADISYON" ? "positive-amount" : "negative-amount"}>
+                  <td className={t.type === "ADISYON" || t.type === "BORC" ? "positive-amount" : "negative-amount"}>
                     {t.tutar}
                   </td>
                   <td>{t.odemeYontemi}</td>
@@ -1048,140 +1208,6 @@ export default function MusteriIslemleri() {
 
       {/* ADİSYON DETAY MODALI */}
       {renderAdisyonDetayModal()}
-
-      {/* MODAL CSS */}
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 1000;
-        }
-        
-        .modal-content {
-          background: white;
-          border-radius: 18px;
-          width: 90%;
-          max-width: 800px;
-          max-height: 90vh;
-          overflow-y: auto;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        
-        .modal-header {
-          padding: 20px;
-          border-bottom: 2px solid #e6d6c1;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        
-        .modal-header h3 {
-          margin: 0;
-          color: #5a3921;
-        }
-        
-        .modal-close {
-          background: none;
-          border: none;
-          font-size: 24px;
-          cursor: pointer;
-          color: #8b4513;
-        }
-        
-        .modal-body {
-          padding: 20px;
-        }
-        
-        .adisyon-info {
-          background: #f8f3e9;
-          padding: 15px;
-          border-radius: 10px;
-          margin-bottom: 20px;
-        }
-        
-        .adisyon-info p {
-          margin: 8px 0;
-          display: flex;
-          justify-content: space-between;
-        }
-        
-        .adisyon-info strong {
-          color: #5a3921;
-        }
-        
-        .urunler-listesi {
-          margin-top: 20px;
-        }
-        
-        .urunler-listesi h4 {
-          color: #5a3921;
-          margin-bottom: 10px;
-        }
-        
-        .urunler-table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        
-        .urunler-table th,
-        .urunler-table td {
-          padding: 10px;
-          border-bottom: 1px solid #e6d6c1;
-          text-align: left;
-        }
-        
-        .urunler-table th {
-          background: #f8f3e9;
-          color: #5a3921;
-          font-weight: 600;
-        }
-        
-        .urunler-table tfoot tr {
-          background: #f8f3e9;
-          font-weight: bold;
-        }
-        
-        .adisyon-not {
-          margin-top: 20px;
-          padding: 15px;
-          background: #f0f7ff;
-          border-radius: 10px;
-          border-left: 4px solid #2196f3;
-        }
-        
-        .adisyon-not h4 {
-          margin-top: 0;
-          color: #1976d2;
-        }
-        
-        .modal-footer {
-          padding: 20px;
-          border-top: 2px solid #e6d6c1;
-          display: flex;
-          justify-content: flex-end;
-        }
-        
-        .modal-footer .btn-primary {
-          padding: 10px 30px;
-          border-radius: 10px;
-          border: none;
-          background: #8b4513;
-          color: white;
-          font-weight: 600;
-          cursor: pointer;
-        }
-        
-        .modal-footer .btn-primary:hover {
-          background: #70380e;
-        }
-      `}</style>
     </div>
   );
 }

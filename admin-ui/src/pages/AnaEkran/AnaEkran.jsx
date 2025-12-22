@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AnaEkran.css";
 
@@ -20,7 +20,9 @@ export default function AnaEkran() {
     normalTotal: 0,
     bilardoTotal: 0,
     avgDuration: 0,
-    tableCount: 0
+    tableCount: 0,
+    transferCount: 0,
+    transferTotal: 0
   });
   
   const navigate = useNavigate();
@@ -37,12 +39,11 @@ export default function AnaEkran() {
 
     updateTime();
     const interval = setInterval(updateTime, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
   // Süre hesaplama fonksiyonu
-  const calculateDuration = (acilisZamani) => {
+  const calculateDuration = useCallback((acilisZamani) => {
     if (!acilisZamani) return { minutes: 0, formatted: "0 dk" };
     
     const start = new Date(acilisZamani);
@@ -61,9 +62,9 @@ export default function AnaEkran() {
         hours: hours
       };
     }
-  };
+  }, []);
 
-  // Açık Adisyonlar Toplamını Hesapla (BİLARDO DAHİL) - GÜNCELLENDİ
+  // Açık Adisyonlar Toplamını Hesapla
   const calculateOpenTablesSummary = useMemo(() => {
     return (openTables) => {
       if (!openTables || openTables.length === 0) {
@@ -74,7 +75,9 @@ export default function AnaEkran() {
           normalTotal: 0,
           bilardoTotal: 0,
           avgDuration: 0,
-          tableCount: 0
+          tableCount: 0,
+          transferCount: 0,
+          transferTotal: 0
         };
       }
       
@@ -84,13 +87,20 @@ export default function AnaEkran() {
       let normalTotal = 0;
       let bilardoTotal = 0;
       let totalDuration = 0;
+      let transferCount = 0;
+      let transferTotal = 0;
       
       openTables.forEach(masa => {
         const amount = parseFloat(masa.toplamTutar) || 0;
         totalAmount += amount;
         
-        // Bilardo kontrolü (masa no > 20 ise bilardo VEYA tur="BİLARDO")
         const isBilardo = masa.tur === "BİLARDO" || masa.isBilardo || parseInt(masa.no) > 20;
+        const isTransfer = masa.transferredFrom || masa.transferDurum;
+        
+        if (isTransfer) {
+          transferCount++;
+          transferTotal += amount;
+        }
         
         if (isBilardo) {
           bilardoCount++;
@@ -100,7 +110,6 @@ export default function AnaEkran() {
           normalTotal += amount;
         }
         
-        // Süreyi hesapla
         const duration = calculateDuration(masa.acilisZamani);
         totalDuration += duration.minutes;
       });
@@ -116,19 +125,65 @@ export default function AnaEkran() {
         normalTotal,
         bilardoTotal,
         avgDuration,
-        tableCount: openTables.length
+        tableCount: openTables.length,
+        transferCount,
+        transferTotal
       };
     };
+  }, [calculateDuration]);
+
+  // Aktarılmış adisyonları kontrol et
+  const checkTransferredTables = useCallback((openTables) => {
+    const transferredTables = [];
+    
+    // Bilardo'dan transfer edilen masaları bul
+    const allAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
+    
+    openTables.forEach(masa => {
+      if (masa.transferredFrom || masa.transferDurum) {
+        transferredTables.push(masa);
+      } else {
+        // Adisyon notlarında "BİLARDO TRANSFER" kontrolü
+        const masaAdisyonlari = allAdisyonlar.filter(ad => {
+          const masaEslesti = 
+            ad.masaNo === `MASA ${masa.no}` || 
+            ad.masaNum === masa.no ||
+            ad.masaNo === masa.masaNo ||
+            ad.id === masa.adisyonId ||
+            ad.masaId === masa.id;
+          
+          const durum = (ad.durum || ad.status || "").toUpperCase();
+          const kapali = ad.kapali || 
+                        durum === "CLOSED" || 
+                        durum === "KAPALI" ||
+                        durum === "KİLİTLİ";
+          
+          return masaEslesti && !kapali;
+        });
+        
+        masaAdisyonlari.forEach(ad => {
+          if (ad.notlar && ad.notlar.includes("BİLARDO TRANSFER")) {
+            masa.transferDurum = true;
+            masa.transferredFrom = ad.transferredFrom || "Bilardo";
+            masa.bilardoUcret = ad.bilardoUcret || 0;
+            masa.ekUrunSayisi = ad.ekUrunSayisi || 0;
+            transferredTables.push(masa);
+          }
+        });
+      }
+    });
+    
+    return transferredTables;
   }, []);
 
-  // Dashboard verilerini güncelle - BİLARDO DAHİL - GÜNCELLENDİ
+  // Dashboard verilerini güncelle
   useEffect(() => {
     const updateDashboardData = () => {
       try {
         // Günlük satış hesapla
         const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
         const today = new Date().toLocaleDateString('tr-TR');
-        const todayStr = today.split('.')[0]; // Sadece gün
+        const todayStr = today.split('.')[0];
         
         const todaySales = adisyonlar
           .filter(a => {
@@ -157,7 +212,7 @@ export default function AnaEkran() {
           (parseInt(u.stock || 0) || 0) <= (parseInt(u.critical || 10) || 10)
         );
 
-        // AÇIK ADİSYONLARI HESAPLA - BİLARDO DAHİL - GÜNCELLENDİ
+        // AÇIK ADİSYONLARI HESAPLA
         const allOpenTables = [];
 
         // 1. NORMAL MASALARI YÜKLE
@@ -167,7 +222,6 @@ export default function AnaEkran() {
         masalar.forEach(masa => {
           if (masa.durum?.toUpperCase() !== "DOLU") return;
           
-          // Bu masa için adisyon ara
           const masaAdisyonlari = allAdisyonlar.filter(ad => {
             const masaEslesti = 
               ad.masaNo === `MASA ${masa.no}` || 
@@ -187,31 +241,21 @@ export default function AnaEkran() {
           
           if (masaAdisyonlari.length === 0) return;
           
-          // Toplam tutarı hesapla
           let toplamTutar = 0;
-          
-          // Önce localStorage'dan masa toplamını al
           const storedTotal = localStorage.getItem(`mc_masa_toplam_${masa.no}`);
+          
           if (storedTotal) {
             toplamTutar = parseFloat(storedTotal) || 0;
           } else {
-            // Manuel hesapla
             masaAdisyonlari.forEach(ad => {
               let adToplam = 0;
               
               if (ad.kalemler && ad.kalemler.length > 0) {
-                adToplam = ad.kalemler.reduce((sum, k) => {
-                  return sum + (Number(k.toplam) || 0);
-                }, 0);
+                adToplam = ad.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
               }
               
-              if (ad.bilardoUcreti) {
-                adToplam += (Number(ad.bilardoUcreti) || 0);
-              }
-              
-              if (ad.ozelUcret) {
-                adToplam += (Number(ad.ozelUcret) || 0);
-              }
+              if (ad.bilardoUcreti) adToplam += (Number(ad.bilardoUcreti) || 0);
+              if (ad.ozelUcret) adToplam += (Number(ad.ozelUcret) || 0);
               
               toplamTutar += adToplam;
             });
@@ -221,38 +265,52 @@ export default function AnaEkran() {
           
           const anaAdisyon = masaAdisyonlari.find(ad => !ad.isSplit) || masaAdisyonlari[0];
           
+          // Transfer bilgilerini kontrol et
+          const transferDurum = anaAdisyon?.notlar?.includes("BİLARDO TRANSFER");
+          const transferredFrom = anaAdisyon?.transferredFrom;
+          
+          // Bilardo ücretini ve ek ürün bilgilerini bul
+          let bilardoUcret = 0;
+          let ekUrunSayisi = 0;
+          let ekUrunToplam = 0;
+          
+          if (transferDurum && anaAdisyon?.kalemler) {
+            anaAdisyon.kalemler.forEach(kalem => {
+              if (kalem.urunAdi === "BİLARDO_UCRETI") {
+                bilardoUcret = parseFloat(kalem.toplam) || 0;
+              } else if (kalem.urunAdi !== "BİLARDO_UCRETI") {
+                ekUrunSayisi++;
+                ekUrunToplam += parseFloat(kalem.toplam) || 0;
+              }
+            });
+          }
+          
           allOpenTables.push({
             ...masa,
             id: masa.id || `masa_${masa.no}`,
             no: String(masa.no),
-            toplamTutar: toplamTutar,
-            urunSayisi: masaAdisyonlari.reduce((sum, ad) => {
-              return sum + (ad.kalemler?.length || 0);
-            }, 0),
+            toplamTutar,
+            urunSayisi: masaAdisyonlari.reduce((sum, ad) => sum + (ad.kalemler?.length || 0), 0),
             musteriAdi: anaAdisyon?.musteriAdi || null,
             acilisZamani: anaAdisyon?.acilisZamani || masa.acilisZamani,
             isBilardo: false,
-            tur: "NORMAL"
+            tur: transferDurum ? "TRANSFER" : "NORMAL",
+            transferDurum,
+            transferredFrom,
+            bilardoUcret,
+            ekUrunSayisi,
+            ekUrunToplam,
+            originalBilardoNo: anaAdisyon?.originalBilardoNo,
+            kalemler: anaAdisyon?.kalemler || []
           });
         });
 
-        // 2. BİLARDO ADİSYONLARINI YÜKLE - GÜNCELLENDİ
-        const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+        // 2. BİLARDO ADİSYONLARINI YÜKLE
         const bilardoMasalar = JSON.parse(localStorage.getItem("bilardo") || "[]");
-        
-        // AÇIK BİLARDO ADİSYONLARINI BUL
-        const openBilardoAdisyonlar = bilardoAdisyonlar.filter(ad => {
-          const durum = (ad.durum || "").toUpperCase();
-          return durum === "ACIK";
-        });
-        
-        // AÇIK ADİSYONLAR STORAGE'DAN YÜKLE (BilardoAdisyon.jsx'den gelen veriler)
         const acikAdisyonlarStorage = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
         
-        // AÇIK BİLARDO ADİSYONLARINI İŞLE
         acikAdisyonlarStorage.forEach(bilardoAdisyon => {
           if (bilardoAdisyon.tur === "BİLARDO" && bilardoAdisyon.durum === "ACIK") {
-            // Bilardo masasını bul
             const bilardoMasa = bilardoMasalar.find(m => 
               m.no === bilardoAdisyon.masaNo || 
               `B${m.no}` === bilardoAdisyon.masaNo
@@ -264,20 +322,20 @@ export default function AnaEkran() {
                 id: bilardoAdisyon.id || `bilardo_${bilardoAdisyon.masaNo}`,
                 no: bilardoAdisyon.masaNo,
                 toplamTutar: parseFloat(bilardoAdisyon.toplamTutar) || 0,
-                urunSayisi: 0,
+                urunSayisi: bilardoAdisyon.ekUrunler?.length || 0,
                 musteriAdi: "Bilardo Müşterisi",
                 acilisZamani: bilardoAdisyon.acilisZamani,
                 isBilardo: true,
                 tur: "BİLARDO",
-                // Bilardo ücreti ve ek ürün bilgileri
                 bilardoUcret: parseFloat(bilardoAdisyon.bilardoUcret) || 0,
-                ekUrunToplam: parseFloat(bilardoAdisyon.ekUrunToplam) || 0
+                ekUrunToplam: parseFloat(bilardoAdisyon.ekUrunToplam) || 0,
+                ekUrunler: bilardoAdisyon.ekUrunler || []
               });
             }
           }
         });
 
-        // 3. TEKİL MASALAR (HESAP AYIRMA SORUNU ÇÖZÜMÜ)
+        // 3. TEKİL MASALAR
         const uniqueTables = [];
         const seenMasaNos = new Set();
 
@@ -293,25 +351,32 @@ export default function AnaEkran() {
           }
         });
 
-        // 4. Açık adisyon özetini hesapla (BİLARDO DAHİL)
+        // 4. Aktarılmış masaları kontrol et
+        const transferredTables = checkTransferredTables(uniqueTables);
+
+        // 5. Açık adisyon özetini hesapla
         const summary = calculateOpenTablesSummary(uniqueTables);
         setOpenTablesSummary(summary);
 
-        // 5. Dashboard verilerini güncelle
+        // 6. Dashboard verilerini güncelle
         setDashboardData({
           dailySales: todaySales.toFixed(2),
           totalDebt: totalDebt.toFixed(2),
           dailyExpenses: todayExpenses.toFixed(2),
           criticalCount: criticalProducts.length,
           openTables: uniqueTables.sort((a, b) => {
-            // Önce normal masalar, sonra bilardo masaları
             const aIsBilardo = a.tur === "BİLARDO" || a.isBilardo;
             const bIsBilardo = b.tur === "BİLARDO" || b.isBilardo;
+            const aIsTransfer = a.transferDurum || a.tur === "TRANSFER";
+            const bIsTransfer = b.transferDurum || b.tur === "TRANSFER";
             
-            if (aIsBilardo && !bIsBilardo) return 1;
+            // Önce transfer edilenler, sonra normal, sonra bilardo
+            if (aIsTransfer && !bIsTransfer) return -1;
+            if (!aIsTransfer && bIsTransfer) return 1;
+            
             if (!aIsBilardo && bIsBilardo) return -1;
+            if (aIsBilardo && !bIsBilardo) return 1;
             
-            // Aynı türdeyse numaraya göre sırala
             return parseInt(a.no.replace('B', '')) - parseInt(b.no.replace('B', ''));
           }),
           criticalProducts: criticalProducts.slice(0, 5)
@@ -334,71 +399,77 @@ export default function AnaEkran() {
           normalTotal: 0,
           bilardoTotal: 0,
           avgDuration: 0,
-          tableCount: 0
+          tableCount: 0,
+          transferCount: 0,
+          transferTotal: 0
         });
       }
     };
 
     updateDashboardData();
     
-    // Storage değişikliklerini dinle
     const handleStorageChange = () => {
       updateDashboardData();
     };
     
-    // Her 10 saniyede bir verileri güncelle
     const interval = setInterval(updateDashboardData, 10000);
     
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('adisyonGuncellendi', handleStorageChange);
-    window.addEventListener('masaGuncellendi', handleStorageChange);
-    window.addEventListener('bilardoAdisyonGuncellendi', handleStorageChange);
+    const events = [
+      'storage', 
+      'adisyonGuncellendi', 
+      'masaGuncellendi', 
+      'bilardoAdisyonGuncellendi',
+      'bilardoTransferEdildi'
+    ];
+    
+    events.forEach(event => {
+      window.addEventListener(event, handleStorageChange);
+    });
     
     return () => {
       clearInterval(interval);
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('adisyonGuncellendi', handleStorageChange);
-      window.removeEventListener('masaGuncellendi', handleStorageChange);
-      window.removeEventListener('bilardoAdisyonGuncellendi', handleStorageChange);
+      events.forEach(event => {
+        window.removeEventListener(event, handleStorageChange);
+      });
     };
-  }, [calculateOpenTablesSummary]);
+  }, [calculateOpenTablesSummary, checkTransferredTables]);
 
   // Rapor kartlarına tıklama
-  const handleReportClick = (type) => {
-    switch(type) {
-      case 'kasa':
-        navigate('/raporlar/kasa');
-        break;
-      case 'gider':
-        navigate('/raporlar/gider-raporu');
-        break;
-      case 'masa':
-        navigate('/raporlar/masa-detay');
-        break;
-      default:
-        navigate('/raporlar');
-    }
-  };
+  const handleReportClick = useCallback((type) => {
+    const routes = {
+      'kasa': '/raporlar/kasa',
+      'gider': '/raporlar/gider-raporu',
+      'masa': '/raporlar/masa-detay'
+    };
+    
+    navigate(routes[type] || '/raporlar');
+  }, [navigate]);
 
   // Format para
-  const formatPara = (value) => {
+  const formatPara = useCallback((value) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return (numValue || 0).toLocaleString('tr-TR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-  };
+  }, []);
 
   // Masa detayına git
-  const goToTableDetail = (masa) => {
+  const goToTableDetail = useCallback((masa) => {
     if (masa.tur === "BİLARDO" || masa.isBilardo) {
-      // Bilardo adisyonuna git
       navigate(`/bilardo-adisyon/${masa.id}`);
     } else {
-      // Normal masa adisyonuna git
       navigate(`/adisyondetay/${masa.no}`);
     }
-  };
+  }, [navigate]);
+
+  // İlk birkaç kalemi göster
+  const showFirstItems = useCallback((kalemler, count = 2) => {
+    if (!kalemler || kalemler.length === 0) return "";
+    
+    const firstItems = kalemler.slice(0, count);
+    return firstItems.map(k => k.urunAdi || "Ürün").join(", ");
+  }, []);
 
   return (
     <div className="ana-wrapper">
@@ -434,13 +505,17 @@ export default function AnaEkran() {
       </div>
 
       <div className="middle-panels">
-        {/* SOL: ÇİFT KOLONLU AÇIK ADİSYONLAR PANELİ */}
         <div className="split-panel">
           <div className="panel-left">
             <div className="panel-header-split">
               <span>📋 Açık Adisyonlar</span>
               <span className="panel-small">
                 {dashboardData.openTables.length} Masa
+                {openTablesSummary.transferCount > 0 && (
+                  <span style={{ marginLeft: '10px', color: '#4CAF50' }}>
+                    ↪️ {openTablesSummary.transferCount} Aktarılmış
+                  </span>
+                )}
               </span>
             </div>
             
@@ -449,22 +524,24 @@ export default function AnaEkran() {
                 dashboardData.openTables.map((masa) => {
                   const duration = calculateDuration(masa.acilisZamani);
                   const isBilardo = masa.tur === "BİLARDO" || masa.isBilardo;
+                  const isTransfer = masa.transferDurum || masa.tur === "TRANSFER";
                   const amount = parseFloat(masa.toplamTutar) || 0;
                   const bilardoUcret = parseFloat(masa.bilardoUcret) || 0;
                   const ekUrunToplam = parseFloat(masa.ekUrunToplam) || 0;
+                  const ekUrunSayisi = masa.ekUrunSayisi || 0;
                   
                   return (
                     <div 
-                      className={`masa-karti ${isBilardo ? 'bilardo' : 'normal'}`} 
+                      className={`masa-karti ${isTransfer ? 'transfer' : isBilardo ? 'bilardo' : 'normal'}`} 
                       key={masa.id}
                       onClick={() => goToTableDetail(masa)}
                       title="Detaylar için tıkla"
                     >
                       <div className="masa-karti-header">
                         <div className="masa-no">
-                          {isBilardo ? '🎱' : '🍽'} Masa {masa.no}
+                          {isTransfer ? '🔄' : isBilardo ? '🎱' : '🍽'} Masa {masa.no}
                           <span className="masa-tur">
-                            {isBilardo ? 'BİLARDO' : 'YEMEK'}
+                            {isTransfer ? 'AKTARILMIŞ' : isBilardo ? 'BİLARDO' : 'YEMEK'}
                           </span>
                         </div>
                         <div className="masa-sure">
@@ -474,7 +551,7 @@ export default function AnaEkran() {
                       
                       <div className="masa-detay">
                         <div className="masa-musteri">
-                          {masa.musteriAdi || 'Müşteri Yok'} | 
+                          {isTransfer ? `↪️ ${masa.transferredFrom || "Bilardo"}` : masa.musteriAdi || 'Müşteri Yok'} | 
                           Ürün: {masa.urunSayisi || 0}
                         </div>
                         <div className="masa-tutar">
@@ -482,18 +559,32 @@ export default function AnaEkran() {
                         </div>
                       </div>
                       
-                      {/* BİLARDO ÜCRETİ VE EK ÜRÜNLER GÖSTERİMİ */}
-                      {isBilardo && (
-                        <div style={{
-                          marginTop: '8px',
-                          padding: '8px',
-                          background: 'rgba(255,255,255,0.2)',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          color: 'rgba(255,255,255,0.9)'
-                        }}>
+                      {/* TRANSFER EDİLMİŞ MASA DETAYLARI */}
+                      {isTransfer && (
+                        <div className="transfer-detay">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                            <span>🎱 Ücret: {formatPara(bilardoUcret)}₺</span>
+                            {ekUrunSayisi > 0 && (
+                              <span>📦 Ek Ürün: {ekUrunSayisi} adet (+{formatPara(ekUrunToplam)}₺)</span>
+                            )}
+                          </div>
+                          {masa.kalemler && masa.kalemler.length > 0 && (
+                            <div style={{ 
+                              marginTop: '6px', 
+                              fontSize: '11px', 
+                              color: 'rgba(255,255,255,0.8)',
+                              fontStyle: 'italic'
+                            }}>
+                              📝 {showFirstItems(masa.kalemler, 2)}
+                              {masa.kalemler.length > 2 && ` ...(+${masa.kalemler.length - 2})`}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* BİLARDO MASA DETAYLARI */}
+                      {isBilardo && !isTransfer && (
+                        <div className="bilardo-detay">
                           <span>🎱: {formatPara(bilardoUcret)}₺</span>
                           {ekUrunToplam > 0 && (
                             <span>📦: +{formatPara(ekUrunToplam)}₺</span>
@@ -515,7 +606,6 @@ export default function AnaEkran() {
             </div>
           </div>
           
-          {/* SAĞ: TOPLAM TUTAR PANELİ - GÜNCELLENDİ */}
           <div className="panel-right">
             <div className="total-display">
               <div className="total-label">TOPLAM AÇIK ADİSYON</div>
@@ -540,6 +630,12 @@ export default function AnaEkran() {
                   </span>
                 </div>
                 <div className="breakdown-item">
+                  <span className="breakdown-label">🔄 Aktarılmış</span>
+                  <span className="breakdown-value">
+                    {openTablesSummary.transferCount} adet
+                  </span>
+                </div>
+                <div className="breakdown-item">
                   <span className="breakdown-label">💰 Normal Toplam</span>
                   <span className="breakdown-value">
                     {formatPara(openTablesSummary.normalTotal)} ₺
@@ -549,6 +645,12 @@ export default function AnaEkran() {
                   <span className="breakdown-label">💰 Bilardo Toplam</span>
                   <span className="breakdown-value">
                     {formatPara(openTablesSummary.bilardoTotal)} ₺
+                  </span>
+                </div>
+                <div className="breakdown-item">
+                  <span className="breakdown-label">💰 Aktarılmış Toplam</span>
+                  <span className="breakdown-value">
+                    {formatPara(openTablesSummary.transferTotal)} ₺
                   </span>
                 </div>
                 <div className="breakdown-item">
@@ -562,7 +664,6 @@ export default function AnaEkran() {
           </div>
         </div>
         
-        {/* SAĞ: KRİTİK STOK PANELİ */}
         <div className="panel-box">
           <div className="panel-header">
             <span>⚠️ Kritik Stok</span>

@@ -1391,7 +1391,25 @@ export default function Adisyon() {
       }
     }
 
-    // BORÇ KAYDI OLUŞTUR
+     // ADİSYON_KEY'E DE MÜŞTERİ ID'SİNİ KAYDET (ÖNEMLİ!)
+    const adisyonlar = okuJSON(ADISYON_KEY, []);
+    const adisyonIndex = adisyonlar.findIndex(a => a.id === adisyon.id);
+    
+    if (adisyonIndex !== -1) {
+      // Adisyona müşteri ID'sini ve borç bilgisini ekle
+      adisyonlar[adisyonIndex] = {
+        ...adisyonlar[adisyonIndex],
+        musteriId: musteriId,
+        hesabaYazilanTutar: borcTutar,
+        musteriAdi: musteriId ? 
+          (guncelMusteriler.find(m => m.id === musteriId)?.adSoyad || "Yeni Müşteri") 
+          : yeniMusteriAdSoyad.trim(),
+        tarih: new Date().toISOString() // Tarihi de kaydet
+      };
+      yazJSON(ADISYON_KEY, adisyonlar);
+    }
+
+      // BORÇ KAYDI OLUŞTUR
     const borclar = okuJSON(BORC_KEY, []);
     const yeniBorc = {
       id: `borc_${Date.now().toString()}`,
@@ -1414,12 +1432,13 @@ export default function Adisyon() {
       ],
       remainingAmount: borcTutar, // Kalan ödenecek tutar
       isCollected: false,
-      collectedAmount: 0
+      collectedAmount: 0,
+      urunler: adisyon?.kalemler || [] // ADİSYON İÇERİĞİNİ KAYDET (ÖNEMLİ!)
     };
     borclar.push(yeniBorc);
     yazJSON(BORC_KEY, borclar);
 
-    // ÖDEME KAYDI OLUŞTUR (Sadece adisyon içinde)
+     // ÖDEME KAYDI OLUŞTUR (Sadece adisyon içinde)
     const yeniOdeme = {
       id: `hy_${Date.now().toString()}`,
       tip: "HESABA_YAZ",
@@ -1468,7 +1487,12 @@ export default function Adisyon() {
     setYeniMusteriTelefon("");
     setYeniMusteriNot("");
     setBorcTutarInput("");
-    
+
+     // MÜŞTERİ İŞLEMLERİ SAYFASINI GÜNCELLE
+    setTimeout(() => {
+      window.dispatchEvent(new Event('musteriBorclariGuncellendi'));
+    }, 100);
+
     // =============================
     // YENİ EKLENEN KOD: Hesaba yaz kaydedildiğinde masalar sayfasını güncelle
     // =============================
@@ -1678,7 +1702,7 @@ export default function Adisyon() {
     }
 
     // =============================
-    // YENİ EKLENEN KOD: Tüm önbellek temizliği
+    // YENİ EKLENDİ: Tüm önbellek temizliği
     // =============================
     const temizlemeListesi = [];
     if (adisyon?.id) temizlemeListesi.push(`mc_adisyon_toplam_${adisyon.id}`);

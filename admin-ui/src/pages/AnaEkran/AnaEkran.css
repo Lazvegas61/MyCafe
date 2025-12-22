@@ -658,3 +658,31 @@ a:hover {
     text-align: center;
   }
 }
+
+/* Transfer edilmiş masa kartı */
+.masa-karti.transfer {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-left: 4px solid #4CAF50;
+}
+
+/* Transfer detay alanı */
+.transfer-detay {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(76, 175, 80, 0.15);
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.9);
+}
+
+/* Bilardo detay alanı */
+.bilardo-detay {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  color: rgba(255,255,255,0.9);
+}

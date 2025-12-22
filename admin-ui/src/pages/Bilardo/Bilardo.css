@@ -924,3 +924,22 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* BUTON TIKLAMA DAVRANIŞI İYİLEŞTİRMESİ */
+.bilardo-aktarim-buttons button,
+.bilardo-sure-btn {
+  position: relative;
+  z-index: 10;
+}
+
+/* Butonlara tıklanabilir görünüm */
+.bilardo-aktarim-buttons button:active {
+  transform: translateY(1px) !important;
+}
+
+/* Kart içindeki butonların tıklama alanını genişlet */
+.bilardo-sure-secim,
+.bilardo-aktarim-buttons {
+  position: relative;
+  z-index: 5;
+}
