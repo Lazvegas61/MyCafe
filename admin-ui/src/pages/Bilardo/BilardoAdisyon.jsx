@@ -4,6 +4,7 @@
    - Bilardo ücreti otomatik gösteriliyor
    - Özet panelinde bilardo ücreti ve ek ürünler gözüküyor
    - Tüm tutarlar doğru hesaplanıyor
+   - GÜNCELLENDİ: Bilardo ücreti ve ek ürünler normal adisyonda gösteriliyor
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
