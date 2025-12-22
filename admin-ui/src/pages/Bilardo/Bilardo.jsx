@@ -1,9 +1,9 @@
 // admin-ui/src/pages/Bilardo/Bilardo.jsx
 /* ------------------------------------------------------------
    📌 Bilardo.jsx — GÜNCELLENMİŞ ve TAM ÇALIŞAN
-   - Anlık ücret hesaplama ve yansıtma
-   - Açık adisyon senkronizasyonu
-   - Hata düzeltmeleri
+   - Bilardo ücreti adisyona otomatik kaydediliyor
+   - Ana ekran senkronizasyonu düzeltildi
+   - Açık adisyonlarda bilardo ücreti gösterimi
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
@@ -122,13 +122,22 @@ export default function Bilardo() {
           }
           
           // Ek ürünlerin toplamını hesapla
-          const ekUrunToplam = (masaAdisyonu.ekUrunler || []).reduce((sum, u) => 
+          const ekUrunler = masaAdisyonu.ekUrunler || [];
+          const ekUrunToplam = ekUrunler.reduce((sum, u) => 
             sum + (u.fiyat * u.adet), 0);
           
           const toplamTutar = anlikUcret + ekUrunToplam;
           
-          // AÇIK ADİSYONLARA EKLE (Ana Sayfa için)
-          updateAcikAdisyonlar(masaAdisyonu, anlikUcret, ekUrunToplam, gecenDakika);
+          // BİLARDO ÜCRETİNİ ADİSYONA KAYDET - DÜZELTİLDİ
+          const adisyonIndex = adisyonlar.findIndex(a => a.id === masa.aktifAdisyonId);
+          if (adisyonIndex !== -1) {
+            adisyonlar[adisyonIndex].bilardoUcret = anlikUcret;
+            adisyonlar[adisyonIndex].toplamTutar = toplamTutar;
+            localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
+          }
+          
+          // AÇIK ADİSYONLARA EKLE (Ana Sayfa için) - GÜNCELLENDİ
+          updateAcikAdisyonlar(masaAdisyonu, anlikUcret, ekUrunToplam, gecenDakika, masa.no);
           
           return {
             ...masa,
@@ -141,7 +150,7 @@ export default function Bilardo() {
             ekUrunToplam: ekUrunToplam,
             toplamTutar: toplamTutar,
             gecenDakika: gecenDakika,
-            ekUrunSayisi: (masaAdisyonu.ekUrunler || []).length
+            ekUrunSayisi: ekUrunler.length
           };
         }
         
@@ -165,72 +174,77 @@ export default function Bilardo() {
     return () => clearInterval(interval);
   }, []);
   
-  // AÇIK ADİSYONLARI GÜNCELLE (Ana Sayfa için)
-  const updateAcikAdisyonlar = (adisyon, bilardoUcret, ekUrunToplam, gecenDakika) => {
-  try {
-    const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-    
-    const bilardoAdisyonu = {
-      id: adisyon.id,
-      masaNo: adisyon.bilardoMasaNo,
-      tur: "BİLARDO",
-      sureTipi: adisyon.sureTipi,
-      gecenDakika: gecenDakika,
-      bilardoUcret: bilardoUcret,
-      ekUrunToplam: ekUrunToplam,
-      toplamTutar: bilardoUcret + ekUrunToplam,
-      acilisZamani: adisyon.acilisZamani,
-      durum: "ACIK",
-      updatedAt: Date.now()
-    };
-    
-    // Var mı kontrol et
-    const existingIndex = acikAdisyonlar.findIndex(a => a.id === adisyon.id);
-    
-    if (existingIndex !== -1) {
-      acikAdisyonlar[existingIndex] = bilardoAdisyonu;
-    } else {
-      acikAdisyonlar.push(bilardoAdisyonu);
+  // AÇIK ADİSYONLARI GÜNCELLE (Ana Sayfa için) - GÜNCELLENDİ
+  const updateAcikAdisyonlar = (adisyon, bilardoUcret, ekUrunToplam, gecenDakika, masaNo) => {
+    try {
+      const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
+      
+      const bilardoAdisyonu = {
+        id: adisyon.id,
+        masaNo: masaNo || adisyon.bilardoMasaNo,
+        tur: "BİLARDO",
+        sureTipi: adisyon.sureTipi,
+        gecenDakika: gecenDakika,
+        bilardoUcret: bilardoUcret, // BİLARDO ÜCRETİ EKLENDİ
+        ekUrunToplam: ekUrunToplam,
+        toplamTutar: bilardoUcret + ekUrunToplam, // TOPLAM TUTAR
+        acilisZamani: adisyon.acilisZamani,
+        durum: "ACIK",
+        updatedAt: Date.now(),
+        // Ana ekran için ek bilgiler
+        no: masaNo || adisyon.bilardoMasaNo,
+        musteriAdi: adisyon.musteriAdi || "Bilardo Müşterisi",
+        urunSayisi: (adisyon.ekUrunler || []).length,
+        isBilardo: true
+      };
+      
+      // Var mı kontrol et
+      const existingIndex = acikAdisyonlar.findIndex(a => a.id === adisyon.id);
+      
+      if (existingIndex !== -1) {
+        acikAdisyonlar[existingIndex] = bilardoAdisyonu;
+      } else {
+        acikAdisyonlar.push(bilardoAdisyonu);
+      }
+      
+      localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
+      
+      // ANA EKRAN İÇİN EK BİR KAYIT DAHA
+      syncToAnaEkran(bilardoAdisyonu);
+    } catch (error) {
+      console.error("Açık adisyon güncelleme hatası:", error);
     }
-    
-    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
-    
-    // ANA EKRAN İÇİN EK BİR KAYIT DAHA
-    syncToAnaEkran(bilardoAdisyonu);
-  } catch (error) {
-    console.error("Açık adisyon güncelleme hatası:", error);
-  }
-};
+  };
 
-// YENİ FONKSİYON: Ana Ekran için senkronizasyon
-const syncToAnaEkran = (bilardoAdisyonu) => {
-  try {
-    // Ana ekran için özel bir storage alanı
-    const anaEkranData = JSON.parse(localStorage.getItem("mc_ana_ekran_data") || "{}");
-    
-    if (!anaEkranData.acikAdisyonlar) {
-      anaEkranData.acikAdisyonlar = [];
+  // YENİ FONKSİYON: Ana Ekran için senkronizasyon
+  const syncToAnaEkran = (bilardoAdisyonu) => {
+    try {
+      // Ana ekran için özel bir storage alanı
+      const anaEkranData = JSON.parse(localStorage.getItem("mc_ana_ekran_data") || "{}");
+      
+      if (!anaEkranData.acikAdisyonlar) {
+        anaEkranData.acikAdisyonlar = [];
+      }
+      
+      // Bilardo adisyonunu ekle/güncelle
+      const index = anaEkranData.acikAdisyonlar.findIndex(a => a.id === bilardoAdisyonu.id);
+      if (index !== -1) {
+        anaEkranData.acikAdisyonlar[index] = bilardoAdisyonu;
+      } else {
+        anaEkranData.acikAdisyonlar.push(bilardoAdisyonu);
+      }
+      
+      localStorage.setItem("mc_ana_ekran_data", JSON.stringify(anaEkranData));
+      
+      // Ayrıca global bir event tetikle (diğer sayfalar için)
+      window.dispatchEvent(new CustomEvent('bilardoAdisyonGuncellendi', {
+        detail: bilardoAdisyonu
+      }));
+      
+    } catch (error) {
+      console.error("Ana ekran senkronizasyon hatası:", error);
     }
-    
-    // Bilardo adisyonunu ekle/güncelle
-    const index = anaEkranData.acikAdisyonlar.findIndex(a => a.id === bilardoAdisyonu.id);
-    if (index !== -1) {
-      anaEkranData.acikAdisyonlar[index] = bilardoAdisyonu;
-    } else {
-      anaEkranData.acikAdisyonlar.push(bilardoAdisyonu);
-    }
-    
-    localStorage.setItem("mc_ana_ekran_data", JSON.stringify(anaEkranData));
-    
-    // Ayrıca global bir event tetikle (diğer sayfalar için)
-    window.dispatchEvent(new CustomEvent('bilardoAdisyonGuncellendi', {
-      detail: bilardoAdisyonu
-    }));
-    
-  } catch (error) {
-    console.error("Ana ekran senkronizasyon hatası:", error);
-  }
-};
+  };
 
   /* ============================================================
      📌 2. ÜCRET HESAPLAMA FONKSİYONLARI
@@ -334,10 +348,12 @@ const syncToAnaEkran = (bilardoAdisyonu) => {
       kapanisZamani: null,
       durum: "ACIK",
       gecenDakika: 0,
-      hesaplananUcret: ucretHesapla(tip, 0),
+      hesaplananUcret: 0,
+      bilardoUcret: ucretHesapla(tip, 0), // BİLARDO ÜCRETİ EKLENDİ
       ekUrunler: [],
       odemeler: [],
       toplamOdenen: 0,
+      toplamTutar: ucretHesapla(tip, 0), // TOPLAM TUTAR EKLENDİ
       not: ""
     };
     
@@ -356,7 +372,8 @@ const syncToAnaEkran = (bilardoAdisyonu) => {
             sureTipi: tip,
             acilisSaati: Date.now(),
             aktifAdisyonId: yeniAdisyon.id,
-            ucret: ucretHesapla(tip, 0)
+            ucret: ucretHesapla(tip, 0),
+            toplamTutar: ucretHesapla(tip, 0)
           }
         : m
     );
@@ -365,7 +382,7 @@ const syncToAnaEkran = (bilardoAdisyonu) => {
     localStorage.setItem("bilardo", JSON.stringify(updated));
     
     // Açık adisyonlara ekle
-    updateAcikAdisyonlar(yeniAdisyon, ucretHesapla(tip, 0), 0, 0);
+    updateAcikAdisyonlar(yeniAdisyon, ucretHesapla(tip, 0), 0, 0, `B${index + 1}`);
     
     // Yönlendirme yap (istemci isterse)
     setTimeout(() => {
@@ -447,7 +464,9 @@ const syncToAnaEkran = (bilardoAdisyonu) => {
           toplamTutar: toplamTutar.toFixed(2),
           acilisZamani: new Date().toISOString(),
           musteriAdi: `Bilardo Masa ${bilardoMasa.no} Transfer`,
-          guncellemeZamani: new Date().toISOString()
+          guncellemeZamani: new Date().toISOString(),
+          bilardoUcret: bilardoUcret, // BİLARDO ÜCRETİ KAYDEDİLDİ
+          ekUrunToplam: ekUrunToplam
         };
       }
       return m;
@@ -665,7 +684,7 @@ const syncToAnaEkran = (bilardoAdisyonu) => {
               </div>
               
               {/* TOPLAM TUTAR (Bilardo + Ek Ürünler) */}
-              {masa.acik && toplamTutar > bilardoUcret && (
+              {masa.acik && (
                 <div className="bilardo-toplam-tutar">
                   <span>TOPLAM TUTAR:</span>
                   <span>{toplamTutar.toFixed(2)}₺</span>
