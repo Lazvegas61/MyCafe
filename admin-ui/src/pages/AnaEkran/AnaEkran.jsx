@@ -161,6 +161,9 @@ export default function AnaEkran() {
         const masalar = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
         const allAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
         
+        // BİLARDO ADİSYONLARINI AYRI HESAPLA
+        const bilardoAdisyonlar = JSON.parse(localStorage.getItem("mc_bilardo_adisyonlar") || "[]");
+        
         // 1. TÜM MASALARI İŞLE (NORMAL + BİLARDO)
         const allOpenTables = [];
 
@@ -245,6 +248,73 @@ export default function AnaEkran() {
           });
         });
 
+        // BİLARDO MASALARI İÇİN AYRI HESAPLAMA
+        const bilardoMasalari = JSON.parse(localStorage.getItem("mc_bilardo_masalar") || "[]");
+        
+        // Açık bilardo adisyonlarını bul
+        const openBilardoAdisyonlar = bilardoAdisyonlar.filter(ad => {
+          // Bilardo adisyonu açık mı kontrol et
+          const durum = (ad.durum || ad.status || "").toUpperCase();
+          const kapali = ad.kapali || 
+                        durum === "CLOSED" || 
+                        durum === "KAPALI" ||
+                        durum === "KİLİTLİ" ||
+                        ad.kapatildi === true;
+          
+          return !kapali;
+        });
+        
+        // Açık bilardo masalarını işle
+        bilardoMasalari.forEach(bilardoMasa => {
+          // DOLU olmayan bilardo masalarını atla
+          if (bilardoMasa.durum?.toUpperCase() !== "DOLU") return;
+          
+          // Bu bilardo masası için adisyon ara
+          const masaBilardoAdisyonlari = openBilardoAdisyonlar.filter(ad => {
+            // Bilardo masa eşleşmesi
+            const masaEslesti = 
+              ad.masaNo === `BİLARDO ${bilardoMasa.no}` || 
+              ad.masaNum === bilardoMasa.no ||
+              ad.masaId === bilardoMasa.id ||
+              ad.bilardoMasaId === bilardoMasa.id;
+            
+            return masaEslesti;
+          });
+          
+          if (masaBilardoAdisyonlari.length === 0) return;
+          
+          // Bilardo adisyon toplamını hesapla
+          let bilardoToplam = 0;
+          masaBilardoAdisyonlari.forEach(ad => {
+            // Bilardo ücretini ekle
+            if (ad.bilardoUcreti) {
+              bilardoToplam += (Number(ad.bilardoUcreti) || 0);
+            }
+            
+            // Adisyon kalemlerini ekle (eğer varsa)
+            if (ad.kalemler && ad.kalemler.length > 0) {
+              ad.kalemler.forEach(kalem => {
+                bilardoToplam += (Number(kalem.toplam) || 0);
+              });
+            }
+          });
+          
+          // Bilardo masasını açık masalara ekle
+          const anaBilardoAdisyon = masaBilardoAdisyonlari[0];
+          allOpenTables.push({
+            ...bilardoMasa,
+            id: bilardoMasa.id || `bilardo_${bilardoMasa.no}`,
+            no: String(bilardoMasa.no),
+            toplamTutar: bilardoToplam,
+            urunSayisi: masaBilardoAdisyonlari.reduce((sum, ad) => {
+              return sum + (ad.kalemler?.length || 0);
+            }, 0),
+            musteriAdi: anaBilardoAdisyon?.musteriAdi || null,
+            acilisZamani: anaBilardoAdisyon?.acilisZamani || bilardoMasa.acilisZamani,
+            isBilardo: true
+          });
+        });
+
         // 2. TEKİL MASALAR (HESAP AYIRMA SORUNU ÇÖZÜMÜ)
         const uniqueTables = [];
         const seenMasaNos = new Set();
@@ -311,12 +381,14 @@ export default function AnaEkran() {
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('adisyonGuncellendi', handleStorageChange);
     window.addEventListener('masaGuncellendi', handleStorageChange);
+    window.addEventListener('bilardoAdisyonGuncellendi', handleStorageChange);
     
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('adisyonGuncellendi', handleStorageChange);
       window.removeEventListener('masaGuncellendi', handleStorageChange);
+      window.removeEventListener('bilardoAdisyonGuncellendi', handleStorageChange);
     };
   }, [calculateOpenTablesSummary]);
 

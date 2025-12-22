@@ -296,6 +296,212 @@ const getUser = () => {
 };
 
 /* ------------------------------------------------------------
+   📌 GLOBAL EVENT LISTENER FONKSİYONU
+------------------------------------------------------------ */
+function initializeGlobalEventListeners() {
+  console.log('🔔 Global event listeners başlatılıyor...');
+  
+  // TÜM SAYFALAR ARASI SENKRONİZASYON İÇİN EVENT LISTENER'LAR
+  const globalEvents = {
+    // MASA GÜNCELLEME EVENT'LERİ
+    MASA_GUNCELLENDI: 'masaGuncellendi',
+    MASA_ACILDI: 'masaAcildi',
+    MASA_KAPANDI: 'masaKapandi',
+    
+    // ADİSYON EVENT'LERİ
+    ADISYON_GUNCELLENDI: 'adisyonGuncellendi',
+    ADISYON_ACILDI: 'adisyonAcildi',
+    ADISYON_KAPANDI: 'adisyonKapandi',
+    
+    // BİLARDO EVENT'LERİ
+    BİLARDO_GUNCELLENDI: 'bilardoGuncellendi',
+    BİLARDO_ADISYON_GUNCELLENDI: 'bilardoAdisyonGuncellendi',
+    BİLARDO_MASA_GUNCELLENDI: 'bilardoMasaGuncellendi',
+    
+    // ÖDEME EVENT'LERİ
+    ODEME_YAPILDI: 'odemeYapildi',
+    BORC_EKLENDI: 'borcEklendi',
+    BORC_ODENDI: 'borcOdendi',
+    
+    // STOK EVENT'LERİ
+    STOK_GUNCELLENDI: 'stokGuncellendi',
+    KRITIK_STOK: 'kritikStok',
+    
+    // RAPOR EVENT'LERİ
+    RAPOR_GUNCELLENDI: 'raporGuncellendi',
+    
+    // GİDER EVENT'LERİ
+    GİDER_EKLENDI: 'giderEklendi',
+    GİDER_SILINDI: 'giderSilindi',
+    
+    // PERSONEL EVENT'LERİ
+    PERSONEL_GUNCELLENDI: 'personelGuncellendi',
+    
+    // GENEL SENKRONİZASYON
+    SENKRONIZE_ET: 'senkronizeEt',
+    VERI_TEMIZLENDI: 'veriTemizlendi'
+  };
+  
+  // EVENT'LERİ YAYINLAMA FONKSİYONU
+  window.dispatchGlobalEvent = (eventName, data = {}) => {
+    const event = new CustomEvent(eventName, { detail: data });
+    window.dispatchEvent(event);
+    console.log(`📢 Global Event Gönderildi: ${eventName}`, data);
+  };
+  
+  // STORAGE DEĞİŞİKLİKLERİNİ EVENT'E DÖNÜŞTÜRME
+  const handleStorageChange = (event) => {
+    const key = event.key;
+    const newValue = event.newValue;
+    
+    // Her storage değişikliğini uygun event'e dönüştür
+    if (key === 'mc_masalar') {
+      window.dispatchGlobalEvent(globalEvents.MASA_GUNCELLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    } 
+    else if (key === 'mc_adisyonlar') {
+      window.dispatchGlobalEvent(globalEvents.ADISYON_GUNCELLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key === 'bilardo_adisyonlar') {
+      window.dispatchGlobalEvent(globalEvents.BİLARDO_ADISYON_GUNCELLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key === 'bilardo') {
+      window.dispatchGlobalEvent(globalEvents.BİLARDO_MASA_GUNCELLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key === 'mc_urunler') {
+      window.dispatchGlobalEvent(globalEvents.STOK_GUNCELLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key === 'mc_borclar') {
+      window.dispatchGlobalEvent(globalEvents.BORC_EKLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key === 'mc_giderler') {
+      window.dispatchGlobalEvent(globalEvents.GİDER_EKLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key.startsWith('mc_')) {
+      // Diğer tüm mc_ anahtarları için genel event
+      window.dispatchGlobalEvent(globalEvents.SENKRONIZE_ET, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+  };
+  
+  // ANA EVENT LISTENER'LARI KUR
+  window.addEventListener('storage', handleStorageChange);
+  
+  // LOCAL STORAGE DEĞİŞİKLİKLERİNİ TAKİP ETMEK İÇİN INTERVAL
+  const storageCheckInterval = setInterval(() => {
+    // Açık adisyonları kontrol et
+    syncAcikAdisyonlar();
+    
+    // Kritik stok kontrolü
+    checkCriticalStock();
+  }, 10000); // 10 saniyede bir kontrol
+  
+  console.log('✅ Global event listeners kuruldu');
+  
+  // Temizleme fonksiyonu
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+    clearInterval(storageCheckInterval);
+  };
+}
+
+// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
+function syncAcikAdisyonlar() {
+  try {
+    // Normal adisyonlar
+    const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
+    const acikNormalAdisyonlar = normalAdisyonlar.filter(a => 
+      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
+    );
+    
+    // Bilardo adisyonları
+    const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+    const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => 
+      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
+    );
+    
+    // Tüm açık adisyonları birleştir
+    const tumAcikAdisyonlar = [
+      ...acikNormalAdisyonlar.map(a => ({
+        ...a,
+        tur: "NORMAL",
+        masaNo: a.masaNo || "Bilinmiyor",
+        toplamTutar: a.toplamTutar || 0
+      })),
+      ...acikBilardoAdisyonlar.map(a => ({
+        ...a,
+        tur: "BİLARDO",
+        masaNo: a.bilardoMasaNo || "Bilinmiyor",
+        toplamTutar: a.toplamTutar || a.bilardoUcreti || 0
+      }))
+    ];
+    
+    // Açık adisyonları kaydet
+    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(tumAcikAdisyonlar));
+    
+    // Event tetikle
+    if (window.dispatchGlobalEvent) {
+      window.dispatchGlobalEvent('adisyonGuncellendi', { 
+        type: 'acik_adisyon_sync', 
+        count: tumAcikAdisyonlar.length 
+      });
+    }
+    
+  } catch (error) {
+    console.error("Açık adisyon senkronizasyon hatası:", error);
+  }
+}
+
+// KRİTİK STOK KONTROL FONKSİYONU
+function checkCriticalStock() {
+  try {
+    const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
+    const criticalProducts = urunler.filter(u => 
+      (parseInt(u.stock || 0) || 0) <= (parseInt(u.critical || 10) || 10)
+    );
+    
+    // Kritik stok değiştiyse event tetikle
+    const prevCritical = localStorage.getItem("mc_last_critical_count") || "0";
+    const currentCritical = criticalProducts.length.toString();
+    
+    if (prevCritical !== currentCritical) {
+      localStorage.setItem("mc_last_critical_count", currentCritical);
+      
+      if (window.dispatchGlobalEvent) {
+        window.dispatchGlobalEvent('kritikStok', { 
+          count: criticalProducts.length,
+          products: criticalProducts.slice(0, 5) // İlk 5 ürünü gönder
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Kritik stok kontrol hatası:", error);
+  }
+}
+
+/* ------------------------------------------------------------
    📌 LAYOUT — Sidebar login harici HER YERDE görünsün
 ------------------------------------------------------------ */
 function Layout({ children }) {
@@ -304,11 +510,18 @@ function Layout({ children }) {
   const user = getUser();
   const hideSidebar = path === "/login";
   const initializedRef = useRef(false);
+  const eventListenersInitializedRef = useRef(false);
 
   useEffect(() => {
     if (!hideSidebar && window.syncService && !initializedRef.current) {
       initializeSyncService();
       initializedRef.current = true;
+    }
+    
+    // GLOBAL EVENT LISTENER'LARI BAŞLAT (sadece bir kere)
+    if (!hideSidebar && !eventListenersInitializedRef.current) {
+      initializeGlobalEventListeners();
+      eventListenersInitializedRef.current = true;
     }
   }, [hideSidebar]);
 
@@ -431,37 +644,6 @@ export default function App() {
       };
     }
   }, [globalSureBittiPopup]);
-  
-  // AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
-  const syncAcikAdisyonlar = () => {
-    try {
-      // Normal adisyonlar
-      const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-      const acikNormalAdisyonlar = normalAdisyonlar.filter(a => a.durum === "ACIK");
-      
-      // Bilardo adisyonları
-      const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-      const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => a.durum === "ACIK");
-      
-      // Tüm açık adisyonları birleştir
-      const tumAcikAdisyonlar = [
-        ...acikNormalAdisyonlar.map(a => ({
-          ...a,
-          tur: "NORMAL",
-          masaNo: a.masaNo || "Bilinmiyor"
-        })),
-        ...acikBilardoAdisyonlar.map(a => ({
-          ...a,
-          tur: "BİLARDO",
-          masaNo: a.bilardoMasaNo || "Bilinmiyor"
-        }))
-      ];
-      
-      localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(tumAcikAdisyonlar));
-    } catch (error) {
-      console.error("Açık adisyon senkronizasyon hatası:", error);
-    }
-  };
 
   return (
     <ErrorBoundary>

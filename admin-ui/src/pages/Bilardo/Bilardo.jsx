@@ -167,37 +167,70 @@ export default function Bilardo() {
   
   // AÇIK ADİSYONLARI GÜNCELLE (Ana Sayfa için)
   const updateAcikAdisyonlar = (adisyon, bilardoUcret, ekUrunToplam, gecenDakika) => {
-    try {
-      const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-      
-      const bilardoAdisyonu = {
-        id: adisyon.id,
-        masaNo: adisyon.bilardoMasaNo,
-        tur: "BİLARDO",
-        sureTipi: adisyon.sureTipi,
-        gecenDakika: gecenDakika,
-        bilardoUcret: bilardoUcret,
-        ekUrunToplam: ekUrunToplam,
-        toplamTutar: bilardoUcret + ekUrunToplam,
-        acilisZamani: adisyon.acilisZamani,
-        durum: "ACIK",
-        updatedAt: Date.now()
-      };
-      
-      // Var mı kontrol et
-      const existingIndex = acikAdisyonlar.findIndex(a => a.id === adisyon.id);
-      
-      if (existingIndex !== -1) {
-        acikAdisyonlar[existingIndex] = bilardoAdisyonu;
-      } else {
-        acikAdisyonlar.push(bilardoAdisyonu);
-      }
-      
-      localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
-    } catch (error) {
-      console.error("Açık adisyon güncelleme hatası:", error);
+  try {
+    const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
+    
+    const bilardoAdisyonu = {
+      id: adisyon.id,
+      masaNo: adisyon.bilardoMasaNo,
+      tur: "BİLARDO",
+      sureTipi: adisyon.sureTipi,
+      gecenDakika: gecenDakika,
+      bilardoUcret: bilardoUcret,
+      ekUrunToplam: ekUrunToplam,
+      toplamTutar: bilardoUcret + ekUrunToplam,
+      acilisZamani: adisyon.acilisZamani,
+      durum: "ACIK",
+      updatedAt: Date.now()
+    };
+    
+    // Var mı kontrol et
+    const existingIndex = acikAdisyonlar.findIndex(a => a.id === adisyon.id);
+    
+    if (existingIndex !== -1) {
+      acikAdisyonlar[existingIndex] = bilardoAdisyonu;
+    } else {
+      acikAdisyonlar.push(bilardoAdisyonu);
     }
-  };
+    
+    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
+    
+    // ANA EKRAN İÇİN EK BİR KAYIT DAHA
+    syncToAnaEkran(bilardoAdisyonu);
+  } catch (error) {
+    console.error("Açık adisyon güncelleme hatası:", error);
+  }
+};
+
+// YENİ FONKSİYON: Ana Ekran için senkronizasyon
+const syncToAnaEkran = (bilardoAdisyonu) => {
+  try {
+    // Ana ekran için özel bir storage alanı
+    const anaEkranData = JSON.parse(localStorage.getItem("mc_ana_ekran_data") || "{}");
+    
+    if (!anaEkranData.acikAdisyonlar) {
+      anaEkranData.acikAdisyonlar = [];
+    }
+    
+    // Bilardo adisyonunu ekle/güncelle
+    const index = anaEkranData.acikAdisyonlar.findIndex(a => a.id === bilardoAdisyonu.id);
+    if (index !== -1) {
+      anaEkranData.acikAdisyonlar[index] = bilardoAdisyonu;
+    } else {
+      anaEkranData.acikAdisyonlar.push(bilardoAdisyonu);
+    }
+    
+    localStorage.setItem("mc_ana_ekran_data", JSON.stringify(anaEkranData));
+    
+    // Ayrıca global bir event tetikle (diğer sayfalar için)
+    window.dispatchEvent(new CustomEvent('bilardoAdisyonGuncellendi', {
+      detail: bilardoAdisyonu
+    }));
+    
+  } catch (error) {
+    console.error("Ana ekran senkronizasyon hatası:", error);
+  }
+};
 
   /* ============================================================
      📌 2. ÜCRET HESAPLAMA FONKSİYONLARI
