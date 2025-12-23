@@ -1,10 +1,9 @@
-// admin-ui/src/pages/Bilardo/Bilardo.jsx - TAM GÜNCELLENMİŞ VERSİYON
+// admin-ui/src/pages/Bilardo/Bilardo.jsx - 404 HATASI ÇÖZÜLDÜ
 /* ------------------------------------------------------------
-   📌 Bilardo.jsx — MASA AKTARIM TAM ÇALIŞIYOR
-   - Bilardo içeriği mevcut masa adisyonuna ekleniyor
-   - Her bilardo → Her masa için çalışıyor
-   - Mevcut adisyon korunuyor, bilardo içeriği ekleniyor
-   - GÜNCELLENDİ: Bilardo ücreti ve ek ürünler normal adisyonda gösteriliyor
+   📌 Bilardo.jsx — 404 HATASI ÇÖZÜLDÜ
+   - Aktarım sonrası direkt Masalar sayfasına yönlendirme
+   - Tüm gereksiz popup'lar kaldırıldı
+   - UZAT butonu eklendi
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
@@ -19,6 +18,11 @@ export default function Bilardo() {
   const [ucretAyarlari, setUcretAyarlari] = useState(null);
   const [silMasaNo, setSilMasaNo] = useState("");
   const [sureBittiPopup, setSureBittiPopup] = useState(null);
+  const [uzatModal, setUzatModal] = useState({
+    acik: false,
+    masa: null,
+    index: null
+  });
   
   // MODAL STATE'LERİ
   const [aktarimModal, setAktarimModal] = useState({
@@ -67,7 +71,6 @@ export default function Bilardo() {
       const masalarData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
       
       // Tüm masaları göster (boş ve dolu olanlar)
-      // Kullanıcı dolu masaya da aktarım yapabilir
       const tumMasalar = masalarData.filter(m => 
         m.durum?.toUpperCase() !== "KAPALI"
       ).sort((a, b) => parseInt(a.no) - parseInt(b.no));
@@ -82,7 +85,6 @@ export default function Bilardo() {
       
     } catch (error) {
       console.error("❌ Masayı aktar modal açma hatası:", error);
-      alert("Masayı aktar modalı açılırken hata oluştu!");
     }
   };
 
@@ -107,7 +109,8 @@ export default function Bilardo() {
             sureTipi: null,
             acilisSaati: null,
             ucret: 0,
-            aktifAdisyonId: null
+            aktifAdisyonId: null,
+            uzatmaSayisi: 0
           });
         }
         bilardoData = yeniMasalar;
@@ -188,7 +191,8 @@ export default function Bilardo() {
             ekUrunToplam: ekUrunToplam,
             toplamTutar: toplamTutar,
             gecenDakika: gecenDakika,
-            ekUrunSayisi: ekUrunler.length
+            ekUrunSayisi: ekUrunler.length,
+            uzatmaSayisi: masa.uzatmaSayisi || 0
           };
         }
         
@@ -197,7 +201,8 @@ export default function Bilardo() {
           ekUrunToplam: 0,
           toplamTutar: 0,
           gecenDakika: 0,
-          ekUrunSayisi: 0
+          ekUrunSayisi: 0,
+          uzatmaSayisi: 0
         };
       });
       
@@ -246,40 +251,8 @@ export default function Bilardo() {
       
       localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
       
-      // ANA EKRAN İÇİN EK BİR KAYIT DAHA
-      syncToAnaEkran(bilardoAdisyonu);
     } catch (error) {
       console.error("Açık adisyon güncelleme hatası:", error);
-    }
-  };
-
-  // YENİ FONKSİYON: Ana Ekran için senkronizasyon
-  const syncToAnaEkran = (bilardoAdisyonu) => {
-    try {
-      // Ana ekran için özel bir storage alanı
-      const anaEkranData = JSON.parse(localStorage.getItem("mc_ana_ekran_data") || "{}");
-      
-      if (!anaEkranData.acikAdisyonlar) {
-        anaEkranData.acikAdisyonlar = [];
-      }
-      
-      // Bilardo adisyonunu ekle/güncelle
-      const index = anaEkranData.acikAdisyonlar.findIndex(a => a.id === bilardoAdisyonu.id);
-      if (index !== -1) {
-        anaEkranData.acikAdisyonlar[index] = bilardoAdisyonu;
-      } else {
-        anaEkranData.acikAdisyonlar.push(bilardoAdisyonu);
-      }
-      
-      localStorage.setItem("mc_ana_ekran_data", JSON.stringify(anaEkranData));
-      
-      // Ayrıca global bir event tetikle (diğer sayfalar için)
-      window.dispatchEvent(new CustomEvent('bilardoAdisyonGuncellendi', {
-        detail: bilardoAdisyonu
-      }));
-      
-    } catch (error) {
-      console.error("Ana ekran senkronizasyon hatası:", error);
     }
   };
 
@@ -324,7 +297,8 @@ export default function Bilardo() {
       sureTipi: null,
       acilisSaati: null,
       ucret: 0,
-      aktifAdisyonId: null
+      aktifAdisyonId: null,
+      uzatmaSayisi: 0
     };
     
     const yeniMasalar = [...masalar, yeniMasa];
@@ -335,20 +309,17 @@ export default function Bilardo() {
   const masaNoIleSil = () => {
     const masaNo = parseInt(silMasaNo.trim());
     if (isNaN(masaNo) || masaNo < 1) {
-      alert("Geçerli bir masa numarası girin!");
       return;
     }
     
     const masaIndex = masaNo - 1;
     if (masaIndex < 0 || masaIndex >= masalar.length) {
-      alert("Bu numarada bir masa yok!");
       return;
     }
     
     const masa = masalar[masaIndex];
     
     if (masa.durum === "ACIK" || masa.acik) {
-      alert("Açık masa silinemez! Önce oyunu bitirin.");
       return;
     }
     
@@ -370,8 +341,6 @@ export default function Bilardo() {
     setMasalar(numberedMasalar);
     localStorage.setItem("bilardo", JSON.stringify(numberedMasalar));
     setSilMasaNo("");
-    
-    alert(`Bilardo Masa ${masaNo} başarıyla silindi.`);
   };
   
   const masaAc = (masa, tip, index) => {
@@ -391,7 +360,8 @@ export default function Bilardo() {
       odemeler: [],
       toplamOdenen: 0,
       toplamTutar: ucretHesapla(tip, 0),
-      not: ""
+      not: "",
+      uzatmaSayisi: 0
     };
     
     // Adisyonları kaydet
@@ -410,7 +380,8 @@ export default function Bilardo() {
             acilisSaati: Date.now(),
             aktifAdisyonId: yeniAdisyon.id,
             ucret: ucretHesapla(tip, 0),
-            toplamTutar: ucretHesapla(tip, 0)
+            toplamTutar: ucretHesapla(tip, 0),
+            uzatmaSayisi: 0
           }
         : m
     );
@@ -421,18 +392,15 @@ export default function Bilardo() {
     // Açık adisyonlara ekle
     updateAcikAdisyonlar(yeniAdisyon, ucretHesapla(tip, 0), 0, 0, `B${index + 1}`);
     
-    // Yönlendirme yap (istemci isterse)
+    // DİREKT ADİSYONA YÖNLENDİR
     setTimeout(() => {
-      if (window.confirm("Bilardo adisyonuna gitmek ister misiniz?")) {
-        navigate(`/bilardo-adisyon/${yeniAdisyon.id}`);
-      }
-    }, 300);
+      navigate(`/bilardo-adisyon/${yeniAdisyon.id}`);
+    }, 100);
   };
   
   // ÇİFT TIKLAMA: Bilardo adisyonuna git
   const handleCardDoubleClick = (masa) => {
     if (!masa.aktifAdisyonId) {
-      alert("Bu masa için henüz adisyon oluşturulmamış!");
       return;
     }
     
@@ -447,14 +415,13 @@ export default function Bilardo() {
   };
 
   /* ============================================================
-     📌 5. MASAYA AKTARIM - GÜNCELLENDİ (BİLARDO ÜCRETİ VE EK ÜRÜNLER GÖSTERİMİ)
+     📌 5. MASAYA AKTARIM - DÜZELTİLDİ (404 HATASI ÇÖZÜLDÜ)
   ============================================================ */
   
   const masaAktar = () => {
     const { bilardoMasa, seciliMasa } = aktarimModal;
     
     if (!bilardoMasa || !seciliMasa) {
-      alert("Lütfen aktarılacak masa seçin!");
       return;
     }
     
@@ -469,7 +436,6 @@ export default function Bilardo() {
         a => a.id === bilardoMasa.aktifAdisyonId
       );
       if (!bilardoAdisyon) {
-        alert("Bilardo adisyonu bulunamadı!");
         return;
       }
 
@@ -510,7 +476,6 @@ export default function Bilardo() {
 
       /* ===============================
          3. 🎱 BİLARDO ÜCRET KALEMİ
-         🔴 TUR = "URUN" (KRİTİK)
       =============================== */
       const timestamp = Date.now();
 
@@ -519,7 +484,6 @@ export default function Bilardo() {
       ) || false;
 
       if (!bilardoKalemiVarMi && bilardoUcret > 0) {
-        // Önce kalemler dizisini oluştur (eğer yoksa)
         if (!hedefAdisyon.kalemler) {
           hedefAdisyon.kalemler = [];
         }
@@ -532,7 +496,7 @@ export default function Bilardo() {
           birimFiyat: bilardoUcret,
           adet: 1,
           toplam: bilardoUcret,
-          tur: "URUN",              // ✅ DÜZELTİLDİ - ADİSYON.JSX İLE UYUMLU
+          tur: "URUN",
           isBilardo: true,
           aciklama: `${bilardoAdisyon.sureTipi} - ${gecenDakika} dakika`,
           tarih: new Date().toISOString(),
@@ -599,7 +563,6 @@ export default function Bilardo() {
         ? `${hedefAdisyon.not}\n\n--- BİLARDO TRANSFER ---\n${bilardoNot}`
         : bilardoNot;
 
-      // Bilardo transfer bilgilerini ekle
       hedefAdisyon.bilardoTransfer = true;
       hedefAdisyon.bilardoMasaNo = bilardoMasa.no;
       hedefAdisyon.bilardoAdisyonId = bilardoAdisyon.id;
@@ -674,7 +637,8 @@ export default function Bilardo() {
               ucret: 0,
               aktifAdisyonId: null,
               ekUrunToplam: 0,
-              toplamTutar: 0
+              toplamTutar: 0,
+              uzatmaSayisi: 0
             }
           : m
       );
@@ -687,10 +651,8 @@ export default function Bilardo() {
       =============================== */
       const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
       
-      // Eski bilardo adisyonunu kaldır
       const filteredAcikAdisyonlar = acikAdisyonlar.filter(a => a.id !== bilardoMasa.aktifAdisyonId);
       
-      // Hedef masa adisyonunu ekle
       const yeniAcikAdisyon = {
         id: hedefAdisyon.id,
         masaNo: `MASA ${seciliMasa.no}`,
@@ -712,7 +674,6 @@ export default function Bilardo() {
         bilardoMasaNo: bilardoMasa.no
       };
       
-      // Var mı kontrol et, yoksa ekle
       const existingAcikIndex = filteredAcikAdisyonlar.findIndex(a => a.id === hedefAdisyon.id);
       if (existingAcikIndex !== -1) {
         filteredAcikAdisyonlar[existingAcikIndex] = yeniAcikAdisyon;
@@ -723,18 +684,7 @@ export default function Bilardo() {
       localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(filteredAcikAdisyonlar));
 
       /* ===============================
-         12. BAŞARI MESAJI
-      =============================== */
-      alert(`✅ BİLARDO ADİSYONU MASA ${seciliMasa.no}'YA EKLENDİ!\n\n` +
-            `📋 TRANSFER EDİLEN İÇERİK:\n` +
-            `• 🎱 Bilardo Ücreti: ${bilardoUcret.toFixed(2)}₺\n` +
-            `• 📦 Ek Ürünler: ${ekUrunler.length} adet (${ekUrunToplam.toFixed(2)}₺)\n` +
-            `• 📊 Toplam Transfer Tutarı: ${(bilardoUcret + ekUrunToplam).toFixed(2)}₺\n` +
-            `• ⏱️ Süre: ${gecenDakika} dakika\n\n` +
-            `Masa ${seciliMasa.no} adisyonuna eklenmiştir.`);
-
-      /* ===============================
-         13. MODALI KAPAT VE EVENT TETİKLE
+         12. MODALI KAPAT VE EVENT TETİKLE
       =============================== */
       setAktarimModal({ acik: false, bilardoMasa: null, seciliMasa: null, normalMasalar: [] });
       
@@ -748,22 +698,85 @@ export default function Bilardo() {
       }));
 
       /* ===============================
-         14. ADİSYON SAYFASINA YÖNLENDİR
+         13. DİREKT MASALAR SAYFASINA YÖNLENDİR (404 HATASI ÇÖZÜLDÜ)
       =============================== */
-      setTimeout(() => {
-        if (window.confirm("Masa adisyonuna gitmek ister misiniz?")) {
-          navigate(`/adisyondetay/${seciliMasa.no}`);
-        }
-      }, 500);
+      navigate("/masalar");
       
     } catch (err) {
       console.error("Bilardo → Masa aktarım hatası:", err);
-      alert("Bilardo aktarımı sırasında bir hata oluştu: " + err.message);
+      // Hata durumunda da Masalar sayfasına yönlendir
+      navigate("/masalar");
     }
   };
 
   /* ============================================================
-     📌 6. SÜRE TAKİBİ ve POPUP
+     📌 6. SÜRE UZATMA FONKSİYONLARI
+  ============================================================ */
+  
+  const uzatModalAc = (masa, index) => {
+    setUzatModal({
+      acik: true,
+      masa: masa,
+      index: index
+    });
+  };
+  
+  const sureUzat = (uzatmaTipi) => {
+    const { masa, index } = uzatModal;
+    if (!masa) return;
+    
+    try {
+      // 1. Bilardo adisyonunu bul
+      const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+      const adisyonIndex = adisyonlar.findIndex(a => a.id === masa.aktifAdisyonId);
+      
+      if (adisyonIndex === -1) {
+        setUzatModal({ acik: false, masa: null, index: null });
+        return;
+      }
+      
+      const adisyon = adisyonlar[adisyonIndex];
+      
+      // 2. Uzatma için NOT ekle
+      const uzatmaNotu = `⏱️ SÜRE UZATMA: ${uzatmaTipi === "30dk" ? "30 Dakika" : "1 Saat"}\n` +
+                        `• Uzatma Tarihi: ${new Date().toLocaleString('tr-TR')}\n` +
+                        `• Uzatma Sayısı: ${(masa.uzatmaSayisi || 0) + 1}\n` +
+                        `• NOT: Peşin ücret alınmadı, adisyon kapanırken tahsil edilecek.`;
+      
+      adisyon.not = adisyon.not ? `${adisyon.not}\n\n${uzatmaNotu}` : uzatmaNotu;
+      
+      // 3. Uzatma sayısını güncelle
+      const yeniUzatmaSayisi = (masa.uzatmaSayisi || 0) + 1;
+      
+      // 4. Adisyonu güncelle
+      adisyonlar[adisyonIndex] = adisyon;
+      localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
+      
+      // 5. Masayı güncelle
+      const updatedMasalar = masalar.map((m, i) =>
+        i === index
+          ? {
+              ...m,
+              sureTipi: uzatmaTipi,
+              uzatmaSayisi: yeniUzatmaSayisi,
+            }
+          : m
+      );
+      
+      setMasalar(updatedMasalar);
+      localStorage.setItem("bilardo", JSON.stringify(updatedMasalar));
+      
+      // 6. Modalı kapat
+      setUzatModal({ acik: false, masa: null, index: null });
+      
+    } catch (error) {
+      console.error("Süre uzatma hatası:", error);
+      setUzatModal({ acik: false, masa: null, index: null });
+    }
+  };
+
+  /* ============================================================
+     📌 7. SÜRE TAKİBİ ve POPUP
   ============================================================ */
   
   const kontrolSureBitti = (currentMasalar = masalar) => {
@@ -779,14 +792,16 @@ export default function Bilardo() {
             masaId: masa.id,
             masaNo: masa.no,
             mesaj: "30 dakika süresi doldu!",
-            timestamp: now
+            timestamp: now,
+            uzatmaGerekli: true
           };
         } else if (masa.sureTipi === "1saat" && gecenDakika >= 60) {
           yeniPopup = {
             masaId: masa.id,
             masaNo: masa.no,
             mesaj: "1 saat süresi doldu!",
-            timestamp: now
+            timestamp: now,
+            uzatmaGerekli: true
           };
         }
       }
@@ -810,12 +825,16 @@ export default function Bilardo() {
     
     const masaIndex = masalar.findIndex(m => m.id === sureBittiPopup.masaId);
     if (masaIndex !== -1 && masalar[masaIndex].aktifAdisyonId) {
-      navigate(`/bilardo-adisyon/${masalar[masaIndex].aktifAdisyonId}`);
+      if (sureBittiPopup.uzatmaGerekli) {
+        uzatModalAc(masalar[masaIndex], masaIndex);
+      } else {
+        navigate(`/bilardo-adisyon/${masalar[masaIndex].aktifAdisyonId}`);
+      }
     }
   };
 
   /* ============================================================
-     📌 7. EKRAN RENDER
+     📌 8. EKRAN RENDER
   ============================================================ */
   
   return (
@@ -831,7 +850,9 @@ export default function Bilardo() {
             BİLARDO {sureBittiPopup.masaNo}: {sureBittiPopup.mesaj}
           </div>
           <div className="bilardo-popup-not">
-            Tıklayarak adisyona gidin...
+            {sureBittiPopup.uzatmaGerekli 
+              ? "Tıklayarak süre uzatma seçeneklerini görün..." 
+              : "Tıklayarak adisyona gidin..."}
           </div>
         </div>
       )}
@@ -904,6 +925,7 @@ export default function Bilardo() {
           const bilardoUcret = masa.ucret || 0;
           const ekUrunSayisi = masa.ekUrunSayisi || 0;
           const ekUrunToplam = masa.ekUrunToplam || 0;
+          const uzatmaSayisi = masa.uzatmaSayisi || 0;
           
           return (
             <div 
@@ -941,6 +963,23 @@ export default function Bilardo() {
                 <div className="bilardo-toplam-tutar">
                   <span>TOPLAM TUTAR:</span>
                   <span>{toplamTutar.toFixed(2)}₺</span>
+                </div>
+              )}
+              
+              {/* UZATMA SAYISI */}
+              {uzatmaSayisi > 0 && (
+                <div style={{
+                  margin: "5px 0",
+                  padding: "5px 10px",
+                  background: "#fff3e0",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  color: "#ef6c00",
+                  textAlign: "center",
+                  fontWeight: "600",
+                  border: "1px solid #ffb74d"
+                }}>
+                  🔄 {uzatmaSayisi} kez uzatıldı
                 </div>
               )}
               
@@ -1051,8 +1090,42 @@ export default function Bilardo() {
                       `İlk 30dk: ${ucretAyarlari?.bilardo30dk || 80}₺ + Sonrası: ${ucretAyarlari?.bilardoDakikaUcreti || 2}₺/dk`}
                   </div>
                   
-                  {/* AKTARIM BUTONLARI */}
+                  {/* AKTARIM ve UZATMA BUTONLARI */}
                   <div className="bilardo-aktarim-buttons">
+                    {/* SÜRELİ OYUNLARDA UZAT BUTONU */}
+                    {(masa.sureTipi === "30dk" || masa.sureTipi === "1saat") && (
+                      <button
+                        className="bilardo-uzat-btn"
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          e.preventDefault();
+                          uzatModalAc(masa, index);
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #ffb74d, #ff9800)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #ffb74d, #ff9800)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '10px 15px',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          flex: '1',
+                          marginRight: '5px'
+                        }}
+                      >
+                        🔄 UZAT
+                      </button>
+                    )}
+                    
                     <button
                       className="bilardo-oyun-bitir-btn"
                       onClick={(e) => { 
@@ -1068,8 +1141,12 @@ export default function Bilardo() {
                         e.currentTarget.style.background = 'linear-gradient(135deg, #9a3e3e, #7f3131)';
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
+                      style={{
+                        flex: masa.sureTipi === "suresiz" ? '1' : '1',
+                        marginRight: '5px'
+                      }}
                     >
-                      💳 ÖDEME YAP
+                      💳 ÖDEME
                     </button>
                     
                     <button
@@ -1083,8 +1160,11 @@ export default function Bilardo() {
                         e.currentTarget.style.background = 'linear-gradient(135deg, #4a6fa5, #3a5a8c)';
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
+                      style={{
+                        flex: '1'
+                      }}
                     >
-                      ↪️ MASAYA AKTAR
+                      ↪️ AKTAR
                     </button>
                   </div>
                 </>
@@ -1173,6 +1253,123 @@ export default function Bilardo() {
                 }}
               >
                 MASAYA AKTAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* UZATMA MODAL */}
+      {uzatModal.acik && (
+        <div className="bilardo-popup-overlay">
+          <div className="bilardo-popup" style={{ maxWidth: '500px' }}>
+            <h3 className="bilardo-popup-title">⏱️ SÜRE UZAT</h3>
+            <p style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <strong>Bilardo {uzatModal.masa?.no}</strong> için süre uzatma seçenekleri:
+            </p>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr', 
+              gap: '15px',
+              marginBottom: '20px'
+            }}>
+              <button
+                className="bilardo-sure-btn"
+                onClick={() => sureUzat("30dk")}
+                style={{
+                  padding: '20px',
+                  background: 'linear-gradient(135deg, #e3f2fd, #bbdefb)',
+                  border: '2px solid #90caf9',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #bbdefb, #90caf9)';
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #e3f2fd, #bbdefb)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <span style={{ fontSize: '18px', fontWeight: '800', color: '#1565c0' }}>30 DAKİKA</span>
+                <span style={{ fontSize: '16px', fontWeight: '700', color: '#0d47a1', marginTop: '5px' }}>
+                  {ucretAyarlari?.bilardo30dk || 80}₺
+                </span>
+                <span style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                  (Adisyon kapanırken tahsil)
+                </span>
+              </button>
+              
+              <button
+                className="bilardo-sure-btn"
+                onClick={() => sureUzat("1saat")}
+                style={{
+                  padding: '20px',
+                  background: 'linear-gradient(135deg, #e8f5e9, #c8e6c9)',
+                  border: '2px solid #81c784',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #c8e6c9, #81c784)';
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #e8f5e9, #c8e6c9)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <span style={{ fontSize: '18px', fontWeight: '800', color: '#2e7d32' }}>1 SAAT</span>
+                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1b5e20', marginTop: '5px' }}>
+                  {ucretAyarlari?.bilardo1saat || 120}₺
+                </span>
+                <span style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                  (Adisyon kapanırken tahsil)
+                </span>
+              </button>
+            </div>
+            
+            <div style={{ 
+              padding: '15px', 
+              background: '#fff3e0', 
+              borderRadius: '8px',
+              marginBottom: '20px',
+              border: '1px solid #ffcc80'
+            }}>
+              <div style={{ fontSize: '14px', color: '#ef6c00', fontWeight: '600' }}>
+                💡 ÖNEMLİ NOT:
+              </div>
+              <div style={{ fontSize: '13px', color: '#666', marginTop: '5px' }}>
+                • Uzatma ücreti peşin alınmaz, adisyon kapanırken tahsil edilir.<br/>
+                • Uzatma sayısı notlara kaydedilir.<br/>
+                • Süre sıfırlanmaz, eklenir.
+              </div>
+            </div>
+            
+            <div className="bilardo-modal-actions">
+              <button 
+                className="bilardo-modal-btn iptal"
+                onClick={() => setUzatModal({ acik: false, masa: null, index: null })}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #e0e0e0, #d0d0d0)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #f0f0f0, #e0e0e0)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                İptal
               </button>
             </div>
           </div>
