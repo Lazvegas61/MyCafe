@@ -1,0 +1,627 @@
+.gun-sonu-rapor-container {
+  padding: 20px;
+  background: linear-gradient(135deg, #f9f5f0 0%, #f2ebe1 100%);
+  min-height: 100vh;
+  font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #2c2416;
+  width: 100%;
+}
+
+/* HEADER - Modern Design */
+.rapor-header {
+  background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
+  padding: 24px 32px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 30px rgba(139, 94, 60, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.rapor-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #8b5e3c, #d4af37, #ffd166);
+}
+
+.rapor-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.rapor-title h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #8b5e3c 0%, #d4af37 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+
+.rapor-title h1 .tarih {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: #8b5e3c;
+  margin-top: 6px;
+  letter-spacing: 0;
+}
+
+.gun-bilgisi {
+  font-size: 15px;
+  color: #6b4e2e;
+  background: linear-gradient(135deg, rgba(139, 94, 60, 0.05) 0%, rgba(212, 175, 55, 0.05) 100%);
+  padding: 16px 24px;
+  border-radius: 14px;
+  border-left: 4px solid #d4af37;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gun-bilgisi i {
+  color: #d4af37;
+  font-size: 20px;
+}
+
+.gun-bilgisi strong {
+  color: #3a2c1a;
+  font-weight: 700;
+  margin: 0 6px;
+  font-size: 16px;
+}
+
+/* BUTON GRUP - Modern Butonlar */
+.btn-group {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #8b5e3c 0%, #a87c52 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(139, 94, 60, 0.25);
+}
+
+.btn-secondary {
+  background: white;
+  color: #8b5e3c;
+  border: 2px solid #8b5e3c;
+  box-shadow: 0 4px 15px rgba(139, 94, 60, 0.1);
+}
+
+.btn-tertiary {
+  background: linear-gradient(135deg, #f0e6d6 0%, #e8d9c7 100%);
+  color: #6b4e2e;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.1);
+}
+
+.btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(139, 94, 60, 0.3);
+}
+
+/* ANA İÇERİK KONTEYNERİ */
+.rapor-ana-container {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  width: 100%;
+  min-height: calc(100vh - 200px);
+}
+
+@media (max-width: 1200px) {
+  .rapor-ana-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* SOL TARAF - GENİŞ ALAN */
+.rapor-sol-taraf {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+/* SAĞ TARAF - SABİT ÖZET PANELİ */
+.rapor-sag-taraf {
+  position: sticky;
+  top: 20px;
+  height: fit-content;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+/* RAPOR SECTION - Modern Kartlar */
+.rapor-section {
+  background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
+  padding: 24px;
+  border-radius: 18px;
+  box-shadow: 0 6px 20px rgba(139, 94, 60, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.rapor-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #8b5e3c, #d4af37);
+}
+
+.rapor-section h2 {
+  margin: 0 0 20px 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #3a2c1a;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rapor-section h2 i {
+  color: #d4af37;
+  font-size: 18px;
+}
+
+/* TABLO STYLES - Modern Tablo */
+.rapor-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f9f5f0 0%, #f2ebe1 100%);
+  box-shadow: 0 4px 15px rgba(139, 94, 60, 0.05);
+}
+
+.rapor-table thead {
+  background: linear-gradient(135deg, rgba(139, 94, 60, 0.1) 0%, rgba(212, 175, 55, 0.1) 100%);
+}
+
+.rapor-table th {
+  text-align: left;
+  padding: 16px;
+  font-weight: 700;
+  color: #6b4e2e;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.2);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.rapor-table td {
+  padding: 14px 16px;
+  color: #3a2c1a;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+  font-weight: 500;
+}
+
+.rapor-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rapor-table tbody tr:hover td {
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.rapor-table .total-row {
+  background: linear-gradient(135deg, rgba(139, 94, 60, 0.08) 0%, rgba(212, 175, 55, 0.08) 100%);
+  font-weight: 800;
+}
+
+.rapor-table .total-row td {
+  padding: 18px 16px;
+  color: #8b5e3c;
+  font-size: 15px;
+  border-top: 2px solid rgba(212, 175, 55, 0.3);
+}
+
+/* GİDER LİSTESİ */
+.gider-listesi {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.gider-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+  font-size: 15px;
+  transition: background-color 0.2s ease;
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+
+.gider-item:hover {
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.gider-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.gider-item .gider-adi {
+  color: #3a2c1a;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gider-item .gider-tutar {
+  color: #e74c3c;
+  font-weight: 700;
+  font-size: 16px;
+  background: rgba(231, 76, 60, 0.1);
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.gider-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 16px;
+  margin-top: 16px;
+  border-top: 2px solid rgba(212, 175, 55, 0.3);
+  font-size: 16px;
+  font-weight: 800;
+  color: #8b5e3c;
+  background: rgba(212, 175, 55, 0.05);
+  border-radius: 12px;
+}
+
+/* ÜRÜN SATIŞLARI */
+.urun-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.urun-kart {
+  background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(139, 94, 60, 0.05);
+}
+
+.urun-kart::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #8b5e3c, #d4af37);
+}
+
+.urun-kart:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(139, 94, 60, 0.15);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.urun-kart h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #3a2c1a;
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.urun-kart .urun-detay {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+}
+
+.urun-kart .urun-detay:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.urun-kart .label {
+  color: #6b4e2e;
+  font-weight: 500;
+}
+
+.urun-kart .deger {
+  color: #3a2c1a;
+  font-weight: 600;
+  background: rgba(212, 175, 55, 0.1);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.urun-kart .toplam {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px solid rgba(212, 175, 55, 0.2);
+  font-weight: 800;
+  color: #8b5e3c;
+  font-size: 16px;
+  text-align: center;
+  background: rgba(212, 175, 55, 0.05);
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.maliyetsiz-badge {
+  margin-left: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.15) 0%, rgba(39, 174, 96, 0.15) 100%);
+  color: #27ae60;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+/* ÖZET KART - Sağda Sabit */
+.ozet-kart {
+  background: linear-gradient(135deg, #3a2c1a 0%, #4a3823 100%);
+  padding: 24px;
+  border-radius: 18px;
+  box-shadow: 0 12px 35px rgba(58, 44, 26, 0.3);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: white;
+  position: sticky;
+  top: 20px;
+  height: fit-content;
+  overflow: hidden;
+}
+
+.ozet-kart h2 {
+  margin: 0 0 24px 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #f5e6d3;
+  padding-bottom: 14px;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ozet-kart h2 i {
+  color: #d4af37;
+  font-size: 20px;
+  background: rgba(212, 175, 55, 0.2);
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.ozet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 15px;
+  transition: padding 0.2s ease;
+}
+
+.ozet-row:hover {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.ozet-row:last-child {
+  border-bottom: none;
+}
+
+.ozet-row .label {
+  color: #c9b699;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ozet-row .label i {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.ozet-row .value {
+  font-weight: 700;
+  font-size: 16px;
+  color: #f5e6d3;
+}
+
+.ozet-row.nakit .value {
+  color: #2ecc71;
+  text-shadow: 0 2px 4px rgba(46, 204, 113, 0.3);
+}
+
+.ozet-row.kart .value {
+  color: #3498db;
+  text-shadow: 0 2px 4px rgba(52, 152, 219, 0.3);
+}
+
+.ozet-row.hesap .value {
+  color: #f39c12;
+  text-shadow: 0 2px 4px rgba(243, 156, 18, 0.3);
+}
+
+.ozet-row.gider .value {
+  color: #e74c3c;
+  text-shadow: 0 2px 4px rgba(231, 76, 60, 0.3);
+}
+
+.ozet-row.net-kar {
+  margin-top: 16px;
+  padding-top: 20px;
+  border-top: 2px solid rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.15);
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.ozet-row.net-kar .label {
+  color: #f7ef8a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.ozet-row.net-kar .value {
+  color: #f7ef8a;
+  font-size: 28px;
+  font-weight: 900;
+  text-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
+}
+
+.hesap-not {
+  display: block;
+  font-size: 11px;
+  color: #b8a98c;
+  font-weight: 400;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+/* ALT BİLGİ */
+.alt-bilgi {
+  text-align: center;
+  padding: 24px;
+  color: #6b4e2e;
+  font-size: 13px;
+  background: linear-gradient(135deg, rgba(139, 94, 60, 0.05) 0%, rgba(212, 175, 55, 0.05) 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  margin-top: 24px;
+  grid-column: 1 / -1;
+}
+
+.guvenlik-bilgisi {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.guvenlik-bilgisi i {
+  color: #d4af37;
+  font-size: 14px;
+}
+
+.rapor-bilgisi {
+  font-size: 12px;
+  color: rgba(107, 78, 46, 0.8);
+}
+
+.rapor-bilgisi strong {
+  color: #3a2c1a;
+  font-weight: 700;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1400px) {
+  .rapor-ana-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .rapor-sag-taraf {
+    position: static;
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .gun-sonu-rapor-container {
+    padding: 16px;
+  }
+  
+  .rapor-header {
+    padding: 20px;
+  }
+  
+  .rapor-title h1 {
+    font-size: 28px;
+  }
+  
+  .gun-bilgisi {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+  }
+  
+  .btn-group {
+    flex-direction: column;
+  }
+  
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .urun-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .rapor-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

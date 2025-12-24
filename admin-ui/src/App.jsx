@@ -1,4 +1,4 @@
-// App.jsx - TAM DÜZELTİLMİŞ VERSİYON
+// App.jsx - GÜNCELLENMİŞ VE HATALARI DÜZELTİLMİŞ VERSİYON
 /* ------------------------------------------------------------
    📌 App.jsx — MyCafe (FINAL - YENİ RAPOR YAPISI ENTEGRE)
 ------------------------------------------------------------ */
@@ -108,11 +108,7 @@ function loadInitialData() {
     bilardoDakikaUcreti: 2
   }));
 }
-loadInitialData();
 
-/* ------------------------------------------------------------
-   🔧 AUTO-FIX PATCH — Yeni Format Normalizasyonu
------------------------------------------------------------- */
 function autoFixCategoryAndProducts() {
   let cats = JSON.parse(localStorage.getItem("mc_kategoriler") || "[]");
   let prods = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
@@ -171,16 +167,10 @@ function autoFixCategoryAndProducts() {
     localStorage.setItem("mc_data_updated", "1");
   }
 }
-autoFixCategoryAndProducts();
 
 /* ------------------------------------------------------------
    🔧 SYNC SERVICE ENTEGRASYONU
 ------------------------------------------------------------ */
-if (typeof window !== 'undefined') {
-  window.syncService = syncService;
-  console.log('🌟 SyncService global olarak yüklendi');
-}
-
 let syncServiceInitialized = false;
 
 function initializeSyncService() {
@@ -230,46 +220,72 @@ function initializeSyncService() {
   }
 }
 
-/* ------------------------------------------------------------
-   📌 SAYFA IMPORTLARI — YENİ RAPOR YAPISI İLE
------------------------------------------------------------- */
-import Login from "./pages/Login/Login.jsx";
-import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
-import Masalar from "./pages/Masalar/Masalar.jsx";
-import Adisyon from "./pages/Adisyon/Adisyon.jsx";
-import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx";
-import './pages/MusteriIslemleri/MusteriIslemleri.css';
-import UrunStokYonetimi from "./pages/UrunStokYonetimi/UrunStokYonetimi.jsx";
-import Giderler from './pages/Giderler/Giderler.jsx';
-import Personel from "./pages/Personel/Personel.jsx";
-import Ayarlar from "./pages/Ayarlar/Ayarlar.jsx";
-import Bilardo from "./pages/Bilardo/Bilardo";
-import BilardoAdisyon from "./pages/Bilardo/BilardoAdisyon.jsx";
+// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
+function syncAcikAdisyonlar() {
+  try {
+    const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
+    const acikNormalAdisyonlar = normalAdisyonlar.filter(a => 
+      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
+    );
+    
+    const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+    const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => 
+      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
+    );
+    
+    const tumAcikAdisyonlar = [
+      ...acikNormalAdisyonlar.map(a => ({
+        ...a,
+        tur: "NORMAL",
+        masaNo: a.masaNo || "Bilinmiyor",
+        toplamTutar: a.toplamTutar || 0
+      })),
+      ...acikBilardoAdisyonlar.map(a => ({
+        ...a,
+        tur: "BİLARDO",
+        masaNo: a.bilardoMasaNo || "Bilinmiyor",
+        toplamTutar: a.toplamTutar || a.bilardoUcreti || 0
+      }))
+    ];
+    
+    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(tumAcikAdisyonlar));
+    
+    if (window.dispatchGlobalEvent) {
+      window.dispatchGlobalEvent('adisyonGuncellendi', { 
+        type: 'acik_adisyon_sync', 
+        count: tumAcikAdisyonlar.length 
+      });
+    }
+  } catch (error) {
+    console.error("Açık adisyon senkronizasyon hatası:", error);
+  }
+}
 
-// YENİ RAPOR SAYFALARI (DEFAULT EXPORT İLE)
-// Dashboard
-import RaporlarDashboard from "./pages/Raporlar/Dashboard/RaporlarDashboard.jsx";
-
-// Masa Raporları
-import MasaOturumRaporu from "./pages/Raporlar/MasaRaporlari/MasaOturumRaporu.jsx";
-import MasaOdemeDagilimi from "./pages/Raporlar/MasaRaporlari/MasaOdemeDagilimi.jsx";
-
-// Gün Sonu Raporları
-import GunSonuOzet from "./pages/Raporlar/GunSonu/GunSonuOzet.jsx";
-import GunSonuDetay from "./pages/Raporlar/GunSonu/GunSonuDetay.jsx";
-
-// Ürün Raporları
-import UrunBazliSatis from "./pages/Raporlar/UrunRaporlari/UrunBazliSatis.jsx";
-
-// Kategori Raporları
-import KategoriBazliSatis from "./pages/Raporlar/KategoriRaporlari/KategoriBazliSatis.jsx";
-
-// Gider Raporları
-import GunlukGiderler from "./pages/Raporlar/GiderRaporlari/GunlukGiderler.jsx";
-
-// Diğer Sayfalar
-import MasaDetay from "./pages/Masalar/MasaDetay.jsx";
-import ErrorBoundary from "./components/ErrorBoundary.jsx";
+// KRİTİK STOK KONTROL FONKSİYONU
+function checkCriticalStock() {
+  try {
+    const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
+    const criticalProducts = urunler.filter(u => 
+      (parseInt(u.stock || 0) || 0) <= (parseInt(u.critical || 10) || 10)
+    );
+    
+    const prevCritical = localStorage.getItem("mc_last_critical_count") || "0";
+    const currentCritical = criticalProducts.length.toString();
+    
+    if (prevCritical !== currentCritical) {
+      localStorage.setItem("mc_last_critical_count", currentCritical);
+      
+      if (window.dispatchGlobalEvent) {
+        window.dispatchGlobalEvent('kritikStok', { 
+          count: criticalProducts.length,
+          products: criticalProducts.slice(0, 5)
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Kritik stok kontrol hatası:", error);
+  }
+}
 
 /* ------------------------------------------------------------
    👤 DEMO ADMIN
@@ -317,62 +333,25 @@ const getUser = () => {
 function initializeGlobalEventListeners() {
   console.log('🔔 Global event listeners başlatılıyor...');
   
-  // TÜM SAYFALAR ARASI SENKRONİZASYON İÇİN EVENT LISTENER'LAR
   const globalEvents = {
-    // MASA GÜNCELLEME EVENT'LERİ
     MASA_GUNCELLENDI: 'masaGuncellendi',
-    MASA_ACILDI: 'masaAcildi',
-    MASA_KAPANDI: 'masaKapandi',
-    
-    // ADİSYON EVENT'LERİ
     ADISYON_GUNCELLENDI: 'adisyonGuncellendi',
-    ADISYON_ACILDI: 'adisyonAcildi',
-    ADISYON_KAPANDI: 'adisyonKapandi',
-    
-    // BİLARDO EVENT'LERİ
-    BİLARDO_GUNCELLENDI: 'bilardoGuncellendi',
     BİLARDO_ADISYON_GUNCELLENDI: 'bilardoAdisyonGuncellendi',
     BİLARDO_MASA_GUNCELLENDI: 'bilardoMasaGuncellendi',
-    
-    // ÖDEME EVENT'LERİ
-    ODEME_YAPILDI: 'odemeYapildi',
-    BORC_EKLENDI: 'borcEklendi',
-    BORC_ODENDI: 'borcOdendi',
-    
-    // STOK EVENT'LERİ
     STOK_GUNCELLENDI: 'stokGuncellendi',
     KRITIK_STOK: 'kritikStok',
-    
-    // RAPOR EVENT'LERİ (YENİ)
-    RAPOR_OLUSTURULDU: 'raporOlusturuldu',
-    RAPOR_EXPORT: 'raporExport',
-    RAPOR_SILINDI: 'raporSilindi',
-    
-    // GİDER EVENT'LERİ
-    GİDER_EKLENDI: 'giderEklendi',
-    GİDER_SILINDI: 'giderSilindi',
-    
-    // PERSONEL EVENT'LERİ
-    PERSONEL_GUNCELLENDI: 'personelGuncellendi',
-    
-    // GENEL SENKRONİZASYON
-    SENKRONIZE_ET: 'senkronizeEt',
-    VERI_TEMIZLENDI: 'veriTemizlendi'
+    SENKRONIZE_ET: 'senkronizeEt'
   };
   
-  // EVENT'LERİ YAYINLAMA FONKSİYONU
   window.dispatchGlobalEvent = (eventName, data = {}) => {
     const event = new CustomEvent(eventName, { detail: data });
     window.dispatchEvent(event);
     console.log(`📢 Global Event Gönderildi: ${eventName}`, data);
   };
   
-  // STORAGE DEĞİŞİKLİKLERİNİ EVENT'E DÖNÜŞTÜRME
   const handleStorageChange = (event) => {
     const key = event.key;
-    const newValue = event.newValue;
     
-    // Her storage değişikliğini uygun event'e dönüştür
     if (key === 'mc_masalar') {
       window.dispatchGlobalEvent(globalEvents.MASA_GUNCELLENDI, { 
         type: 'storage_update', 
@@ -403,27 +382,7 @@ function initializeGlobalEventListeners() {
         key: key 
       });
     }
-    else if (key === 'mc_borclar') {
-      window.dispatchGlobalEvent(globalEvents.BORC_EKLENDI, { 
-        type: 'storage_update', 
-        key: key 
-      });
-    }
-    else if (key === 'mc_giderler') {
-      window.dispatchGlobalEvent(globalEvents.GİDER_EKLENDI, { 
-        type: 'storage_update', 
-        key: key 
-      });
-    }
-    else if (key.startsWith('mc_rapor_')) {
-      // Rapor event'leri
-      window.dispatchGlobalEvent(globalEvents.RAPOR_OLUSTURULDU, { 
-        type: 'storage_update', 
-        key: key 
-      });
-    }
     else if (key.startsWith('mc_')) {
-      // Diğer tüm mc_ anahtarları için genel event
       window.dispatchGlobalEvent(globalEvents.SENKRONIZE_ET, { 
         type: 'storage_update', 
         key: key 
@@ -431,100 +390,49 @@ function initializeGlobalEventListeners() {
     }
   };
   
-  // ANA EVENT LISTENER'LARI KUR
   window.addEventListener('storage', handleStorageChange);
   
-  // LOCAL STORAGE DEĞİŞİKLİKLERİNİ TAKİP ETMEK İÇİN INTERVAL
   const storageCheckInterval = setInterval(() => {
-    // Açık adisyonları kontrol et
     syncAcikAdisyonlar();
-    
-    // Kritik stok kontrolü
     checkCriticalStock();
-  }, 10000); // 10 saniyede bir kontrol
+  }, 10000);
   
   console.log('✅ Global event listeners kuruldu');
   
-  // Temizleme fonksiyonu
   return () => {
     window.removeEventListener('storage', handleStorageChange);
     clearInterval(storageCheckInterval);
   };
 }
 
-// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
-function syncAcikAdisyonlar() {
-  try {
-    // Normal adisyonlar
-    const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-    const acikNormalAdisyonlar = normalAdisyonlar.filter(a => 
-      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
-    );
-    
-    // Bilardo adisyonları
-    const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-    const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => 
-      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
-    );
-    
-    // Tüm açık adisyonları birleştir
-    const tumAcikAdisyonlar = [
-      ...acikNormalAdisyonlar.map(a => ({
-        ...a,
-        tur: "NORMAL",
-        masaNo: a.masaNo || "Bilinmiyor",
-        toplamTutar: a.toplamTutar || 0
-      })),
-      ...acikBilardoAdisyonlar.map(a => ({
-        ...a,
-        tur: "BİLARDO",
-        masaNo: a.bilardoMasaNo || "Bilinmiyor",
-        toplamTutar: a.toplamTutar || a.bilardoUcreti || 0
-      }))
-    ];
-    
-    // Açık adisyonları kaydet
-    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(tumAcikAdisyonlar));
-    
-    // Event tetikle
-    if (window.dispatchGlobalEvent) {
-      window.dispatchGlobalEvent('adisyonGuncellendi', { 
-        type: 'acik_adisyon_sync', 
-        count: tumAcikAdisyonlar.length 
-      });
-    }
-    
-  } catch (error) {
-    console.error("Açık adisyon senkronizasyon hatası:", error);
-  }
-}
+/* ------------------------------------------------------------
+   📌 SAYFA IMPORTLARI — YENİ RAPOR YAPISI İLE
+------------------------------------------------------------ */
+import Login from "./pages/Login/Login.jsx";
+import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
+import Masalar from "./pages/Masalar/Masalar.jsx";
+import Adisyon from "./pages/Adisyon/Adisyon.jsx";
+import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx";
+import './pages/MusteriIslemleri/MusteriIslemleri.css';
+import UrunStokYonetimi from "./pages/UrunStokYonetimi/UrunStokYonetimi.jsx";
+import Giderler from './pages/Giderler/Giderler.jsx';
+import Personel from "./pages/Personel/Personel.jsx";
+import Ayarlar from "./pages/Ayarlar/Ayarlar.jsx";
+import Bilardo from "./pages/Bilardo/Bilardo";
+import BilardoAdisyon from "./pages/Bilardo/BilardoAdisyon.jsx";
+import MasaDetay from "./pages/Masalar/MasaDetay.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
-// KRİTİK STOK KONTROL FONKSİYONU
-function checkCriticalStock() {
-  try {
-    const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
-    const criticalProducts = urunler.filter(u => 
-      (parseInt(u.stock || 0) || 0) <= (parseInt(u.critical || 10) || 10)
-    );
-    
-    // Kritik stok değiştiyse event tetikle
-    const prevCritical = localStorage.getItem("mc_last_critical_count") || "0";
-    const currentCritical = criticalProducts.length.toString();
-    
-    if (prevCritical !== currentCritical) {
-      localStorage.setItem("mc_last_critical_count", currentCritical);
-      
-      if (window.dispatchGlobalEvent) {
-        window.dispatchGlobalEvent('kritikStok', { 
-          count: criticalProducts.length,
-          products: criticalProducts.slice(0, 5) // İlk 5 ürünü gönder
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Kritik stok kontrol hatası:", error);
-  }
-}
+// YENİ RAPOR SAYFALARI
+import RaporlarDashboard from "./pages/Raporlar/Dashboard/RaporlarDashboard.jsx";
+import GunSonuOzet from "./pages/Raporlar/GunSonu/GunSonuOzet.jsx";
+import GunSonuDetay from "./pages/Raporlar/GunSonu/GunSonuDetay.jsx";
+import GunSonuRapor from "./pages/Raporlar/GunSonu/GunSonuRapor.jsx";
+import UrunBazliSatis from "./pages/Raporlar/UrunRaporlari/UrunBazliSatis.jsx";
+import KategoriBazliSatis from "./pages/Raporlar/KategoriRaporlari/KategoriBazliSatis.jsx";
+import GunlukGiderler from "./pages/Raporlar/GiderRaporlari/GunlukGiderler.jsx";
+import MasaAnalizi from "./pages/Raporlar/MasaRaporlari/MasaAnalizi.jsx";
+
 
 /* ------------------------------------------------------------
    📌 LAYOUT — Sidebar login harici HER YERDE görünsün
@@ -543,7 +451,6 @@ function Layout({ children }) {
       initializedRef.current = true;
     }
     
-    // GLOBAL EVENT LISTENER'LARI BAŞLAT (sadece bir kere)
     if (!hideSidebar && !eventListenersInitializedRef.current) {
       initializeGlobalEventListeners();
       eventListenersInitializedRef.current = true;
@@ -583,10 +490,22 @@ export default function App() {
   const syncInitializedRef = useRef(false);
   const [globalSureBittiPopup, setGlobalSureBittiPopup] = useState(null);
 
+  // İlk yüklemede verileri hazırla
   useEffect(() => {
+    loadInitialData();
+    autoFixCategoryAndProducts();
     ensureDemoAdmin();
+  }, []);
+
+  // Sync service ve interval'leri başlat
+  useEffect(() => {
+    // Sync service'i global scope'a ekle
+    if (typeof window !== 'undefined') {
+      window.syncService = syncService;
+      console.log('🌟 SyncService global olarak yüklendi');
+    }
     
-    // BİLARDO SÜRE KONTROLÜ INTERVAL'I
+    // Bilardo süre kontrol interval'i
     const checkBilardoSuresi = () => {
       try {
         const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
@@ -622,7 +541,6 @@ export default function App() {
         if (yeniPopup && (!globalSureBittiPopup || globalSureBittiPopup.adisyonId !== yeniPopup.adisyonId)) {
           setGlobalSureBittiPopup(yeniPopup);
           
-          // 30 saniye sonra kapat
           setTimeout(() => {
             setGlobalSureBittiPopup(prev => 
               prev?.adisyonId === yeniPopup.adisyonId ? null : prev
@@ -638,10 +556,9 @@ export default function App() {
     
     if (!syncInitializedRef.current) {
       const handleStorageChange = (event) => {
-        if (event.key && event.key.startsWith('mc_') || event.key === 'bilardo_adisyonlar') {
+        if (event.key && (event.key.startsWith('mc_') || event.key === 'bilardo_adisyonlar')) {
           console.log('💾 Storage değişti:', event.key);
           
-          // Açık adisyonları senkronize et
           syncAcikAdisyonlar();
           
           if (window.syncService && window.syncService.senkronizeMasalar) {
@@ -668,12 +585,15 @@ export default function App() {
         clearInterval(bilardoInterval);
       };
     }
+    
+    return () => {
+      // Cleanup function
+    };
   }, [globalSureBittiPopup]);
 
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        {/* GLOBAL SÜRE BİTTİ POPUP'ı */}
         {globalSureBittiPopup && (
           <GlobalSureBittiPopup
             data={globalSureBittiPopup}
@@ -682,71 +602,59 @@ export default function App() {
         )}
         
         <Routes>
-          {/* 1. ÖZEL ROUTE'LAR */}
-          <Route path="/login" element={<Layout><Login /></Layout>} />
-          
-          {/* 2. PARAMETRELİ ROUTE'LAR */}
-          <Route path="/adisyon/:id" element={<Layout><Adisyon /></Layout>} />
-          <Route path="/masa-detay/:id" element={<Layout><MasaDetay /></Layout>} />
-          
-          {/* BİLARDO ADİSYON */}
-          <Route path="/bilardo-adisyon/:id" element={<Layout><BilardoAdisyon /></Layout>} />
-          
-          {/* YENİ RAPOR ROUTE'LARI - YENİ YAPINIZA GÖRE */}
-          
-          {/* Raporlar Dashboard */}
-          <Route path="/raporlar" element={<Layout><RaporlarDashboard /></Layout>} />
-          <Route path="/raporlar/dashboard" element={<Layout><RaporlarDashboard /></Layout>} />
-          
-          {/* Masa Raporları */}
-          <Route path="/raporlar/masa-oturum" element={<Layout><MasaOturumRaporu /></Layout>} />
-          <Route path="/raporlar/masa-odeme" element={<Layout><MasaOdemeDagilimi /></Layout>} />
-          
-          {/* Gün Sonu Raporları */}
-          <Route path="/raporlar/gun-sonu" element={<Layout><GunSonuOzet /></Layout>} />
-          <Route path="/raporlar/gun-sonu-detay" element={<Layout><GunSonuDetay /></Layout>} />
-          
-          {/* Ürün Raporları */}
-          <Route path="/raporlar/urun-bazli" element={<Layout><UrunBazliSatis /></Layout>} />
-          
-          {/* Kategori Raporları */}
-          <Route path="/raporlar/kategori-bazli" element={<Layout><KategoriBazliSatis /></Layout>} />
-          
-          {/* Gider Raporları */}
-          <Route path="/raporlar/gunluk-giderler" element={<Layout><GunlukGiderler /></Layout>} />
-          
-          {/* 3. ANA SAYFALAR */}
-          <Route path="/" element={<Layout><AnaEkran /></Layout>} />
-          <Route path="/ana" element={<Layout><AnaEkran /></Layout>} />
-          <Route path="/masalar" element={<Layout><Masalar /></Layout>} />
-          <Route path="/musteri-islemleri" element={<Layout><MusteriIslemleri /></Layout>} />
-          <Route path="/urun-stok" element={<Layout><UrunStokYonetimi /></Layout>} />
-          <Route path="/giderler" element={<Layout><Giderler /></Layout>} />
-          <Route path="/personel" element={<Layout><Personel /></Layout>} />
-          <Route path="/ayarlar" element={<Layout><Ayarlar /></Layout>} />
-          <Route path="/bilardo" element={<Layout><Bilardo /></Layout>} />
-          
-          {/* 4. 404 - EN ALTA */}
-          <Route
-            path="*"
-            element={
-              <Layout>
-                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-                  <div className="text-center">
-                    <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
-                    <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
-                    <a 
-                      href="/" 
-                      className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
-                    >
-                      Ana Sayfaya Dön
-                    </a>
-                  </div>
-                </div>
-              </Layout>
-            }
-          />
-        </Routes>
+  {/* 1. ÖZEL ROUTE'LAR */}
+  <Route path="/login" element={<Layout><Login /></Layout>} />
+  
+  {/* 2. PARAMETRELİ ROUTE'LAR */}
+  <Route path="/adisyon/:id" element={<Layout><Adisyon /></Layout>} />
+  <Route path="/masa-detay/:id" element={<Layout><MasaDetay /></Layout>} />
+  <Route path="/bilardo-adisyon/:id" element={<Layout><BilardoAdisyon /></Layout>} />
+  
+  {/* 3. RAPOR ROUTE'LARI - GUNSONU RAPOR ÖNCE */}
+  <Route path="/gun-sonu-rapor/:id" element={<Layout><GunSonuRapor /></Layout>} />
+  
+  {/* Diğer rapor route'ları */}
+  <Route path="/raporlar" element={<Layout><RaporlarDashboard /></Layout>} />
+  <Route path="/raporlar/dashboard" element={<Layout><RaporlarDashboard /></Layout>} />
+<Route path="/raporlar/masa-analizi" element={<Layout><MasaAnalizi /></Layout>} />
+  <Route path="/raporlar/gun-sonu" element={<Layout><GunSonuOzet /></Layout>} />
+  <Route path="/raporlar/gun-sonu-detay" element={<Layout><GunSonuDetay /></Layout>} />
+  <Route path="/raporlar/urun-bazli" element={<Layout><UrunBazliSatis /></Layout>} />
+  <Route path="/raporlar/kategori-bazli" element={<Layout><KategoriBazliSatis /></Layout>} />
+  <Route path="/raporlar/gunluk-giderler" element={<Layout><GunlukGiderler /></Layout>} />
+  
+  {/* 4. ANA SAYFALAR */}
+  <Route path="/" element={<Layout><AnaEkran /></Layout>} />
+  <Route path="/ana" element={<Layout><AnaEkran /></Layout>} />
+  <Route path="/masalar" element={<Layout><Masalar /></Layout>} />
+  <Route path="/musteri-islemleri" element={<Layout><MusteriIslemleri /></Layout>} />
+  <Route path="/urun-stok" element={<Layout><UrunStokYonetimi /></Layout>} />
+  <Route path="/giderler" element={<Layout><Giderler /></Layout>} />
+  <Route path="/personel" element={<Layout><Personel /></Layout>} />
+  <Route path="/ayarlar" element={<Layout><Ayarlar /></Layout>} />
+  <Route path="/bilardo" element={<Layout><Bilardo /></Layout>} />
+  
+  {/* 5. 404 - EN ALTA */}
+  <Route
+    path="*"
+    element={
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+          <div className="text-center">
+            <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
+            <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
+            <a 
+              href="/" 
+              className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
+            >
+              Ana Sayfaya Dön
+            </a>
+          </div>
+        </div>
+      </Layout>
+    }
+  />
+</Routes>
       </BrowserRouter>
     </ErrorBoundary>
   );

@@ -1,13 +1,16 @@
 /* /workspaces/MyCafe/admin-ui/src/pages/Raporlar/Dashboard/RaporlarDashboard.css */
-.raporlarDashboard {
+
+/* Ana container */
+.raporlar-dashboard {
   min-height: 100vh;
   background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 50%, #fde68a 100%);
-  padding: 16px;
+  padding: 24px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #4b2e05;
 }
 
-.dashboardWrapper {
-  max-width: 1280px;
+.dashboard-wrapper {
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -19,228 +22,114 @@
   font-size: 14px;
   color: #92400e;
   margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 
-.breadcrumbLink {
+.breadcrumb-link {
   display: flex;
   align-items: center;
+  gap: 6px;
   color: #92400e;
   text-decoration: none;
-}
-
-.breadcrumbLink:hover {
-  color: #4b2e05;
-}
-
-.breadcrumbSeparator {
-  color: #92400e;
-  opacity: 0.7;
-}
-
-.breadcrumbCurrent {
   font-weight: 500;
-  color: #4b2e05;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
-/* Başlık */
-.header {
+.breadcrumb-link:hover {
+  background-color: rgba(251, 191, 36, 0.1);
+}
+
+/* Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 32px;
 }
 
-.title {
+.dashboard-title {
   font-size: 32px;
   font-weight: bold;
   color: #4b2e05;
   margin: 0 0 8px 0;
 }
 
-.date {
-  font-size: 16px;
+.dashboard-date {
+  font-size: 14px;
   color: #92400e;
   display: flex;
   align-items: center;
+  gap: 8px;
   margin: 0;
 }
 
 /* Butonlar */
-.buttonPrimary {
+.button-group {
   display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  background: #d97706;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  gap: 12px;
 }
 
-.buttonPrimary:hover {
-  background: #b45309;
-}
-
-.buttonSecondary {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  background: white;
-  color: #92400e;
-  border: 1px solid #fbbf24;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.buttonSecondary:hover {
-  background: #fef3c7;
-}
-
-/* İstatistik Kartları */
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-@media (min-width: 768px) {
-  .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .statsGrid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.statCard {
-  padding: 20px;
-  border-radius: 12px;
-  color: white;
-  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-}
-
-.statContent {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.statLabel {
-  font-size: 14px;
-  opacity: 0.9;
-  margin: 0 0 4px 0;
-}
-
-.statValue {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0;
-}
-
-.statFooter {
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-/* Rapor Kartları */
-.cardsGrid {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-@media (min-width: 768px) {
-  .cardsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .cardsGrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.cardLink {
-  text-decoration: none;
-  display: block;
-}
-
-.card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  border: 1px solid #fed7aa;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-  border-color: #fbbf24;
-}
-
-.cardHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.cardIcon {
-  padding: 12px;
-  border-radius: 12px;
-  color: white;
-}
-
-.cardBadge {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 20px;
-}
-
-.cardTitle {
-  font-size: 18px;
-  font-weight: bold;
-  color: #1f2937;
-  margin: 0 0 8px 0;
-}
-
-.cardDescription {
-  font-size: 14px;
-  color: #6b7280;
-  margin: 0 0 16px 0;
-}
-
-.cardFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.cardLinkText {
-  font-size: 14px;
-  font-weight: 500;
-  color: #d97706;
-}
-
-.cardArrow {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #fef3c7;
+.button {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.button-primary {
+  background-color: #d97706;
+  color: white;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+}
+
+.button-primary:hover {
+  background-color: #b45309;
+  transform: translateY(-1px);
+}
+
+.button-secondary {
+  background-color: white;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.button-secondary:hover {
+  background-color: #fef3c7;
+  transform: translateY(-1px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .raporlar-dashboard {
+    padding: 12px;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .dashboard-title {
+    font-size: 24px;
+  }
+  
+  .button-group {
+    width: 100%;
+  }
+  
+  .button {
+    flex: 1;
+  }
 }
