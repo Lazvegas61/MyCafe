@@ -1,6 +1,6 @@
-// App.jsx - GÜNCELLENMİŞ VERSİYON
+// App.jsx - TAM DÜZELTİLMİŞ VERSİYON
 /* ------------------------------------------------------------
-   📌 App.jsx — MyCafe (FULL FINAL – GLOBAL POPUP ve BİLARDO SENKRONİZASYONU)
+   📌 App.jsx — MyCafe (FINAL - YENİ RAPOR YAPISI ENTEGRE)
 ------------------------------------------------------------ */
 
 import React, { useEffect, useRef, useState } from "react";
@@ -12,7 +12,7 @@ import {
 } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
-import GlobalSureBittiPopup from "./components/GlobalSureBittiPopup"; // YENİ EKLENDİ
+import GlobalSureBittiPopup from "./components/GlobalSureBittiPopup";
 import syncService from "./services/syncService";
 
 /* ------------------------------------------------------------
@@ -56,7 +56,7 @@ function loadInitialData() {
     });
   }
   
-  // BİLARDO MASALARI EKLENDİ
+  // BİLARDO MASALARI
   const bilardoMasalari = [];
   for (let i = 1; i <= 10; i++) {
     bilardoMasalari.push({
@@ -80,7 +80,7 @@ function loadInitialData() {
   localStorage.setItem("mc_masalar", JSON.stringify(tumMasalar));
   localStorage.setItem("mc_adisyonlar", JSON.stringify([]));
   
-  // BİLARDO VERİLERİNİ OLUŞTUR
+  // BİLARDO VERİLERİ
   const bilardoVerileri = [];
   for (let i = 1; i <= 10; i++) {
     bilardoVerileri.push({
@@ -231,7 +231,7 @@ function initializeSyncService() {
 }
 
 /* ------------------------------------------------------------
-   📌 SAYFA IMPORTLARI — DÜZELTİLDİ
+   📌 SAYFA IMPORTLARI — YENİ RAPOR YAPISI İLE
 ------------------------------------------------------------ */
 import Login from "./pages/Login/Login.jsx";
 import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
@@ -239,19 +239,35 @@ import Masalar from "./pages/Masalar/Masalar.jsx";
 import Adisyon from "./pages/Adisyon/Adisyon.jsx";
 import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx";
 import './pages/MusteriIslemleri/MusteriIslemleri.css';
-import UrunStokYonetimi from "./pages/UrunStokYonetimi.jsx";
-import Giderler from "./pages/Giderler.jsx";
+import UrunStokYonetimi from "./pages/UrunStokYonetimi/UrunStokYonetimi.jsx";
+import Giderler from './pages/Giderler/Giderler.jsx';
 import Personel from "./pages/Personel/Personel.jsx";
 import Ayarlar from "./pages/Ayarlar/Ayarlar.jsx";
 import Bilardo from "./pages/Bilardo/Bilardo";
 import BilardoAdisyon from "./pages/Bilardo/BilardoAdisyon.jsx";
-import ReportsIndex from "./pages/reports/ReportsIndex.jsx";
-import KategoriBazli from "./pages/reports/KategoriBazli.jsx";
-import UrunBazli from "./pages/reports/UrunBazli.jsx";
-import KasaRaporu from "./pages/reports/KasaRaporu.jsx";
-import MusteriBorcRaporu from "./pages/reports/MusteriBorcRaporu.jsx";
-import GiderRaporu from "./pages/reports/GiderRaporu.jsx";
-import MasaDetayRaporu from "./pages/reports/MasaDetayRaporu.jsx";
+
+// YENİ RAPOR SAYFALARI (DEFAULT EXPORT İLE)
+// Dashboard
+import RaporlarDashboard from "./pages/Raporlar/Dashboard/RaporlarDashboard.jsx";
+
+// Masa Raporları
+import MasaOturumRaporu from "./pages/Raporlar/MasaRaporlari/MasaOturumRaporu.jsx";
+import MasaOdemeDagilimi from "./pages/Raporlar/MasaRaporlari/MasaOdemeDagilimi.jsx";
+
+// Gün Sonu Raporları
+import GunSonuOzet from "./pages/Raporlar/GunSonu/GunSonuOzet.jsx";
+import GunSonuDetay from "./pages/Raporlar/GunSonu/GunSonuDetay.jsx";
+
+// Ürün Raporları
+import UrunBazliSatis from "./pages/Raporlar/UrunRaporlari/UrunBazliSatis.jsx";
+
+// Kategori Raporları
+import KategoriBazliSatis from "./pages/Raporlar/KategoriRaporlari/KategoriBazliSatis.jsx";
+
+// Gider Raporları
+import GunlukGiderler from "./pages/Raporlar/GiderRaporlari/GunlukGiderler.jsx";
+
+// Diğer Sayfalar
 import MasaDetay from "./pages/Masalar/MasaDetay.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -327,8 +343,10 @@ function initializeGlobalEventListeners() {
     STOK_GUNCELLENDI: 'stokGuncellendi',
     KRITIK_STOK: 'kritikStok',
     
-    // RAPOR EVENT'LERİ
-    RAPOR_GUNCELLENDI: 'raporGuncellendi',
+    // RAPOR EVENT'LERİ (YENİ)
+    RAPOR_OLUSTURULDU: 'raporOlusturuldu',
+    RAPOR_EXPORT: 'raporExport',
+    RAPOR_SILINDI: 'raporSilindi',
     
     // GİDER EVENT'LERİ
     GİDER_EKLENDI: 'giderEklendi',
@@ -368,7 +386,7 @@ function initializeGlobalEventListeners() {
       });
     }
     else if (key === 'bilardo_adisyonlar') {
-      window.dispatchGlobalEvent(globalEvents.BİLARDO_ADISYON_GUNCELLENDI, { 
+      window.dispatchGlobalEvent(globalEvents.BİLARDO_ADİSYON_GUNCELLENDI, { 
         type: 'storage_update', 
         key: key 
       });
@@ -393,6 +411,13 @@ function initializeGlobalEventListeners() {
     }
     else if (key === 'mc_giderler') {
       window.dispatchGlobalEvent(globalEvents.GİDER_EKLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
+    else if (key.startsWith('mc_rapor_')) {
+      // Rapor event'leri
+      window.dispatchGlobalEvent(globalEvents.RAPOR_OLUSTURULDU, { 
         type: 'storage_update', 
         key: key 
       });
@@ -552,7 +577,7 @@ function Layout({ children }) {
 }
 
 /* ------------------------------------------------------------
-   🚀 ROOT APP — ANA SAYFA DÜZELTİLDİ
+   🚀 ROOT APP — ANA SAYFA (YENİ RAPOR YAPISI İLE)
 ------------------------------------------------------------ */
 export default function App() {
   const syncInitializedRef = useRef(false);
@@ -667,13 +692,28 @@ export default function App() {
           {/* BİLARDO ADİSYON */}
           <Route path="/bilardo-adisyon/:id" element={<Layout><BilardoAdisyon /></Layout>} />
           
-          {/* RAPOR ALT SAYFALARI */}
-          <Route path="/raporlar/kategori-satis" element={<Layout><KategoriBazli /></Layout>} />
-          <Route path="/raporlar/urun-satis" element={<Layout><UrunBazli /></Layout>} />
-          <Route path="/raporlar/kasa" element={<Layout><KasaRaporu /></Layout>} />
-          <Route path="/raporlar/musteri-borc" element={<Layout><MusteriBorcRaporu /></Layout>} />
-          <Route path="/raporlar/gider-raporu" element={<Layout><GiderRaporu /></Layout>} />
-          <Route path="/raporlar/masa-detay" element={<Layout><MasaDetayRaporu /></Layout>} />
+          {/* YENİ RAPOR ROUTE'LARI - YENİ YAPINIZA GÖRE */}
+          
+          {/* Raporlar Dashboard */}
+          <Route path="/raporlar" element={<Layout><RaporlarDashboard /></Layout>} />
+          <Route path="/raporlar/dashboard" element={<Layout><RaporlarDashboard /></Layout>} />
+          
+          {/* Masa Raporları */}
+          <Route path="/raporlar/masa-oturum" element={<Layout><MasaOturumRaporu /></Layout>} />
+          <Route path="/raporlar/masa-odeme" element={<Layout><MasaOdemeDagilimi /></Layout>} />
+          
+          {/* Gün Sonu Raporları */}
+          <Route path="/raporlar/gun-sonu" element={<Layout><GunSonuOzet /></Layout>} />
+          <Route path="/raporlar/gun-sonu-detay" element={<Layout><GunSonuDetay /></Layout>} />
+          
+          {/* Ürün Raporları */}
+          <Route path="/raporlar/urun-bazli" element={<Layout><UrunBazliSatis /></Layout>} />
+          
+          {/* Kategori Raporları */}
+          <Route path="/raporlar/kategori-bazli" element={<Layout><KategoriBazliSatis /></Layout>} />
+          
+          {/* Gider Raporları */}
+          <Route path="/raporlar/gunluk-giderler" element={<Layout><GunlukGiderler /></Layout>} />
           
           {/* 3. ANA SAYFALAR */}
           <Route path="/" element={<Layout><AnaEkran /></Layout>} />
@@ -682,7 +722,6 @@ export default function App() {
           <Route path="/musteri-islemleri" element={<Layout><MusteriIslemleri /></Layout>} />
           <Route path="/urun-stok" element={<Layout><UrunStokYonetimi /></Layout>} />
           <Route path="/giderler" element={<Layout><Giderler /></Layout>} />
-          <Route path="/raporlar" element={<Layout><ReportsIndex /></Layout>} />
           <Route path="/personel" element={<Layout><Personel /></Layout>} />
           <Route path="/ayarlar" element={<Layout><Ayarlar /></Layout>} />
           <Route path="/bilardo" element={<Layout><Bilardo /></Layout>} />
@@ -692,9 +731,17 @@ export default function App() {
             path="*"
             element={
               <Layout>
-                <div style={{ padding: "50px", textAlign: "center" }}>
-                  <h1>404 - Sayfa Bulunamadı</h1>
-                  <p>Ana sayfaya yönlendiriliyorsunuz...</p>
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+                  <div className="text-center">
+                    <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
+                    <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
+                    <a 
+                      href="/" 
+                      className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
+                    >
+                      Ana Sayfaya Dön
+                    </a>
+                  </div>
                 </div>
               </Layout>
             }

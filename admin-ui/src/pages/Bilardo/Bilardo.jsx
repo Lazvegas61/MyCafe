@@ -1,9 +1,9 @@
-// admin-ui/src/pages/Bilardo/Bilardo.jsx - 404 HATASI ÇÖZÜLDÜ
+// admin-ui/src/pages/Bilardo/Bilardo.jsx - SÜRE UZATMA MANTIĞI GÜNCELLENDİ
 /* ------------------------------------------------------------
-   📌 Bilardo.jsx — 404 HATASI ÇÖZÜLDÜ
-   - Aktarım sonrası direkt Masalar sayfasına yönlendirme
-   - Tüm gereksiz popup'lar kaldırıldı
-   - UZAT butonu eklendi
+   📌 Bilardo.jsx — YENİ SÜRE UZATMA MANTIĞI
+   - İlk açılış: Normal bilardo ücreti (80₺ veya 120₺)
+   - Süre uzatma: Dakika başı ücret eklenir
+   - Tasarımlar korundu, sadece süre bitimi popup'ı kaldı
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
@@ -65,8 +65,6 @@ export default function Bilardo() {
         e.preventDefault();
       }
       
-      console.log("🔧 Masayı aktar modalı açılıyor:", masa);
-      
       // TÜM MASALARI YÜKLE (dolu olanlar dahil)
       const masalarData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
       
@@ -110,7 +108,8 @@ export default function Bilardo() {
             acilisSaati: null,
             ucret: 0,
             aktifAdisyonId: null,
-            uzatmaSayisi: 0
+            uzatmaSayisi: 0,
+            uzatmaBaslangicZamani: null // Yeni: Uzatma başlangıç zamanı
           });
         }
         bilardoData = yeniMasalar;
@@ -134,8 +133,9 @@ export default function Bilardo() {
         
         if (masaAdisyonu && masaAdisyonu.durum === "ACIK") {
           const now = Date.now();
-          const gecenDakika = masaAdisyonu.acilisZamani ? 
-            Math.floor((now - masaAdisyonu.acilisZamani) / 60000) : 0;
+          const acilisZamani = masaAdisyonu.acilisZamani || masa.acilisSaati;
+          const gecenDakika = acilisZamani ? 
+            Math.floor((now - acilisZamani) / 60000) : 0;
           
           // ANLIK ÜCRET HESAPLA
           let anlikUcret = 0;
@@ -143,23 +143,32 @@ export default function Bilardo() {
           const bilardo1saat = ayarlar.bilardo1saat || 120;
           const bilardoDakikaUcreti = ayarlar.bilardoDakikaUcreti || 2;
           
-          switch(masaAdisyonu.sureTipi) {
-            case "30dk":
-              anlikUcret = bilardo30dk;
-              break;
-            case "1saat":
-              anlikUcret = bilardo1saat;
-              break;
-            case "suresiz":
-              if (gecenDakika <= 30) {
+          // YENİ MANTIK: Uzatma durumuna göre hesapla
+          if (masaAdisyonu.uzatmaDurumu === true && masa.uzatmaBaslangicZamani) {
+            // UZATMA DURUMUNDA: Dakika başı ücret
+            const uzatmaBaslangic = masa.uzatmaBaslangicZamani;
+            const uzatmaGecenDakika = Math.floor((now - uzatmaBaslangic) / 60000);
+            anlikUcret = masaAdisyonu.baslangicUcreti + (uzatmaGecenDakika * bilardoDakikaUcreti);
+          } else {
+            // NORMAL DURUM: Orijinal hesaplama
+            switch(masaAdisyonu.sureTipi) {
+              case "30dk":
                 anlikUcret = bilardo30dk;
-              } else {
-                const ekDakika = gecenDakika - 30;
-                anlikUcret = bilardo30dk + (Math.ceil(ekDakika) * bilardoDakikaUcreti);
-              }
-              break;
-            default:
-              anlikUcret = 0;
+                break;
+              case "1saat":
+                anlikUcret = bilardo1saat;
+                break;
+              case "suresiz":
+                if (gecenDakika <= 30) {
+                  anlikUcret = bilardo30dk;
+                } else {
+                  const ekDakika = gecenDakika - 30;
+                  anlikUcret = bilardo30dk + (Math.ceil(ekDakika) * bilardoDakikaUcreti);
+                }
+                break;
+              default:
+                anlikUcret = 0;
+            }
           }
           
           // Ek ürünlerin toplamını hesapla
@@ -174,6 +183,7 @@ export default function Bilardo() {
           if (adisyonIndex !== -1) {
             adisyonlar[adisyonIndex].bilardoUcret = anlikUcret;
             adisyonlar[adisyonIndex].toplamTutar = toplamTutar;
+            adisyonlar[adisyonIndex].gecenDakika = gecenDakika;
             localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
           }
           
@@ -185,14 +195,15 @@ export default function Bilardo() {
             acik: true,
             durum: "ACIK",
             sureTipi: masaAdisyonu.sureTipi,
-            acilisSaati: masaAdisyonu.acilisZamani,
+            acilisSaati: acilisZamani,
             aktifAdisyonId: masaAdisyonu.id,
             ucret: anlikUcret,
             ekUrunToplam: ekUrunToplam,
             toplamTutar: toplamTutar,
             gecenDakika: gecenDakika,
             ekUrunSayisi: ekUrunler.length,
-            uzatmaSayisi: masa.uzatmaSayisi || 0
+            uzatmaSayisi: masa.uzatmaSayisi || 0,
+            uzatmaBaslangicZamani: masa.uzatmaBaslangicZamani || null
           };
         }
         
@@ -202,7 +213,8 @@ export default function Bilardo() {
           toplamTutar: 0,
           gecenDakika: 0,
           ekUrunSayisi: 0,
-          uzatmaSayisi: 0
+          uzatmaSayisi: 0,
+          uzatmaBaslangicZamani: null
         };
       });
       
@@ -237,7 +249,8 @@ export default function Bilardo() {
         no: masaNo || adisyon.bilardoMasaNo,
         musteriAdi: adisyon.musteriAdi || "Bilardo Müşterisi",
         urunSayisi: (adisyon.ekUrunler || []).length,
-        isBilardo: true
+        isBilardo: true,
+        uzatmaDurumu: adisyon.uzatmaDurumu || false
       };
       
       // Var mı kontrol et
@@ -298,7 +311,8 @@ export default function Bilardo() {
       acilisSaati: null,
       ucret: 0,
       aktifAdisyonId: null,
-      uzatmaSayisi: 0
+      uzatmaSayisi: 0,
+      uzatmaBaslangicZamani: null
     };
     
     const yeniMasalar = [...masalar, yeniMasa];
@@ -344,6 +358,9 @@ export default function Bilardo() {
   };
   
   const masaAc = (masa, tip, index) => {
+    // İlk açılış ücreti
+    const baslangicUcreti = ucretHesapla(tip, 0);
+    
     // Yeni bilardo adisyonu oluştur
     const yeniAdisyon = {
       id: `bilardo_${Date.now()}`,
@@ -355,13 +372,16 @@ export default function Bilardo() {
       durum: "ACIK",
       gecenDakika: 0,
       hesaplananUcret: 0,
-      bilardoUcret: ucretHesapla(tip, 0),
+      bilardoUcret: baslangicUcreti,
+      baslangicUcreti: baslangicUcreti, // Yeni: Başlangıç ücretini kaydet
       ekUrunler: [],
       odemeler: [],
       toplamOdenen: 0,
-      toplamTutar: ucretHesapla(tip, 0),
+      toplamTutar: baslangicUcreti,
       not: "",
-      uzatmaSayisi: 0
+      uzatmaSayisi: 0,
+      uzatmaDurumu: false, // Yeni: Uzatma durumu
+      uzatmaBaslangicZamani: null // Yeni: Uzatma başlangıç zamanı
     };
     
     // Adisyonları kaydet
@@ -379,9 +399,10 @@ export default function Bilardo() {
             sureTipi: tip,
             acilisSaati: Date.now(),
             aktifAdisyonId: yeniAdisyon.id,
-            ucret: ucretHesapla(tip, 0),
-            toplamTutar: ucretHesapla(tip, 0),
-            uzatmaSayisi: 0
+            ucret: baslangicUcreti,
+            toplamTutar: baslangicUcreti,
+            uzatmaSayisi: 0,
+            uzatmaBaslangicZamani: null
           }
         : m
     );
@@ -390,7 +411,7 @@ export default function Bilardo() {
     localStorage.setItem("bilardo", JSON.stringify(updated));
     
     // Açık adisyonlara ekle
-    updateAcikAdisyonlar(yeniAdisyon, ucretHesapla(tip, 0), 0, 0, `B${index + 1}`);
+    updateAcikAdisyonlar(yeniAdisyon, baslangicUcreti, 0, 0, `B${index + 1}`);
     
     // DİREKT ADİSYONA YÖNLENDİR
     setTimeout(() => {
@@ -415,7 +436,7 @@ export default function Bilardo() {
   };
 
   /* ============================================================
-     📌 5. MASAYA AKTARIM - DÜZELTİLDİ (404 HATASI ÇÖZÜLDÜ)
+     📌 5. MASAYA AKTARIM
   ============================================================ */
   
   const masaAktar = () => {
@@ -426,9 +447,6 @@ export default function Bilardo() {
     }
     
     try {
-      /* ===============================
-         1. BİLARDO ADİSYONUNU BUL
-      =============================== */
       const bilardoAdisyonlar = JSON.parse(
         localStorage.getItem("bilardo_adisyonlar") || "[]"
       );
@@ -444,9 +462,6 @@ export default function Bilardo() {
       const ekUrunler = bilardoAdisyon.ekUrunler || [];
       const ekUrunToplam = ekUrunler.reduce((sum, u) => sum + (u.fiyat * u.adet), 0);
 
-      /* ===============================
-         2. HEDEF MASA ADİSYONU
-      =============================== */
       const mcAdisyonlar = JSON.parse(
         localStorage.getItem("mc_adisyonlar") || "[]"
       );
@@ -474,9 +489,6 @@ export default function Bilardo() {
         mcAdisyonlar.push(hedefAdisyon);
       }
 
-      /* ===============================
-         3. 🎱 BİLARDO ÜCRET KALEMİ
-      =============================== */
       const timestamp = Date.now();
 
       const bilardoKalemiVarMi = hedefAdisyon.kalemler?.some(
@@ -507,9 +519,6 @@ export default function Bilardo() {
         });
       }
 
-      /* ===============================
-         4. EK ÜRÜNLER
-      =============================== */
       ekUrunler.forEach((urun, i) => {
         if (!hedefAdisyon.kalemler) {
           hedefAdisyon.kalemler = [];
@@ -533,9 +542,6 @@ export default function Bilardo() {
         });
       });
 
-      /* ===============================
-         5. TOPLAMLAR
-      =============================== */
       hedefAdisyon.toplamTutar = (hedefAdisyon.kalemler || []).reduce(
         (s, k) => s + Number(k.toplam || 0),
         0
@@ -548,9 +554,6 @@ export default function Bilardo() {
 
       hedefAdisyon.kalanTutar = hedefAdisyon.toplamTutar - hedefAdisyon.odenenTutar;
 
-      /* ===============================
-         6. NOT (BİLARDO BİLGİSİ BURADA)
-      =============================== */
       const bilardoNot = `🎱 Bilardo Masa ${bilardoMasa.no} Transfer Edildi\n` +
                          `• Süre Tipi: ${bilardoAdisyon.sureTipi === "30dk" ? "30 Dakika" : 
                                        bilardoAdisyon.sureTipi === "1saat" ? "1 Saat" : "Süresiz"}\n` +
@@ -570,9 +573,6 @@ export default function Bilardo() {
       hedefAdisyon.bilardoEkUrunToplam = ekUrunToplam;
       hedefAdisyon.bilardoGecenDakika = gecenDakika;
 
-      /* ===============================
-         7. KAYDET - MC ADİSYONLARINI GÜNCELLE
-      =============================== */
       const adisyonIndex = mcAdisyonlar.findIndex(a => a.id === hedefAdisyon.id);
       if (adisyonIndex !== -1) {
         mcAdisyonlar[adisyonIndex] = hedefAdisyon;
@@ -580,9 +580,6 @@ export default function Bilardo() {
       
       localStorage.setItem("mc_adisyonlar", JSON.stringify(mcAdisyonlar));
 
-      /* ===============================
-         8. MASA DURUMUNU GÜNCELLE
-      =============================== */
       const masalarData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
       const updatedMasalar = masalarData.map(m => {
         if (m.id === seciliMasa.id) {
@@ -605,9 +602,6 @@ export default function Bilardo() {
       
       localStorage.setItem("mc_masalar", JSON.stringify(updatedMasalar));
 
-      /* ===============================
-         9. BİLARDO ADİSYONUNU KAPAT
-      =============================== */
       const bilardoAdisyonIndex = bilardoAdisyonlar.findIndex(
         a => a.id === bilardoAdisyon.id
       );
@@ -623,9 +617,6 @@ export default function Bilardo() {
         );
       }
 
-      /* ===============================
-         10. BİLARDO MASASINI KAPAT
-      =============================== */
       const updatedBilardoMasalar = masalar.map((m, i) => 
         i === bilardoMasa.index 
           ? { 
@@ -638,7 +629,8 @@ export default function Bilardo() {
               aktifAdisyonId: null,
               ekUrunToplam: 0,
               toplamTutar: 0,
-              uzatmaSayisi: 0
+              uzatmaSayisi: 0,
+              uzatmaBaslangicZamani: null
             }
           : m
       );
@@ -646,11 +638,7 @@ export default function Bilardo() {
       setMasalar(updatedBilardoMasalar);
       localStorage.setItem("bilardo", JSON.stringify(updatedBilardoMasalar));
 
-      /* ===============================
-         11. AÇIK ADİSYONLARI GÜNCELLE
-      =============================== */
       const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-      
       const filteredAcikAdisyonlar = acikAdisyonlar.filter(a => a.id !== bilardoMasa.aktifAdisyonId);
       
       const yeniAcikAdisyon = {
@@ -683,9 +671,6 @@ export default function Bilardo() {
       
       localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(filteredAcikAdisyonlar));
 
-      /* ===============================
-         12. MODALI KAPAT VE EVENT TETİKLE
-      =============================== */
       setAktarimModal({ acik: false, bilardoMasa: null, seciliMasa: null, normalMasalar: [] });
       
       window.dispatchEvent(new CustomEvent('masaGuncellendi', {
@@ -697,20 +682,16 @@ export default function Bilardo() {
         }
       }));
 
-      /* ===============================
-         13. DİREKT MASALAR SAYFASINA YÖNLENDİR (404 HATASI ÇÖZÜLDÜ)
-      =============================== */
       navigate("/masalar");
       
     } catch (err) {
       console.error("Bilardo → Masa aktarım hatası:", err);
-      // Hata durumunda da Masalar sayfasına yönlendir
       navigate("/masalar");
     }
   };
 
   /* ============================================================
-     📌 6. SÜRE UZATMA FONKSİYONLARI
+     📌 6. SÜRE UZATMA FONKSİYONLARI - YENİ MANTIK
   ============================================================ */
   
   const uzatModalAc = (masa, index) => {
@@ -738,27 +719,34 @@ export default function Bilardo() {
       const adisyon = adisyonlar[adisyonIndex];
       
       // 2. Uzatma için NOT ekle
-      const uzatmaNotu = `⏱️ SÜRE UZATMA: ${uzatmaTipi === "30dk" ? "30 Dakika" : "1 Saat"}\n` +
+      const uzatmaNotu = `⏱️ SÜRE UZATMA BAŞLATILDI\n` +
+                        `• Uzatma Tipi: ${uzatmaTipi === "30dk" ? "30 Dakika" : "1 Saat"}\n` +
                         `• Uzatma Tarihi: ${new Date().toLocaleString('tr-TR')}\n` +
                         `• Uzatma Sayısı: ${(masa.uzatmaSayisi || 0) + 1}\n` +
-                        `• NOT: Peşin ücret alınmadı, adisyon kapanırken tahsil edilecek.`;
+                        `• NOT: Dakika başı ücret uygulanacak (${ucretAyarlari?.bilardoDakikaUcreti || 2}₺/dk)`;
       
       adisyon.not = adisyon.not ? `${adisyon.not}\n\n${uzatmaNotu}` : uzatmaNotu;
       
-      // 3. Uzatma sayısını güncelle
+      // 3. Uzatma durumunu aktif et
       const yeniUzatmaSayisi = (masa.uzatmaSayisi || 0) + 1;
+      const simdi = Date.now();
       
-      // 4. Adisyonu güncelle
+      // 4. Adisyonu güncelle (uzatma durumunu aktif et)
+      adisyon.uzatmaDurumu = true;
+      adisyon.uzatmaSayisi = yeniUzatmaSayisi;
+      adisyon.uzatmaBaslangicZamani = simdi;
       adisyonlar[adisyonIndex] = adisyon;
       localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
       
-      // 5. Masayı güncelle
+      // 5. Masayı güncelle (uzatma başlangıç zamanını kaydet)
       const updatedMasalar = masalar.map((m, i) =>
         i === index
           ? {
               ...m,
-              sureTipi: uzatmaTipi,
               uzatmaSayisi: yeniUzatmaSayisi,
+              uzatmaBaslangicZamani: simdi,
+              // NOT: Burada ücret güncellemesi YAPMIYORUZ
+              // Ücret, anlık hesaplama ile otomatik güncellenecek
             }
           : m
       );
@@ -787,19 +775,13 @@ export default function Bilardo() {
       if (masa.acik && masa.acilisSaati) {
         const gecenDakika = Math.floor((now - masa.acilisSaati) / 60000);
         
-        if (masa.sureTipi === "30dk" && gecenDakika >= 30) {
+        // SADECE SÜRELİ OYUNLARDA (30dk veya 1saat) VE UZATMA DURUMU YOKSA
+        if ((masa.sureTipi === "30dk" && gecenDakika >= 30 && !masa.uzatmaBaslangicZamani) ||
+            (masa.sureTipi === "1saat" && gecenDakika >= 60 && !masa.uzatmaBaslangicZamani)) {
           yeniPopup = {
             masaId: masa.id,
             masaNo: masa.no,
-            mesaj: "30 dakika süresi doldu!",
-            timestamp: now,
-            uzatmaGerekli: true
-          };
-        } else if (masa.sureTipi === "1saat" && gecenDakika >= 60) {
-          yeniPopup = {
-            masaId: masa.id,
-            masaNo: masa.no,
-            mesaj: "1 saat süresi doldu!",
+            mesaj: masa.sureTipi === "30dk" ? "30 dakika süresi doldu!" : "1 saat süresi doldu!",
             timestamp: now,
             uzatmaGerekli: true
           };
@@ -903,17 +885,17 @@ export default function Bilardo() {
           <div className="bilardo-ucret-item">
             <span>30 Dakika</span>
             <strong>{ucretAyarlari.bilardo30dk || 80}₺</strong>
-            <small>30dk'dan önce kapanırsa da aynı</small>
+            <small>İlk 30dk ücreti</small>
           </div>
           <div className="bilardo-ucret-item">
             <span>1 Saat</span>
             <strong>{ucretAyarlari.bilardo1saat || 120}₺</strong>
-            <small>Saatlik ücret</small>
+            <small>İlk saat ücreti</small>
           </div>
           <div className="bilardo-ucret-item">
-            <span>Süresiz</span>
-            <strong>{ucretAyarlari.bilardo30dk || 80}₺</strong>
-            <small>+ {ucretAyarlari.bilardoDakikaUcreti || 2}₺/dk (30dk sonrası)</small>
+            <span>Dakika Ücreti</span>
+            <strong>{ucretAyarlari.bilardoDakikaUcreti || 2}₺/dk</strong>
+            <small>Uzatma sonrası dakika başı</small>
           </div>
         </div>
       )}
@@ -926,6 +908,7 @@ export default function Bilardo() {
           const ekUrunSayisi = masa.ekUrunSayisi || 0;
           const ekUrunToplam = masa.ekUrunToplam || 0;
           const uzatmaSayisi = masa.uzatmaSayisi || 0;
+          const uzatmaDurumunda = masa.uzatmaBaslangicZamani !== null;
           
           return (
             <div 
@@ -956,6 +939,16 @@ export default function Bilardo() {
                   {masa.acik ? "ANLIK ÜCRET" : "SON ÜCRET"}
                 </div>
                 <div className="tutar">{bilardoUcret.toFixed(2)}₺</div>
+                {uzatmaDurumunda && (
+                  <div className="uzatma-aciklama" style={{
+                    fontSize: '11px',
+                    color: '#ff9800',
+                    marginTop: '3px',
+                    fontWeight: '600'
+                  }}>
+                    (Dakika ücreti işliyor)
+                  </div>
+                )}
               </div>
               
               {/* TOPLAM TUTAR (Bilardo + Ek Ürünler) */}
@@ -966,8 +959,8 @@ export default function Bilardo() {
                 </div>
               )}
               
-              {/* UZATMA SAYISI */}
-              {uzatmaSayisi > 0 && (
+              {/* UZATMA DURUMU */}
+              {uzatmaDurumunda && (
                 <div style={{
                   margin: "5px 0",
                   padding: "5px 10px",
@@ -978,6 +971,22 @@ export default function Bilardo() {
                   textAlign: "center",
                   fontWeight: "600",
                   border: "1px solid #ffb74d"
+                }}>
+                  🔄 UZATMA AKTİF ({uzatmaSayisi}. kez)
+                </div>
+              )}
+              
+              {uzatmaSayisi > 0 && !uzatmaDurumunda && (
+                <div style={{
+                  margin: "5px 0",
+                  padding: "5px 10px",
+                  background: "#e8f5e9",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  color: "#2e7d32",
+                  textAlign: "center",
+                  fontWeight: "600",
+                  border: "1px solid #81c784"
                 }}>
                   🔄 {uzatmaSayisi} kez uzatıldı
                 </div>
@@ -1006,15 +1015,18 @@ export default function Bilardo() {
                 <div style={{
                   margin: "10px 0",
                   padding: "8px 12px",
-                  background: "linear-gradient(135deg, #e3f2fd, #bbdefb)",
+                  background: uzatmaDurumunda 
+                    ? "linear-gradient(135deg, #fff3e0, #ffe0b2)" 
+                    : "linear-gradient(135deg, #e3f2fd, #bbdefb)",
                   borderRadius: "8px",
                   fontSize: "14px",
-                  color: "#1565c0",
+                  color: uzatmaDurumunda ? "#ef6c00" : "#1565c0",
                   textAlign: "center",
                   fontWeight: "600",
-                  border: "1px solid #90caf9"
+                  border: `1px solid ${uzatmaDurumunda ? "#ffb74d" : "#90caf9"}`
                 }}>
                   ⏱️ {masa.gecenDakika} dakika geçti
+                  {uzatmaDurumunda && " (uzatma aktif)"}
                 </div>
               )}
               
@@ -1084,16 +1096,19 @@ export default function Bilardo() {
                   
                   {/* ÜCRET AÇIKLAMASI */}
                   <div className="bilardo-ucret-aciklama">
-                    {masa.sureTipi === "30dk" && `30 dakika ücreti: ${ucretAyarlari?.bilardo30dk || 80}₺`}
-                    {masa.sureTipi === "1saat" && `1 saat ücreti: ${ucretAyarlari?.bilardo1saat || 120}₺`}
-                    {masa.sureTipi === "suresiz" && 
-                      `İlk 30dk: ${ucretAyarlari?.bilardo30dk || 80}₺ + Sonrası: ${ucretAyarlari?.bilardoDakikaUcreti || 2}₺/dk`}
+                    {uzatmaDurumunda ? (
+                      `Dakika ücreti: ${ucretAyarlari?.bilardoDakikaUcreti || 2}₺/dk`
+                    ) : (
+                      masa.sureTipi === "30dk" ? `30 dakika ücreti: ${ucretAyarlari?.bilardo30dk || 80}₺` :
+                      masa.sureTipi === "1saat" ? `1 saat ücreti: ${ucretAyarlari?.bilardo1saat || 120}₺` :
+                      `İlk 30dk: ${ucretAyarlari?.bilardo30dk || 80}₺ + Sonrası: ${ucretAyarlari?.bilardoDakikaUcreti || 2}₺/dk`
+                    )}
                   </div>
                   
                   {/* AKTARIM ve UZATMA BUTONLARI */}
                   <div className="bilardo-aktarim-buttons">
-                    {/* SÜRELİ OYUNLARDA UZAT BUTONU */}
-                    {(masa.sureTipi === "30dk" || masa.sureTipi === "1saat") && (
+                    {/* SÜRELİ OYUNLARDA UZAT BUTONU (Uzatma durumunda değilse) */}
+                    {(masa.sureTipi === "30dk" || masa.sureTipi === "1saat") && !uzatmaDurumunda && (
                       <button
                         className="bilardo-uzat-btn"
                         onClick={(e) => { 
@@ -1126,6 +1141,28 @@ export default function Bilardo() {
                       </button>
                     )}
                     
+                    {/* UZATMA DURUMUNDA "UZATMA AKTİF" BUTONU */}
+                    {uzatmaDurumunda && (
+                      <button
+                        className="bilardo-uzat-btn"
+                        style={{
+                          background: 'linear-gradient(135deg, #ff9800, #f57c00)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '10px 15px',
+                          borderRadius: '8px',
+                          fontWeight: '700',
+                          fontSize: '14px',
+                          flex: '1',
+                          marginRight: '5px',
+                          cursor: 'default',
+                          opacity: 0.8
+                        }}
+                      >
+                        🔄 UZATMA AKTİF
+                      </button>
+                    )}
+                    
                     <button
                       className="bilardo-oyun-bitir-btn"
                       onClick={(e) => { 
@@ -1142,7 +1179,7 @@ export default function Bilardo() {
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}
                       style={{
-                        flex: masa.sureTipi === "suresiz" ? '1' : '1',
+                        flex: (masa.sureTipi === "suresiz" || uzatmaDurumunda) ? '1' : '1',
                         marginRight: '5px'
                       }}
                     >
@@ -1298,11 +1335,8 @@ export default function Bilardo() {
                 }}
               >
                 <span style={{ fontSize: '18px', fontWeight: '800', color: '#1565c0' }}>30 DAKİKA</span>
-                <span style={{ fontSize: '16px', fontWeight: '700', color: '#0d47a1', marginTop: '5px' }}>
-                  {ucretAyarlari?.bilardo30dk || 80}₺
-                </span>
-                <span style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                  (Adisyon kapanırken tahsil)
+                <span style={{ fontSize: '12px', color: '#666', marginTop: '5px', textAlign: 'center' }}>
+                  (Dakika ücreti başlat)
                 </span>
               </button>
               
@@ -1330,11 +1364,8 @@ export default function Bilardo() {
                 }}
               >
                 <span style={{ fontSize: '18px', fontWeight: '800', color: '#2e7d32' }}>1 SAAT</span>
-                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1b5e20', marginTop: '5px' }}>
-                  {ucretAyarlari?.bilardo1saat || 120}₺
-                </span>
-                <span style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                  (Adisyon kapanırken tahsil)
+                <span style={{ fontSize: '12px', color: '#666', marginTop: '5px', textAlign: 'center' }}>
+                  (Dakika ücreti başlat)
                 </span>
               </button>
             </div>
@@ -1347,12 +1378,25 @@ export default function Bilardo() {
               border: '1px solid #ffcc80'
             }}>
               <div style={{ fontSize: '14px', color: '#ef6c00', fontWeight: '600' }}>
-                💡 ÖNEMLİ NOT:
+                💡 YENİ SÜRE UZATMA MANTIĞI:
               </div>
               <div style={{ fontSize: '13px', color: '#666', marginTop: '5px' }}>
-                • Uzatma ücreti peşin alınmaz, adisyon kapanırken tahsil edilir.<br/>
-                • Uzatma sayısı notlara kaydedilir.<br/>
-                • Süre sıfırlanmaz, eklenir.
+                1. İlk açılış ücreti: {ucretAyarlari?.bilardo30dk || 80}₺ (30dk) veya {ucretAyarlari?.bilardo1saat || 120}₺ (1saat)<br/>
+                2. Uzatma sonrası: Dakika başı {ucretAyarlari?.bilardoDakikaUcreti || 2}₺ ücreti<br/>
+                3. Ücret adisyon kapanırken otomatik hesaplanır<br/>
+                4. Her uzatmada dakika sayacı sıfırlanmaz, eklenir
+              </div>
+            </div>
+            
+            <div style={{ 
+              padding: '10px', 
+              background: '#e3f2fd', 
+              borderRadius: '6px',
+              marginBottom: '15px',
+              border: '1px solid #bbdefb'
+            }}>
+              <div style={{ fontSize: '13px', color: '#1565c0', textAlign: 'center' }}>
+                Örnek: İlk 30dk = {ucretAyarlari?.bilardo30dk || 80}₺ + 15dk uzatma = +{((ucretAyarlari?.bilardoDakikaUcreti || 2) * 15).toFixed(2)}₺
               </div>
             </div>
             

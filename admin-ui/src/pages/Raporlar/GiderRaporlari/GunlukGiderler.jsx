@@ -1,0 +1,13 @@
+// GunlukGiderler.jsx - DEFAULT EXPORT
+import React from 'react';
+
+const GunlukGiderler = () => {
+  return (
+    <div className="p-6">
+      <h1 className="text-3xl font-bold text-amber-900 mb-6">💰 Günlük Giderler Raporu</h1>
+      <p className="text-amber-700">Günlük giderler raporu burada olacak.</p>
+    </div>
+  );
+};
+
+export default GunlukGiderler;
