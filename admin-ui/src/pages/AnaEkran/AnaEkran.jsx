@@ -10,6 +10,29 @@ export default function AnaEkran() {
     openTables: []
   });
   
+  // GÜN DURUMU STATE'LERİ
+  const [gunDurumu, setGunDurumu] = useState(() => {
+    return localStorage.getItem('mycafe_gun_durumu') || 'kapali';
+  });
+
+  const [gunBaslangicZamani, setGunBaslangicZamani] = useState(() => {
+    const saved = localStorage.getItem('mycafe_gun_baslangic');
+    return saved ? new Date(saved) : null;
+  });
+
+  const [gunBilgileri, setGunBilgileri] = useState(() => {
+    const saved = localStorage.getItem('mycafe_gun_bilgileri');
+    return saved ? JSON.parse(saved) : {
+      baslangicKasa: 0,
+      nakitGiris: 0,
+      krediKarti: 0,
+      toplamAdisyon: 0,
+      acikAdisyon: 0,
+      gunlukSatis: 0,
+      baslangicTarih: null
+    };
+  });
+  
   const navigate = useNavigate();
 
   // Canlı saat güncellemesi
@@ -27,7 +50,133 @@ export default function AnaEkran() {
     return () => clearInterval(interval);
   }, []);
 
-  // Dashboard verilerini güncelle - MASALAR İÇİN DÜZELTİLDİ
+  // Gün başlatma fonksiyonu - BASİTLEŞTİRİLDİ
+  const handleGunBaslat = useCallback(() => {
+    const baslangicZamani = new Date();
+    const baslangicKasa = 0; // Kasa başlangıç bakiyesi sıfır
+    
+    // LocalStorage'a kaydet
+    localStorage.setItem('mycafe_gun_durumu', 'aktif');
+    localStorage.setItem('mycafe_gun_baslangic', baslangicZamani.toISOString());
+    localStorage.setItem('mycafe_gun_baslangic_kasa', baslangicKasa.toString());
+    
+    const yeniGunBilgileri = {
+      baslangicKasa: baslangicKasa,
+      nakitGiris: 0,
+      krediKarti: 0,
+      toplamAdisyon: 0,
+      acikAdisyon: 0,
+      gunlukSatis: 0,
+      baslangicTarih: baslangicZamani.toISOString(),
+      sonGuncelleme: new Date().toISOString()
+    };
+    
+    localStorage.setItem('mycafe_gun_bilgileri', JSON.stringify(yeniGunBilgileri));
+    
+    // State'leri güncelle
+    setGunDurumu('aktif');
+    setGunBaslangicZamani(baslangicZamani);
+    setGunBilgileri(yeniGunBilgileri);
+    
+    // Global event gönder
+    if (window.dispatchGlobalEvent) {
+      window.dispatchGlobalEvent('gunBaslatildi', { 
+        zaman: baslangicZamani,
+        kasa: baslangicKasa 
+      });
+    }
+    
+    // Başarı mesajı
+    alert(`✅ Gün başlatıldı!\n\n📅 Tarih: ${baslangicZamani.toLocaleDateString('tr-TR')}\n⏰ Saat: ${baslangicZamani.toLocaleTimeString('tr-TR')}`);
+    
+  }, []);
+
+  // Gün sonlandırma fonksiyonu - BASİTLEŞTİRİLDİ
+  const handleGunSonu = useCallback(() => {
+    // Gün başlatılmamışsa uyarı ver
+    if (gunDurumu === 'kapali') {
+      alert('❌ Gün başlatılmamış! Önce "GÜN BAŞLAT" butonuna tıklayın.');
+      return;
+    }
+    
+    // Açık adisyon kontrolü
+    const acikAdisyonlar = JSON.parse(localStorage.getItem('mc_acik_adisyonlar') || '[]');
+    
+    if (acikAdisyonlar.length > 0) {
+      const confirmMessage = `${acikAdisyonlar.length} açık adisyon bulunuyor. Yine de günü sonlandırmak istiyor musunuz?`;
+      
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+    }
+    
+    // Gün sonu raporu oluştur
+    const gunSonuRaporId = `GUN_${new Date().toISOString().split('T')[0].replace(/-/g, '')}_${Date.now()}`;
+    const baslangicZamani = new Date(localStorage.getItem('mycafe_gun_baslangic') || new Date());
+    const bitisZamani = new Date();
+    
+    // Gün verilerini topla
+    const gunVerileri = JSON.parse(localStorage.getItem('mycafe_gun_bilgileri') || '{}');
+    
+    // Bugünkü satış verilerini hesapla
+    const today = new Date().toISOString().split('T')[0];
+    const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
+    const bilardoAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
+    
+    const bugunkuNormalSatis = adisyonlar
+      .filter(a => {
+        const tarih = new Date(a.tarih || a.acilisZamani).toISOString().split('T')[0];
+        return tarih === today;
+      })
+      .reduce((sum, a) => sum + (parseFloat(a.toplamTutar || 0) || 0), 0);
+    
+    const bugunkuBilardoSatis = bilardoAdisyonlar
+      .filter(b => {
+        const tarih = new Date(b.acilisZamani).toISOString().split('T')[0];
+        return tarih === today && b.tur === "BİLARDO";
+      })
+      .reduce((sum, b) => sum + (parseFloat(b.toplamTutar || 0) || 0), 0);
+    
+    // Raporu oluştur
+    const gunSonuRaporu = {
+      id: gunSonuRaporId,
+      baslangic: baslangicZamani.toISOString(),
+      bitis: bitisZamani.toISOString(),
+      sureDakika: Math.floor((bitisZamani - baslangicZamani) / 60000),
+      sureSaat: Math.floor((bitisZamani - baslangicZamani) / 3600000),
+      baslangicKasa: gunVerileri.baslangicKasa || 0,
+      toplamCiro: bugunkuNormalSatis + bugunkuBilardoSatis,
+      nakit: bugunkuNormalSatis * 0.6,
+      krediKarti: bugunkuNormalSatis * 0.4,
+      bilardoCiro: bugunkuBilardoSatis,
+      toplamAdisyon: gunVerileri.toplamAdisyon || 0,
+      acikAdisyon: acikAdisyonlar.length,
+      kritikStok: dashboardData.criticalProducts.length,
+      tarih: today,
+      olusturulmaZamani: new Date().toISOString()
+    };
+    
+    // Raporu localStorage'a kaydet
+    localStorage.setItem(`mycafe_gun_sonu_${gunSonuRaporId}`, JSON.stringify(gunSonuRaporu));
+    
+    // Eski gün listesini güncelle
+    const eskiGunler = JSON.parse(localStorage.getItem('mycafe_gun_sonu_listesi') || '[]');
+    eskiGunler.unshift(gunSonuRaporu);
+    localStorage.setItem('mycafe_gun_sonu_listesi', JSON.stringify(eskiGunler.slice(0, 30)));
+    
+    // Günü kapat
+    localStorage.setItem('mycafe_gun_durumu', 'kapali');
+    setGunDurumu('kapali');
+    
+    // Başarı mesajı
+    alert(`✅ Gün sonlandırıldı!\n\n📊 Gün Sonu Raporu oluşturuldu:\n• Toplam Ciro: ${gunSonuRaporu.toplamCiro.toLocaleString('tr-TR')} ₺\n• Süre: ${gunSonuRaporu.sureSaat} saat ${gunSonuRaporu.sureDakika % 60} dakika`);
+    
+    // Rapor sayfasına yönlendir
+    navigate(`/gun-sonu-rapor/${gunSonuRaporId}`);
+    
+  }, [gunDurumu, dashboardData.criticalProducts.length, navigate]);
+
+  // Dashboard verilerini güncelle
   useEffect(() => {
     const updateDashboardData = () => {
       try {
@@ -74,26 +223,20 @@ export default function AnaEkran() {
           })
           .slice(0, 5);
         
-        // AÇIK ADİSYONLAR - MASALAR İÇİN DÜZELTİLDİ
+        // AÇIK ADİSYONLAR
         const openTables = [];
         
-        // 1. ÖNCE AÇIK ADİSYONLARI BUL (mc_acik_adisyonlar)
         const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
         
-        // Normal masaları kontrol et (tur: "NORMAL" veya tur belirtilmemiş)
         acikAdisyonlar.forEach(ad => {
-          // Sadece açık olanları al
           if (ad.durum === "ACIK" || ad.durum === "AÇIK") {
             const isBilardo = ad.tur === "BİLARDO";
             
             if (!isBilardo) {
-              // NORMAL MASA
               const masaNo = ad.masaNo || `MASA ${ad.masaNum}`;
               
-              // Toplam tutarı hesapla
               let toplamTutar = 0;
               
-              // 1. Kalemlerden topla
               if (ad.kalemler && ad.kalemler.length > 0) {
                 toplamTutar = ad.kalemler.reduce((sum, kalem) => {
                   const birimFiyat = parseFloat(kalem.birimFiyat || kalem.fiyat || 0);
@@ -102,7 +245,6 @@ export default function AnaEkran() {
                 }, 0);
               }
               
-              // 2. Direkt toplamTutar değerini kontrol et
               if (ad.toplamTutar && parseFloat(ad.toplamTutar) > 0) {
                 toplamTutar = parseFloat(ad.toplamTutar);
               }
@@ -114,10 +256,9 @@ export default function AnaEkran() {
                 toplamTutar: toplamTutar,
                 tur: "NORMAL",
                 urunSayisi: ad.kalemler?.length || 0,
-                adisyonData: ad // Tüm adisyon verisini sakla
+                adisyonData: ad
               });
             } else {
-              // BİLARDO MASA
               const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
               const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
               const toplamTutar = (isNaN(bilardoUcret) ? 0 : bilardoUcret) + 
@@ -138,21 +279,17 @@ export default function AnaEkran() {
           }
         });
         
-        // 2. MASALAR TABLOSUNU DA KONTROL ET (mc_masalar)
         const masalar = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
         
         masalar.forEach(masa => {
           if (masa.durum?.toUpperCase() === "DOLU") {
-            // Bu masa zaten açık adisyonlarda var mı kontrol et
             const masaAlreadyExists = openTables.some(t => {
               const tableNo = t.no.replace('MASA ', '').replace('BİLARDO ', '');
               const masaNo = String(masa.no);
               return tableNo === masaNo;
             });
             
-            // Eğer yoksa ve açık adisyonlarda da yoksa, masayı ekle
             if (!masaAlreadyExists) {
-              // Bu masa için mc_adisyonlar'da açık adisyon ara
               const masaAdisyonlari = adisyonlar.filter(ad => {
                 const masaEslesti = 
                   ad.masaNo === `MASA ${masa.no}` || 
@@ -247,44 +384,25 @@ export default function AnaEkran() {
 
   // Masa veya bilardo detayına git
   const goToTableDetail = useCallback((masa) => {
-    console.log("Detaya gidiliyor:", masa);
+    // Gün başlatılmamışsa uyarı ver
+    if (gunDurumu === 'kapali') {
+      alert('❌ Gün başlatılmamış! Önce "GÜN BAŞLAT" butonuna tıklayın.');
+      return;
+    }
     
     if (masa.tur === "BİLARDO") {
-      // Bilardo için
       const masaNumarasi = masa.no.replace('BİLARDO ', '').replace('B', '');
       navigate(`/bilardo-adisyon/${masaNumarasi}`);
     } else {
-      // Normal masa için
       const masaNumarasi = masa.no.replace('MASA ', '');
       navigate(`/adisyondetay/${masaNumarasi}`);
     }
-  }, [navigate]);
-
-  // Gün sonu butonu
-  const handleDayEnd = useCallback(() => {
-    navigate('/raporlar/gun-sonu');
-  }, [navigate]);
+  }, [navigate, gunDurumu]);
 
   // Raporlar sayfasına git
   const goToReports = useCallback(() => {
     navigate('/raporlar');
   }, [navigate]);
-
-  // Debug için
-  useEffect(() => {
-    console.log("=== DASHBOARD DEBUG ===");
-    console.log("Toplam açık adisyon:", dashboardData.openTables.length);
-    console.log("Açık adisyonlar:", dashboardData.openTables);
-    
-    // LocalStorage'daki verileri kontrol et
-    const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-    const masalar = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
-    const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-    
-    console.log("mc_acik_adisyonlar:", acikAdisyonlar);
-    console.log("mc_masalar:", masalar);
-    console.log("mc_adisyonlar (ilk 3):", adisyonlar.slice(0, 3));
-  }, [dashboardData]);
 
   return (
     <div className="ana-wrapper">
@@ -293,43 +411,189 @@ export default function AnaEkran() {
         <div className="clock-box">{currentTime}</div>
       </div>
 
-      {/* GÜN SONU BUTONU */}
+      {/* GÜN KONTROL BUTONLARI */}
       <div style={{
         display: 'flex',
-        justifyContent: 'flex-end',
-        marginBottom: '20px'
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+        gap: '10px'
       }}>
-        <button 
-          onClick={handleDayEnd}
-          style={{
-            padding: '10px 20px',
-            background: 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)',
-            color: 'white',
-            border: '1px solid #8B4513',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(139, 69, 19, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.3s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 3px 8px rgba(139, 69, 19, 0.25)';
-            e.currentTarget.style.background = 'linear-gradient(135deg, #A0522D 0%, #8B4513 100%)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(139, 69, 19, 0.15)';
-            e.currentTarget.style.background = 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)';
-          }}
-        >
-          📊 GÜN SONU RAPORU
-        </button>
+        {/* SOL TARAFA - GÜN BAŞLANGICI BUTONU */}
+        <div>
+          {gunDurumu === 'kapali' ? (
+            <button 
+              onClick={handleGunBaslat}
+              style={{
+                padding: '12px 24px',
+                background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
+                color: 'white',
+                border: '2px solid #27ae60',
+                borderRadius: '8px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(46, 204, 113, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease',
+                minWidth: '250px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 6px 15px rgba(46, 204, 113, 0.4)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(46, 204, 113, 0.3)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)';
+              }}
+            >
+              🟢 GÜN BAŞLAT
+              <span style={{ fontSize: '14px', opacity: 0.9 }}>
+                {new Date().toLocaleDateString('tr-TR')}
+              </span>
+            </button>
+          ) : (
+            <div style={{
+              padding: '12px 24px',
+              background: 'linear-gradient(135deg, rgba(46, 204, 113, 0.2) 0%, rgba(39, 174, 96, 0.1) 100%)',
+              border: '2px solid #27ae60',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: '#27ae60',
+              minWidth: '250px'
+            }}>
+              🟢 GÜN AKTİF
+              <span style={{ fontSize: '14px', opacity: 0.8, marginLeft: '10px' }}>
+                {gunBaslangicZamani ? gunBaslangicZamani.toLocaleTimeString('tr-TR') : ''}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* SAĞ TARAFA - GÜN SONU BUTONU */}
+        <div>
+          <button 
+            onClick={handleGunSonu}
+            style={{
+              padding: '12px 24px',
+              background: gunDurumu === 'kapali' 
+                ? 'linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)' 
+                : 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+              color: 'white',
+              border: gunDurumu === 'kapali' ? '2px solid #95a5a6' : '2px solid #c0392b',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: gunDurumu === 'kapali' ? 'not-allowed' : 'pointer',
+              boxShadow: gunDurumu === 'kapali' 
+                ? '0 4px 12px rgba(149, 165, 166, 0.2)' 
+                : '0 4px 12px rgba(231, 76, 60, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.3s ease',
+              minWidth: '250px',
+              opacity: gunDurumu === 'kapali' ? 0.7 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (gunDurumu !== 'kapali') {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 6px 15px rgba(231, 76, 60, 0.4)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (gunDurumu !== 'kapali') {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(231, 76, 60, 0.3)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+              }
+            }}
+            disabled={gunDurumu === 'kapali'}
+          >
+            🔴 GÜN SONU RAPORU
+            {gunDurumu === 'kapali' && (
+              <span style={{ fontSize: '12px', marginLeft: '5px', opacity: 0.8 }}>
+                (Gün başlatılmamış)
+              </span>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* GÜN DURUMU BİLGİ KARTI */}
+      {gunDurumu === 'aktif' && gunBaslangicZamani && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(46, 204, 113, 0.15) 0%, rgba(39, 174, 96, 0.08) 100%)',
+          border: '2px solid rgba(46, 204, 113, 0.4)',
+          borderRadius: '12px',
+          padding: '20px',
+          marginBottom: '25px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '15px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{
+              background: '#2ecc71',
+              color: 'white',
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'bold',
+              fontSize: '22px',
+              boxShadow: '0 4px 8px rgba(46, 204, 113, 0.3)'
+            }}>
+              ⏰
+            </div>
+            <div>
+              <div style={{ fontWeight: 'bold', color: '#27ae60', fontSize: '18px' }}>
+                Gün Süresi: {Math.floor((new Date() - gunBaslangicZamani) / 3600000)} saat
+              </div>
+              <div style={{ fontSize: '14px', color: '#555' }}>
+                Başlangıç: {gunBaslangicZamani.toLocaleDateString('tr-TR')} {gunBaslangicZamani.toLocaleTimeString('tr-TR')}
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', color: '#666', fontWeight: '600' }}>Bugünkü Satış</div>
+              <div style={{ fontWeight: 'bold', color: '#e74c3c', fontSize: '20px' }}>
+                {formatPara(dashboardData.dailySales.total)} ₺
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', color: '#666', fontWeight: '600' }}>Açık Adisyon</div>
+              <div style={{ fontWeight: 'bold', color: '#3498db', fontSize: '20px' }}>
+                {dashboardData.openTables.length}
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', color: '#666', fontWeight: '600' }}>Kritik Stok</div>
+              <div style={{ fontWeight: 'bold', color: '#f39c12', fontSize: '20px' }}>
+                {dashboardData.criticalProducts.length}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SATIŞ İSTATİSTİKLERİ */}
       <div className="summary-cards">
@@ -506,6 +770,11 @@ export default function AnaEkran() {
               const tutar = parseFloat(t.toplamTutar) || 0;
               return sum + tutar;
             }, 0))} ₺
+            {gunDurumu === 'kapali' && (
+              <span style={{ color: '#e74c3c', marginLeft: '10px', fontWeight: 'bold' }}>
+                ⚠️ Gün başlatılmamış
+              </span>
+            )}
           </span>
         </div>
         
@@ -530,6 +799,9 @@ export default function AnaEkran() {
                       <tr 
                         key={masa.id}
                         className={`table-row ${isBilardo ? 'bilardo-row' : 'normal-row'}`}
+                        style={{
+                          opacity: gunDurumu === 'kapali' ? 0.6 : 1
+                        }}
                       >
                         <td>
                           <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
@@ -558,8 +830,14 @@ export default function AnaEkran() {
                           <button 
                             className="action-button"
                             onClick={() => goToTableDetail(masa)}
+                            style={{
+                              opacity: gunDurumu === 'kapali' ? 0.5 : 1,
+                              cursor: gunDurumu === 'kapali' ? 'not-allowed' : 'pointer'
+                            }}
+                            disabled={gunDurumu === 'kapali'}
                           >
                             📋 Detay
+                            {gunDurumu === 'kapali' && ' (Kilitli)'}
                           </button>
                         </td>
                       </tr>
@@ -573,7 +851,9 @@ export default function AnaEkran() {
               <div className="empty-icon-wide">✅</div>
               <div className="empty-text-wide">Açık Adisyon Bulunmuyor</div>
               <div className="empty-subtext-wide">
-                Yeni adisyon açmak için "+ Adisyon" butonuna tıklayın
+                {gunDurumu === 'kapali' 
+                  ? 'Yeni adisyon açmak için önce "GÜN BAŞLAT" butonuna tıklayın'
+                  : 'Yeni adisyon açmak için "+ Adisyon" butonuna tıklayın'}
               </div>
             </div>
           )}
