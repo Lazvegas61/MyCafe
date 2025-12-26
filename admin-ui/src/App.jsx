@@ -1,14 +1,15 @@
-// App.jsx - GÜNCELLENMİŞ VE HATALARI DÜZELTİLMİŞ VERSİYON
+// App.jsx - TÜM GÜNCELLEMELERLE BİRLİKTE
 /* ------------------------------------------------------------
-   📌 App.jsx — MyCafe (FINAL - YENİ RAPOR YAPISI ENTEGRE)
+   📌 App.jsx — MyCafe (FINAL - GÜN BAŞLATMA SİSTEMİ ENTEGRE)
 ------------------------------------------------------------ */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
@@ -220,24 +221,34 @@ function initializeSyncService() {
   }
 }
 
-// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
+// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU - GÜNCELLENMİŞ VERSİYON
 function syncAcikAdisyonlar() {
   try {
     const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-    const acikNormalAdisyonlar = normalAdisyonlar.filter(a => 
-      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
-    );
+    
+    // SADECE AÇIK OLAN NORMAL ADİSYONLARI AL
+    const acikNormalAdisyonlar = normalAdisyonlar.filter(a => {
+      const durum = a.durum?.toUpperCase();
+      const isKapali = a.kapali || durum === "KAPALI" || durum === "KAPATILDI";
+      const isAcil = a.isAcil;
+      return !isKapali && !isAcil;
+    });
     
     const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-    const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => 
-      a.durum === "ACIK" || (a.kapali !== true && a.durum !== "KAPALI")
-    );
+    
+    // SADECE AÇIK OLAN BİLARDO ADİSYONLARI AL
+    const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => {
+      const durum = a.durum?.toUpperCase();
+      const isKapali = a.kapali || durum === "KAPALI" || durum === "KAPATILDI";
+      const isAcil = a.isAcil;
+      return !isKapali && !isAcil;
+    });
     
     const tumAcikAdisyonlar = [
       ...acikNormalAdisyonlar.map(a => ({
         ...a,
         tur: "NORMAL",
-        masaNo: a.masaNo || "Bilinmiyor",
+        masaNo: a.masaNo || `MASA ${a.masaNum}`,
         toplamTutar: a.toplamTutar || 0
       })),
       ...acikBilardoAdisyonlar.map(a => ({
@@ -433,17 +444,30 @@ import KategoriBazliSatis from "./pages/Raporlar/KategoriRaporlari/KategoriBazli
 import GunlukGiderler from "./pages/Raporlar/GiderRaporlari/GunlukGiderler.jsx";
 import MasaAnalizi from "./pages/Raporlar/MasaRaporlari/MasaAnalizi.jsx";
 
-
 /* ------------------------------------------------------------
    📌 LAYOUT — Sidebar login harici HER YERDE görünsün
 ------------------------------------------------------------ */
-function Layout({ children }) {
+function Layout({ children, gunAktif, onGunBaslat }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const path = location.pathname;
   const user = getUser();
   const hideSidebar = path === "/login";
   const initializedRef = useRef(false);
   const eventListenersInitializedRef = useRef(false);
+  const [showGunBaslatModal, setShowGunBaslatModal] = useState(false);
+
+  // Kullanıcı giriş yaptıktan sonra Gün Başlat modal'ını göster
+  useEffect(() => {
+    if (user && path !== "/login" && !gunAktif) {
+      // 1 saniye sonra modal'ı göster (sayfanın yüklenmesini bekle)
+      const timer = setTimeout(() => {
+        setShowGunBaslatModal(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, path, gunAktif]);
 
   useEffect(() => {
     if (!hideSidebar && window.syncService && !initializedRef.current) {
@@ -457,44 +481,270 @@ function Layout({ children }) {
     }
   }, [hideSidebar]);
 
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100%",
-        display: "flex",
-        flexDirection: "row",
-        background: "#f5e7d0",
-        color: "#4b2e05",
-      }}
-    >
-      {!hideSidebar && <Sidebar user={user} />}
+  // Gün aktif değilse ve ana sayfa/login hariç diğer sayfalardaysak, ana sayfaya yönlendir
+  useEffect(() => {
+    const userLoggedIn = !!getUser();
+    if (userLoggedIn && !gunAktif && path !== "/login" && path !== "/" && path !== "/ana") {
+      navigate('/');
+    }
+  }, [gunAktif, path, navigate]);
 
+  const handleGunBaslatClick = () => {
+    if (onGunBaslat) {
+      onGunBaslat();
+      setShowGunBaslatModal(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    // Modal kapatılamaz, sadece Gün Başlat'a basılabilir
+    // Kullanıcıyı çıkışa yönlendirebiliriz
+    if (window.confirm("Gün başlatmadan devam edemezsiniz. Çıkış yapmak ister misiniz?")) {
+      localStorage.removeItem("mc_user");
+      navigate("/login");
+    }
+  };
+
+  // Login sayfasında opacity ve pointer-events uygulama
+  const isLoginPage = path === "/login";
+  
+  return (
+    <>
+      {/* GÜN BAŞLAT MODAL'ı */}
+      {showGunBaslatModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          backdropFilter: 'blur(5px)'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #f5e7d0 0%, #e8d9b5 100%)',
+            borderRadius: '20px',
+            padding: '40px',
+            width: '500px',
+            maxWidth: '90%',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+            border: '3px solid #4b2e05',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '48px',
+              marginBottom: '20px',
+              color: '#4b2e05'
+            }}>
+              ⏰
+            </div>
+            
+            <h2 style={{
+              color: '#4b2e05',
+              fontSize: '28px',
+              marginBottom: '10px'
+            }}>
+              GÜN BAŞLANGICI
+            </h2>
+            
+            <p style={{
+              color: '#6b4210',
+              fontSize: '16px',
+              marginBottom: '30px',
+              lineHeight: '1.5'
+            }}>
+              Sistemi kullanmaya başlamak için gün başlatmanız gerekiyor.<br />
+              Gün başlatıldıktan sonra tüm işlemler aktif olacaktır.
+            </p>
+            
+            <div style={{
+              backgroundColor: 'rgba(139, 69, 19, 0.1)',
+              padding: '20px',
+              borderRadius: '12px',
+              marginBottom: '30px',
+              border: '1px solid rgba(139, 69, 19, 0.2)'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: '10px'
+              }}>
+                <span style={{fontWeight: 'bold', color: '#4b2e05'}}>📅 Tarih:</span>
+                <span>{new Date().toLocaleDateString('tr-TR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}</span>
+              </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: '10px'
+              }}>
+                <span style={{fontWeight: 'bold', color: '#4b2e05'}}>⏰ Saat:</span>
+                <span>{new Date().toLocaleTimeString('tr-TR')}</span>
+              </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between'
+              }}>
+                <span style={{fontWeight: 'bold', color: '#4b2e05'}}>👤 Kullanıcı:</span>
+                <span>{user?.adSoyad || user?.username || 'Bilinmiyor'}</span>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleGunBaslatClick}
+              style={{
+                background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '18px 40px',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 8px 20px rgba(46, 204, 113, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                margin: '0 auto',
+                transition: 'all 0.3s ease',
+                width: '100%'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(46, 204, 113, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(46, 204, 113, 0.4)';
+              }}
+            >
+              <span style={{fontSize: '28px'}}>🚀</span>
+              GÜN BAŞLAT
+            </button>
+            
+            <p style={{
+              fontSize: '12px',
+              color: '#8B4513',
+              marginTop: '20px',
+              opacity: 0.7
+            }}>
+              Not: Gün başlatmadan diğer işlemleri yapamazsınız.
+            </p>
+          </div>
+        </div>
+      )}
+      
       <div
         style={{
-          flex: 1,
-          marginLeft: hideSidebar ? 0 : 280,
-          padding: "25px",
+          minHeight: "100vh",
+          width: "100%",
+          display: "flex",
+          flexDirection: "row",
+          background: "#f5e7d0",
+          color: "#4b2e05",
+          filter: showGunBaslatModal ? 'blur(5px)' : 'none',
+          opacity: showGunBaslatModal ? 0.3 : 1,
+          pointerEvents: showGunBaslatModal ? 'none' : 'auto',
+          transition: 'all 0.3s ease'
         }}
       >
-        {children}
+        {!hideSidebar && <Sidebar user={user} gunAktif={gunAktif} />}
+
+        <div
+          style={{
+            flex: 1,
+            marginLeft: hideSidebar ? 0 : 280,
+            padding: "25px",
+            opacity: isLoginPage ? 1 : (gunAktif ? 1 : 0.5),
+            transition: 'opacity 0.3s ease',
+            pointerEvents: isLoginPage ? 'auto' : (gunAktif ? 'auto' : 'none'),
+          }}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 /* ------------------------------------------------------------
-   🚀 ROOT APP — ANA SAYFA (YENİ RAPOR YAPISI İLE)
+   🚀 ROOT APP — ANA SAYFA
 ------------------------------------------------------------ */
 export default function App() {
   const syncInitializedRef = useRef(false);
   const [globalSureBittiPopup, setGlobalSureBittiPopup] = useState(null);
+  const [gunAktif, setGunAktif] = useState(() => {
+    return localStorage.getItem('mycafe_gun_durumu') === 'aktif';
+  });
 
   // İlk yüklemede verileri hazırla
   useEffect(() => {
     loadInitialData();
     autoFixCategoryAndProducts();
     ensureDemoAdmin();
+  }, []);
+
+  // Gün durumu değişikliklerini dinle
+  useEffect(() => {
+    const handleGunDurumuDegisti = (event) => {
+      if (event.detail && typeof event.detail.aktif !== 'undefined') {
+        setGunAktif(event.detail.aktif);
+      }
+    };
+    
+    window.addEventListener('gunDurumuDegisti', handleGunDurumuDegisti);
+    
+    return () => {
+      window.removeEventListener('gunDurumuDegisti', handleGunDurumuDegisti);
+    };
+  }, []);
+
+  // Gün başlatma fonksiyonu - App.jsx'ten Layout'a gönderilecek
+  const handleGunBaslat = useCallback(() => {
+    const baslangicZamani = new Date();
+    const baslangicKasa = 0;
+    
+    // LocalStorage'a kaydet
+    localStorage.setItem('mycafe_gun_durumu', 'aktif');
+    localStorage.setItem('mycafe_gun_baslangic', baslangicZamani.toISOString());
+    localStorage.setItem('mycafe_gun_baslangic_kasa', baslangicKasa.toString());
+    
+    const yeniGunBilgileri = {
+      baslangicKasa: baslangicKasa,
+      nakitGiris: 0,
+      krediKarti: 0,
+      toplamAdisyon: 0,
+      acikAdisyon: 0,
+      gunlukSatis: 0,
+      baslangicTarih: baslangicZamani.toISOString(),
+      sonGuncelleme: new Date().toISOString()
+    };
+    
+    localStorage.setItem('mycafe_gun_bilgileri', JSON.stringify(yeniGunBilgileri));
+    
+    // State'leri güncelle
+    setGunAktif(true);
+    
+    // Global event gönder
+    if (window.dispatchGlobalEvent) {
+      window.dispatchGlobalEvent('gunDurumuDegisti', { aktif: true });
+      window.dispatchGlobalEvent('gunBaslatildi', { 
+        zaman: baslangicZamani,
+        kasa: baslangicKasa 
+      });
+    }
+    
+    console.log('✅ Gün başlatıldı:', baslangicZamani);
+    
   }, []);
 
   // Sync service ve interval'leri başlat
@@ -602,59 +852,58 @@ export default function App() {
         )}
         
         <Routes>
-  {/* 1. ÖZEL ROUTE'LAR */}
-  <Route path="/login" element={<Layout><Login /></Layout>} />
-  
-  {/* 2. PARAMETRELİ ROUTE'LAR */}
-  <Route path="/adisyon/:id" element={<Layout><Adisyon /></Layout>} />
-  <Route path="/masa-detay/:id" element={<Layout><MasaDetay /></Layout>} />
-  <Route path="/bilardo-adisyon/:id" element={<Layout><BilardoAdisyon /></Layout>} />
-  
-  {/* 3. RAPOR ROUTE'LARI - GUNSONU RAPOR ÖNCE */}
-  <Route path="/gun-sonu-rapor/:id" element={<Layout><GunSonuRapor /></Layout>} />
-  
-  {/* Diğer rapor route'ları */}
-  <Route path="/raporlar" element={<Layout><RaporlarDashboard /></Layout>} />
-  <Route path="/raporlar/dashboard" element={<Layout><RaporlarDashboard /></Layout>} />
-<Route path="/raporlar/masa-analizi" element={<Layout><MasaAnalizi /></Layout>} />
-  <Route path="/raporlar/gun-sonu" element={<Layout><GunSonuOzet /></Layout>} />
-  <Route path="/raporlar/gun-sonu-detay" element={<Layout><GunSonuDetay /></Layout>} />
-  <Route path="/raporlar/urun-bazli" element={<Layout><UrunBazliSatis /></Layout>} />
-  <Route path="/raporlar/kategori-bazli" element={<Layout><KategoriBazliSatis /></Layout>} />
-  <Route path="/raporlar/gunluk-giderler" element={<Layout><GunlukGiderler /></Layout>} />
-  
-  {/* 4. ANA SAYFALAR */}
-  <Route path="/" element={<Layout><AnaEkran /></Layout>} />
-  <Route path="/ana" element={<Layout><AnaEkran /></Layout>} />
-  <Route path="/masalar" element={<Layout><Masalar /></Layout>} />
-  <Route path="/musteri-islemleri" element={<Layout><MusteriIslemleri /></Layout>} />
-  <Route path="/urun-stok" element={<Layout><UrunStokYonetimi /></Layout>} />
-  <Route path="/giderler" element={<Layout><Giderler /></Layout>} />
-  <Route path="/personel" element={<Layout><Personel /></Layout>} />
-  <Route path="/ayarlar" element={<Layout><Ayarlar /></Layout>} />
-  <Route path="/bilardo" element={<Layout><Bilardo /></Layout>} />
-  
-  {/* 5. 404 - EN ALTA */}
-  <Route
-    path="*"
-    element={
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-          <div className="text-center">
-            <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
-            <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
-            <a 
-              href="/" 
-              className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
-            >
-              Ana Sayfaya Dön
-            </a>
-          </div>
-        </div>
-      </Layout>
-    }
-  />
-</Routes>
+          {/* 1. ÖZEL ROUTE'LAR */}
+          <Route path="/login" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Login /></Layout>} />
+          
+          {/* 2. PARAMETRELİ ROUTE'LAR */}
+          <Route path="/adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Adisyon /></Layout>} />
+          <Route path="/adisyondetay/:masaNo" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Adisyon /></Layout>} />
+          <Route path="/masa-detay/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaDetay /></Layout>} />
+          <Route path="/bilardo-adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><BilardoAdisyon /></Layout>} />
+          
+          {/* 3. RAPOR ROUTE'LARI */}
+          <Route path="/gun-sonu-rapor/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuRapor /></Layout>} />
+          <Route path="/raporlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
+          <Route path="/raporlar/dashboard" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
+          <Route path="/raporlar/masa-analizi" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaAnalizi /></Layout>} />
+          <Route path="/raporlar/gun-sonu" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuOzet /></Layout>} />
+          <Route path="/raporlar/gun-sonu-detay" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuDetay /></Layout>} />
+          <Route path="/raporlar/urun-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunBazliSatis /></Layout>} />
+          <Route path="/raporlar/kategori-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><KategoriBazliSatis /></Layout>} />
+          <Route path="/raporlar/gunluk-giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunlukGiderler /></Layout>} />
+          
+          {/* 4. ANA SAYFALAR */}
+          <Route path="/" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />
+          <Route path="/ana" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />
+          <Route path="/masalar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Masalar /></Layout>} />
+          <Route path="/musteri-islemleri" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MusteriIslemleri /></Layout>} />
+          <Route path="/urun-stok" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunStokYonetimi /></Layout>} />
+          <Route path="/giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Giderler /></Layout>} />
+          <Route path="/personel" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Personel /></Layout>} />
+          <Route path="/ayarlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Ayarlar /></Layout>} />
+          <Route path="/bilardo" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Bilardo /></Layout>} />
+          
+          {/* 5. 404 - EN ALTA */}
+          <Route
+            path="*"
+            element={
+              <Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}>
+                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+                  <div className="text-center">
+                    <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
+                    <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
+                    <a 
+                      href="/" 
+                      className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
+                    >
+                      Ana Sayfaya Dön
+                    </a>
+                  </div>
+                </div>
+              </Layout>
+            }
+          />
+        </Routes>
       </BrowserRouter>
     </ErrorBoundary>
   );

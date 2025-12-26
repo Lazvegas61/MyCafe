@@ -21,10 +21,11 @@ const menuItems = [
   { key: "ayarlar", label: "Ayarlar", path: "/ayarlar", icon: "⚙️" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ gunAktif }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
+  const user = JSON.parse(localStorage.getItem("mc_user") || "null");
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 50);
@@ -43,6 +44,11 @@ export default function Sidebar() {
     }
     return location.pathname.startsWith(path);
   };
+
+  // Kullanıcı giriş yapmamışsa sidebar'ı gösterme
+  if (!user) {
+    return null;
+  }
 
   return (
     <div
@@ -94,9 +100,15 @@ export default function Sidebar() {
       <div style={{ flex: 1 }}>
         {menuItems.map((item) => {
           const active = isActive(item.path);
+          const disabled = !gunAktif && item.path !== "/" && item.path !== "/ana";
 
           return (
-            <Link key={item.key} to={item.path} style={{ textDecoration: "none" }}>
+            <Link 
+              key={item.key} 
+              to={disabled ? "#" : item.path} 
+              style={{ textDecoration: "none" }}
+              onClick={(e) => disabled && e.preventDefault()}
+            >
               <div
                 style={{
                   display: "flex",
@@ -105,29 +117,45 @@ export default function Sidebar() {
                   padding: "14px 14px",
                   marginBottom: 8,
                   borderRadius: 14,
-                  cursor: "pointer",
+                  cursor: disabled ? "not-allowed" : "pointer",
                   background: active ? "rgba(245,208,133,0.25)" : "transparent",
                   boxShadow: active
                     ? "0 0 0 2px rgba(245,208,133,0.85), 0 4px 10px rgba(0,0,0,0.35)"
                     : "none",
-                  color: active ? RENK.secili : RENK.yazi,
+                  color: active ? RENK.secili : (disabled ? "rgba(255,255,255,0.4)" : RENK.yazi),
                   fontWeight: active ? 800 : 550,
                   transition: "all 0.14s ease",
                   fontSize: 18,
+                  opacity: disabled ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = RENK.hover;
+                  if (!active && !disabled) e.currentTarget.style.background = RENK.hover;
                 }}
                 onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = "transparent";
+                  if (!active && !disabled) e.currentTarget.style.background = "transparent";
                 }}
               >
-                <div style={{ fontSize: 24, width: 28, textAlign: "center" }}>
+                <div style={{ 
+                  fontSize: 24, 
+                  width: 28, 
+                  textAlign: "center",
+                  opacity: disabled ? 0.5 : 1
+                }}>
                   {item.icon}
                 </div>
 
                 <div style={{ letterSpacing: 0.4 }}>
                   {item.label}
+                  {disabled && (
+                    <span style={{
+                      fontSize: '12px',
+                      marginLeft: '8px',
+                      color: 'rgba(255,255,255,0.5)',
+                      fontStyle: 'italic'
+                    }}>
+                      (kilitli)
+                    </span>
+                  )}
                 </div>
               </div>
             </Link>

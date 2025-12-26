@@ -16,7 +16,14 @@ import {
   Printer,
   Mail,
   TrendingUp,
-  Coffee
+  Coffee,
+  Calendar,
+  Filter,
+  Search,
+  Settings,
+  HelpCircle,
+  Database,
+  RefreshCw
 } from 'lucide-react';
 
 const RaporlarDashboard = () => {
@@ -41,7 +48,8 @@ const RaporlarDashboard = () => {
       path: "/raporlar/gun-sonu",
       color: "#f59e0b",
       gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-      badge: "Günlük"
+      badge: "Günlük",
+      stats: "₺ 12.5K"
     },
     {
       id: 2,
@@ -51,7 +59,8 @@ const RaporlarDashboard = () => {
       path: "/raporlar/masa-analizi",
       color: "#3b82f6",
       gradient: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-      badge: "Analiz"
+      badge: "Analiz",
+      stats: "24 Masa"
     },
     {
       id: 3,
@@ -61,7 +70,8 @@ const RaporlarDashboard = () => {
       path: "/raporlar/urun-bazli",
       color: "#10b981",
       gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-      badge: "Satış"
+      badge: "Satış",
+      stats: "156 Ürün"
     },
     {
       id: 4,
@@ -71,7 +81,8 @@ const RaporlarDashboard = () => {
       path: "/raporlar/kategori-bazli",
       color: "#6366f1",
       gradient: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-      badge: "Dağılım"
+      badge: "Dağılım",
+      stats: "8 Kategori"
     },
     {
       id: 5,
@@ -81,7 +92,8 @@ const RaporlarDashboard = () => {
       path: "/raporlar/gunluk-giderler",
       color: "#ef4444",
       gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-      badge: "Maliyet"
+      badge: "Maliyet",
+      stats: "₺ 2.3K"
     },
     {
       id: 6,
@@ -91,7 +103,8 @@ const RaporlarDashboard = () => {
       path: "/raporlar/detayli",
       color: "#8b5cf6",
       gradient: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-      badge: "Detay"
+      badge: "Detay",
+      stats: "50+ Rapor"
     }
   ];
 
@@ -133,7 +146,8 @@ const RaporlarDashboard = () => {
       amount: "₺ 1,250.50", 
       icon: <BarChart3 />,
       type: "gun-sonu",
-      color: "#f59e0b"
+      color: "#f59e0b",
+      status: "Tamamlandı"
     },
     { 
       name: "Kategori Satış Raporu", 
@@ -141,7 +155,8 @@ const RaporlarDashboard = () => {
       amount: "₺ 3,450.00", 
       icon: <PieChart />,
       type: "kategori-bazli",
-      color: "#6366f1"
+      color: "#6366f1",
+      status: "Tamamlandı"
     },
     { 
       name: "Masa Analizi Raporu", 
@@ -149,7 +164,8 @@ const RaporlarDashboard = () => {
       amount: "₺ 2,180.00", 
       icon: <Users />,
       type: "masa-analizi",
-      color: "#3b82f6"
+      color: "#3b82f6",
+      status: "Hazırlanıyor"
     },
     { 
       name: "Ürün Satış Raporu", 
@@ -157,7 +173,8 @@ const RaporlarDashboard = () => {
       amount: "₺ 890.75", 
       icon: <ShoppingBag />,
       type: "urun-bazli",
-      color: "#10b981"
+      color: "#10b981",
+      status: "Tamamlandı"
     },
     { 
       name: "Gider Analizi", 
@@ -165,42 +182,28 @@ const RaporlarDashboard = () => {
       amount: "₺ 675.00", 
       icon: <DollarSign />,
       type: "gunluk-giderler",
-      color: "#ef4444"
+      color: "#ef4444",
+      status: "Tamamlandı"
     }
   ];
 
-  // Responsive grid hesaplamaları
-  const getGridColumns = () => {
-    if (isDesktop) return 3;
-    if (isTablet) return 2;
-    return 1;
-  };
-
-  const getActionsGridColumns = () => {
-    if (isDesktop) return 4;
-    if (isTablet) return 2;
-    return 1;
-  };
-
-  const gridColumns = getGridColumns();
-  const actionsGridColumns = getActionsGridColumns();
-
-  // Ana container stili
+  // TAM SAYFA STİL DEĞİŞİKLİKLERİ
   const containerStyle = {
     minHeight: '100vh',
     backgroundColor: '#fef3c7',
     backgroundImage: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 50%, #fde68a 100%)',
-    padding: isMobile ? '12px' : '24px',
+    padding: '0', // Padding'i kaldırdık
     fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
     color: '#4b2e05'
   };
 
   const wrapperStyle = {
-    maxWidth: '1400px',
-    margin: '0 auto'
+    maxWidth: '100%', // Tam genişlik
+    margin: '0',
+    padding: isMobile ? '16px' : '24px', // İç padding eklendi
   };
 
-  // Breadcrumb
+  // Breadcrumb - Üst kısımda sabit
   const breadcrumbStyle = {
     display: 'flex',
     alignItems: 'center',
@@ -208,283 +211,113 @@ const RaporlarDashboard = () => {
     fontSize: '14px',
     color: '#92400e',
     marginBottom: '24px',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    padding: '12px 0',
+    borderBottom: '1px solid rgba(251, 191, 36, 0.3)'
   };
 
-  const breadcrumbLinkStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    color: '#92400e',
-    textDecoration: 'none',
-    fontWeight: '500',
-    padding: '4px 8px',
-    borderRadius: '6px',
-    transition: 'all 0.2s ease'
-  };
-
-  // Header
+  // Header - Daha büyük ve etkileyici
   const headerStyle = {
-    marginBottom: '32px'
+    marginBottom: '32px',
+    padding: '20px 0',
+    borderBottom: '2px solid rgba(251, 191, 36, 0.4)'
   };
 
   const titleStyle = {
-    fontSize: isMobile ? '28px' : '36px',
+    fontSize: isMobile ? '32px' : '48px',
     fontWeight: 'bold',
     color: '#4b2e05',
-    margin: '0 0 4px 0',
+    margin: '0 0 8px 0',
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: '16px'
   };
 
-  // Rapor Kartları
+  const subtitleStyle = {
+    fontSize: isMobile ? '16px' : '18px',
+    color: '#92400e',
+    margin: '0',
+    fontWeight: '500'
+  };
+
+  // Rapor Kartları Grid - Tam genişlik
   const cardsGridStyle = {
     display: 'grid',
-    gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
+    gridTemplateColumns: `repeat(${isDesktop ? 3 : isTablet ? 2 : 1}, 1fr)`,
     gap: '24px',
     marginBottom: '40px'
   };
 
+  // İki Kolon Layout - Tam genişlik
+  const twoColumnLayoutStyle = {
+    display: 'grid',
+    gridTemplateColumns: isDesktop ? '2fr 1fr' : '1fr',
+    gap: '32px',
+    marginBottom: '40px',
+    width: '100%'
+  };
+
+  // Kart Stilleri - Daha büyük
   const cardStyle = {
     backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    border: '1px solid #f3f4f6',
+    borderRadius: '16px',
+    padding: '28px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+    border: '2px solid rgba(251, 191, 36, 0.1)',
     transition: 'all 0.3s ease',
     cursor: 'pointer',
     textDecoration: 'none',
     display: 'block',
     color: 'inherit',
-    height: '100%'
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden'
   };
 
-  const cardHeaderStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '20px'
-  };
-
+  // Kart iconu daha büyük
   const cardIconStyle = (gradient) => ({
-    width: '60px',
-    height: '60px',
-    borderRadius: '12px',
+    width: '70px',
+    height: '70px',
+    borderRadius: '16px',
     background: gradient,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: 'white'
+    color: 'white',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
   });
 
-  const badgeStyle = (color) => ({
-    backgroundColor: `${color}15`,
-    color: color,
-    padding: '6px 14px',
-    borderRadius: '20px',
-    fontSize: '12px',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  });
-
-  const cardTitleStyle = {
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 12px 0'
-  };
-
-  const cardDescStyle = {
-    fontSize: '14px',
-    color: '#6b7280',
-    margin: '0 0 24px 0',
-    lineHeight: '1.6',
-    minHeight: '42px'
-  };
-
-  const cardFooterStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: '16px',
-    borderTop: '1px solid #f3f4f6'
-  };
-
-  const linkTextStyle = {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#d97706',
-    textDecoration: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  };
-
-  // Hızlı İşlemler
-  const quickActionsStyle = {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '32px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-  };
-
-  const sectionTitleStyle = {
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 24px 0',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  };
-
+  // Hızlı İşlemler Kartları
   const actionsGridStyle = {
     display: 'grid',
-    gridTemplateColumns: `repeat(${actionsGridColumns}, 1fr)`,
-    gap: '16px'
+    gridTemplateColumns: `repeat(${isDesktop ? 4 : isTablet ? 2 : 1}, 1fr)`,
+    gap: '20px'
   };
 
   const actionCardStyle = {
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'white',
     borderRadius: '12px',
-    padding: '20px',
+    padding: '24px',
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     textAlign: 'center',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center'
-  };
-
-  const actionIconStyle = (color) => ({
-    width: '48px',
-    height: '48px',
-    borderRadius: '12px',
-    backgroundColor: `${color}15`,
-    display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '12px',
-    color: color
-  });
-
-  const actionTitleStyle = {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 4px 0'
+    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+    border: '1px solid rgba(251, 191, 36, 0.2)'
   };
 
-  const actionSubtitleStyle = {
-    fontSize: '13px',
-    color: '#6b7280',
-    margin: '0'
-  };
-
-  // Son Raporlar
-  const recentReportsStyle = {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '32px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-  };
-
-  const recentHeaderStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '24px'
-  };
-
-  const viewAllStyle = {
-    fontSize: '14px',
-    color: '#d97706',
-    textDecoration: 'none',
-    fontWeight: '600',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  };
-
-  const reportListStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  };
-
-  const reportItemStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '8px',
-    transition: 'all 0.2s ease'
-  };
-
-  const reportContentStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    flex: 1
-  };
-
-  const reportIconStyle = (color) => ({
-    width: '44px',
-    height: '44px',
-    borderRadius: '10px',
-    backgroundColor: `${color}15`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: color
-  });
-
-  const reportNameStyle = {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 4px 0'
-  };
-
-  const reportDateStyle = {
-    fontSize: '13px',
-    color: '#6b7280',
-    margin: '0'
-  };
-
-  const reportAmountStyle = {
-    textAlign: 'right',
-    minWidth: '120px'
-  };
-
-  const amountTextStyle = {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#d97706',
-    margin: '0 0 4px 0'
-  };
-
-  const recreateLinkStyle = {
-    fontSize: '12px',
-    color: '#3b82f6',
-    textDecoration: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
-  };
-
-  // Footer
+  // Footer - Tam genişlik
   const footerStyle = {
-    paddingTop: '24px',
-    borderTop: '1px solid #e5e7eb',
+    padding: '24px 0',
+    borderTop: '2px solid rgba(251, 191, 36, 0.3)',
     color: '#6b7280',
-    fontSize: '14px'
+    fontSize: '14px',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    borderRadius: '16px',
+    marginTop: '20px'
   };
 
   const footerContentStyle = {
@@ -498,24 +331,53 @@ const RaporlarDashboard = () => {
   const footerInfoStyle = {
     display: 'flex',
     flexDirection: isMobile ? 'column' : 'row',
-    gap: isMobile ? '8px' : '24px',
+    gap: isMobile ? '8px' : '32px',
     alignItems: isMobile ? 'flex-start' : 'center'
   };
 
-  const footerActionsStyle = {
+  const footerButtonStyle = {
+    padding: '10px 20px',
+    backgroundColor: 'white',
+    border: '2px solid rgba(251, 191, 36, 0.3)',
+    borderRadius: '10px',
+    color: '#92400e',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
     display: 'flex',
-    gap: '12px'
+    alignItems: 'center',
+    gap: '8px'
   };
 
-  const footerButtonStyle = {
-    padding: '6px 12px',
-    backgroundColor: 'transparent',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    color: '#6b7280',
+  // Üst Kontroller
+  const topControlsStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px',
+    flexWrap: 'wrap',
+    gap: '16px'
+  };
+
+  const controlButtonsStyle = {
+    display: 'flex',
+    gap: '12px',
+    flexWrap: 'wrap'
+  };
+
+  const controlButtonStyle = {
+    padding: '10px 16px',
+    backgroundColor: 'white',
+    border: '1px solid rgba(251, 191, 36, 0.3)',
+    borderRadius: '8px',
+    color: '#92400e',
     fontSize: '14px',
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   };
 
   return (
@@ -523,7 +385,7 @@ const RaporlarDashboard = () => {
       <div style={wrapperStyle}>
         {/* Breadcrumb */}
         <div style={breadcrumbStyle}>
-          <Link to="/" style={breadcrumbLinkStyle}>
+          <Link to="/" style={{...breadcrumbLinkStyle, color: '#92400e'}}>
             <Home size={16} />
             Ana Sayfa
           </Link>
@@ -534,15 +396,105 @@ const RaporlarDashboard = () => {
         {/* Header */}
         <div style={headerStyle}>
           <h1 style={titleStyle}>
-            <Coffee size={isMobile ? 28 : 36} color="#d97706" />
+            <div style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white'
+            }}>
+              <Coffee size={32} />
+            </div>
             📊 MyCafe Rapor Merkezi
           </h1>
+          <p style={subtitleStyle}>
+            İşletmenizin tüm finansal ve operasyonel verileri tek bir yerde
+          </p>
+        </div>
+
+        {/* Üst Kontroller */}
+        <div style={topControlsStyle}>
+          <div style={controlButtonsStyle}>
+            <button 
+              style={controlButtonStyle}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef3c7';
+                e.currentTarget.style.borderColor = '#f59e0b';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+              }}
+            >
+              <Calendar size={16} />
+              Tarih Seç
+            </button>
+            <button 
+              style={controlButtonStyle}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef3c7';
+                e.currentTarget.style.borderColor = '#f59e0b';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+              }}
+            >
+              <Filter size={16} />
+              Filtrele
+            </button>
+            <button 
+              style={controlButtonStyle}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef3c7';
+                e.currentTarget.style.borderColor = '#f59e0b';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+                e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+              }}
+            >
+              <RefreshCw size={16} />
+              Yenile
+            </button>
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'center'
+          }}>
+            <div style={{
+              padding: '10px 16px',
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Database size={16} color="#92400e" />
+              <span style={{ fontSize: '14px', color: '#92400e' }}>
+                Veri Boyutu: <strong>2.4 GB</strong>
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Rapor Kartları - ANA BÖLÜM */}
-        <div style={{ marginBottom: '40px' }}>
-          <h2 style={{...sectionTitleStyle, marginBottom: '24px'}}>
-            <BarChart3 size={20} />
+        <div style={{ marginBottom: '48px' }}>
+          <h2 style={{
+            fontSize: isMobile ? '24px' : '32px',
+            fontWeight: 'bold',
+            color: '#4b2e05',
+            margin: '0 0 32px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <BarChart3 size={isMobile ? 24 : 32} color="#d97706" />
             Rapor Türleri
           </h2>
           <div style={cardsGridStyle}>
@@ -552,33 +504,76 @@ const RaporlarDashboard = () => {
                 to={card.path}
                 style={cardStyle}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.12)';
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)';
                   e.currentTarget.style.borderColor = card.color;
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-                  e.currentTarget.style.borderColor = '#f3f4f6';
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.1)';
                 }}
               >
-                <div style={cardHeaderStyle}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: '20px'
+                }}>
                   <div style={cardIconStyle(card.gradient)}>
-                    {React.cloneElement(card.icon, { size: 28 })}
+                    {React.cloneElement(card.icon, { size: 32 })}
                   </div>
-                  <span style={badgeStyle(card.color)}>
+                  <span style={{
+                    backgroundColor: `${card.color}15`,
+                    color: card.color,
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
                     {card.badge}
                   </span>
                 </div>
-                <h3 style={cardTitleStyle}>{card.title}</h3>
-                <p style={cardDescStyle}>{card.description}</p>
-                <div style={cardFooterStyle}>
-                  <span style={linkTextStyle}>
+                <h3 style={{
+                  fontSize: '24px',
+                  fontWeight: '600',
+                  color: '#1f2937',
+                  margin: '0 0 12px 0'
+                }}>{card.title}</h3>
+                <p style={{
+                  fontSize: '15px',
+                  color: '#6b7280',
+                  margin: '0 0 24px 0',
+                  lineHeight: '1.6',
+                  minHeight: '48px'
+                }}>{card.description}</p>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '20px',
+                  borderTop: '1px solid rgba(251, 191, 36, 0.2)'
+                }}>
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: '#d97706',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
                     Raporu Aç
-                    <ChevronRight size={16} />
+                    <ChevronRight size={18} />
                   </span>
-                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                    Detaylı analiz
+                  <span style={{
+                    fontSize: '14px',
+                    color: card.color,
+                    fontWeight: 'bold'
+                  }}>
+                    {card.stats}
                   </span>
                 </div>
               </Link>
@@ -587,16 +582,25 @@ const RaporlarDashboard = () => {
         </div>
 
         {/* İki Kolon Layout */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isDesktop ? '2fr 1fr' : '1fr',
-          gap: '24px',
-          marginBottom: '32px'
-        }}>
+        <div style={twoColumnLayoutStyle}>
           {/* Sol Kolon - Hızlı İşlemler */}
-          <div style={quickActionsStyle}>
-            <h3 style={sectionTitleStyle}>
-              <TrendingUp size={20} />
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+            border: '2px solid rgba(251, 191, 36, 0.1)'
+          }}>
+            <h3 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              color: '#1f2937',
+              margin: '0 0 28px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <TrendingUp size={24} color="#d97706" />
               Hızlı İşlemler
             </h3>
             <div style={actionsGridStyle}>
@@ -606,62 +610,175 @@ const RaporlarDashboard = () => {
                   style={actionCardStyle}
                   onClick={action.action}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f3f4f6';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.backgroundColor = '#fef3c7';
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+                    e.currentTarget.style.borderColor = action.color;
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.2)';
                   }}
                 >
-                  <div style={actionIconStyle(action.color)}>
-                    {React.cloneElement(action.icon, { size: 24 })}
+                  <div style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '12px',
+                    backgroundColor: `${action.color}15`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '16px',
+                    color: action.color
+                  }}>
+                    {React.cloneElement(action.icon, { size: 28 })}
                   </div>
-                  <h4 style={actionTitleStyle}>{action.label}</h4>
-                  <p style={actionSubtitleStyle}>{action.sublabel}</p>
+                  <h4 style={{
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    color: '#1f2937',
+                    margin: '0 0 4px 0'
+                  }}>{action.label}</h4>
+                  <p style={{
+                    fontSize: '14px',
+                    color: '#6b7280',
+                    margin: '0'
+                  }}>{action.sublabel}</p>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Sağ Kolon - Son Raporlar */}
-          <div style={recentReportsStyle}>
-            <div style={recentHeaderStyle}>
-              <h3 style={sectionTitleStyle}>
-                <FileText size={20} />
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+            border: '2px solid rgba(251, 191, 36, 0.1)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '28px'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: '600',
+                color: '#1f2937',
+                margin: '0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <FileText size={24} color="#d97706" />
                 Son Raporlar
               </h3>
-              <a href="#" style={viewAllStyle}>
+              <a href="#" style={{
+                fontSize: '14px',
+                color: '#d97706',
+                textDecoration: 'none',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
                 Tümünü Gör
                 <ChevronRight size={16} />
               </a>
             </div>
-            <div style={reportListStyle}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
               {recentReports.map((report, index) => (
                 <div
                   key={index}
-                  style={reportItemStyle}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '20px',
+                    backgroundColor: '#fef3c7',
+                    borderRadius: '12px',
+                    transition: 'all 0.2s ease',
+                    border: '1px solid rgba(251, 191, 36, 0.3)'
+                  }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f3f4f6';
+                    e.currentTarget.style.backgroundColor = '#fde68a';
+                    e.currentTarget.style.transform = 'translateX(4px)';
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
+                    e.currentTarget.style.backgroundColor = '#fef3c7';
+                    e.currentTarget.style.transform = 'translateX(0)';
                   }}
                 >
-                  <div style={reportContentStyle}>
-                    <div style={reportIconStyle(report.color)}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    flex: 1
+                  }}>
+                    <div style={{
+                      width: '50px',
+                      height: '50px',
+                      borderRadius: '12px',
+                      backgroundColor: `${report.color}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: report.color
+                    }}>
                       {report.icon}
                     </div>
                     <div>
-                      <h4 style={reportNameStyle}>{report.name}</h4>
-                      <p style={reportDateStyle}>{report.date}</p>
+                      <h4 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        margin: '0 0 4px 0'
+                      }}>{report.name}</h4>
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#6b7280',
+                        margin: '0'
+                      }}>{report.date}</p>
+                      <span style={{
+                        fontSize: '12px',
+                        color: report.color,
+                        backgroundColor: `${report.color}15`,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        marginTop: '4px',
+                        display: 'inline-block'
+                      }}>
+                        {report.status}
+                      </span>
                     </div>
                   </div>
-                  <div style={reportAmountStyle}>
-                    <p style={amountTextStyle}>{report.amount}</p>
+                  <div style={{
+                    textAlign: 'right',
+                    minWidth: '140px'
+                  }}>
+                    <p style={{
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      color: '#d97706',
+                      margin: '0 0 8px 0'
+                    }}>{report.amount}</p>
                     <Link 
                       to={`/raporlar/${report.type}`} 
-                      style={recreateLinkStyle}
+                      style={{
+                        fontSize: '13px',
+                        color: '#3b82f6',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        justifyContent: 'flex-end'
+                      }}
                     >
                       Tekrar Oluştur
                       <ChevronRight size={12} />
@@ -677,35 +794,46 @@ const RaporlarDashboard = () => {
         <div style={footerStyle}>
           <div style={footerContentStyle}>
             <div style={footerInfoStyle}>
-              <span>📈 6 ana rapor türü</span>
-              <span>💾 10 yıllık veri arşivi</span>
-              <span>⚡ Gerçek zamanlı güncelleme</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Database size={16} /> 6 ana rapor türü
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <BarChart3 size={16} /> 10 yıllık veri arşivi
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <RefreshCw size={16} /> Gerçek zamanlı güncelleme
+              </span>
             </div>
-            <div style={footerActionsStyle}>
+            <div style={{
+              display: 'flex',
+              gap: '16px'
+            }}>
               <button 
                 style={footerButtonStyle}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
-                  e.currentTarget.style.color = '#4b2e05';
+                  e.currentTarget.style.backgroundColor = '#fef3c7';
+                  e.currentTarget.style.borderColor = '#d97706';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
                 }}
               >
+                <Settings size={16} />
                 Rapor Ayarları
               </button>
               <button 
                 style={footerButtonStyle}
                 onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
-                  e.currentTarget.style.color = '#4b2e05';
+                  e.currentTarget.style.backgroundColor = '#fef3c7';
+                  e.currentTarget.style.borderColor = '#d97706';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#6b7280';
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
                 }}
               >
+                <HelpCircle size={16} />
                 Yardım & Destek
               </button>
             </div>
@@ -714,6 +842,21 @@ const RaporlarDashboard = () => {
       </div>
     </div>
   );
+};
+
+// Breadcrumb link style'i ekleyelim
+const breadcrumbLinkStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  color: '#92400e',
+  textDecoration: 'none',
+  fontWeight: '500',
+  padding: '8px 12px',
+  borderRadius: '8px',
+  transition: 'all 0.2s ease',
+  backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  border: '1px solid rgba(251, 191, 36, 0.3)'
 };
 
 export default RaporlarDashboard;
