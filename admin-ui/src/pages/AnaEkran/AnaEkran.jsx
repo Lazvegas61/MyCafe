@@ -97,7 +97,7 @@ export default function AnaEkran({ setGunAktif }) {
     
   }, [setGunAktif]);
 
-  // Gün sonlandırma fonksiyonu
+  // Gün sonlandırma fonksiyonu - GÜNCELLENMİŞ VERSİYON
   const handleGunSonu = useCallback(() => {
     if (gunDurumu === 'kapali') {
       alert('❌ Gün başlatılmamış! Önce "GÜN BAŞLAT" butonuna tıklayın.');
@@ -171,6 +171,7 @@ export default function AnaEkran({ setGunAktif }) {
       setGunAktif(false);
     }
     
+    // ÖNEMLİ: Gün sonu event'ini gönder (Layout component'i bunu dinleyecek)
     if (window.dispatchGlobalEvent) {
       window.dispatchGlobalEvent('gunDurumuDegisti', { aktif: false });
       window.dispatchGlobalEvent('gunSonlandirildi', { 
@@ -181,6 +182,8 @@ export default function AnaEkran({ setGunAktif }) {
     
     alert(`✅ Gün sonlandırıldı!\n\n📊 Gün Sonu Raporu oluşturuldu:\n• Toplam Ciro: ${gunSonuRaporu.toplamCiro.toLocaleString('tr-TR')} ₺\n• Süre: ${gunSonuRaporu.sureSaat} saat ${gunSonuRaporu.sureDakika % 60} dakika`);
     
+    // HEMEN GÜN SONU RAPORU SAYFASINA YÖNLENDİR
+    // Layout component'i artık modal göstermeyecek
     navigate(`/gun-sonu-rapor/${gunSonuRaporId}`);
     
   }, [gunDurumu, dashboardData.criticalProducts.length, navigate, setGunAktif]);

@@ -456,9 +456,25 @@ function Layout({ children, gunAktif, onGunBaslat }) {
   const initializedRef = useRef(false);
   const eventListenersInitializedRef = useRef(false);
   const [showGunBaslatModal, setShowGunBaslatModal] = useState(false);
+  const [gunSonuYapildi, setGunSonuYapildi] = useState(false);
+
+  // Gün sonu sayfası kontrolü (özel durum)
+  const isGunSonuRaporSayfasi = path.includes("/gun-sonu-rapor/");
 
   // Kullanıcı giriş yaptıktan sonra Gün Başlat modal'ını göster
   useEffect(() => {
+    // EĞER GÜN SONU RAPOR SAYFASINDAYSAK MODAL GÖSTERME
+    if (isGunSonuRaporSayfasi) {
+      setShowGunBaslatModal(false);
+      return;
+    }
+    
+    // EĞER GÜN SONU YAPILDIYSA MODAL GÖSTERME
+    if (gunSonuYapildi) {
+      setShowGunBaslatModal(false);
+      return;
+    }
+    
     if (user && path !== "/login" && !gunAktif) {
       // 1 saniye sonra modal'ı göster (sayfanın yüklenmesini bekle)
       const timer = setTimeout(() => {
@@ -467,7 +483,29 @@ function Layout({ children, gunAktif, onGunBaslat }) {
       
       return () => clearTimeout(timer);
     }
-  }, [user, path, gunAktif]);
+  }, [user, path, gunAktif, isGunSonuRaporSayfasi, gunSonuYapildi]);
+
+  // Gün sonu event'ini dinle
+  useEffect(() => {
+    const handleGunSonlandirildi = () => {
+      setGunSonuYapildi(true);
+      setShowGunBaslatModal(false);
+    };
+    
+    window.addEventListener('gunSonlandirildi', handleGunSonlandirildi);
+    
+    return () => {
+      window.removeEventListener('gunSonlandirildi', handleGunSonlandirildi);
+    };
+  }, []);
+
+  // Gün başlatıldığında modal'ı kapat
+  useEffect(() => {
+    if (gunAktif) {
+      setShowGunBaslatModal(false);
+      setGunSonuYapildi(false);
+    }
+  }, [gunAktif]);
 
   useEffect(() => {
     if (!hideSidebar && window.syncService && !initializedRef.current) {
@@ -484,21 +522,26 @@ function Layout({ children, gunAktif, onGunBaslat }) {
   // Gün aktif değilse ve ana sayfa/login hariç diğer sayfalardaysak, ana sayfaya yönlendir
   useEffect(() => {
     const userLoggedIn = !!getUser();
+    
+    // GÜN SONU RAPOR SAYFASI ÖZEL İSTİSNA
+    if (isGunSonuRaporSayfasi) {
+      return; // Gün sonu rapor sayfasına gitmeye izin ver
+    }
+    
     if (userLoggedIn && !gunAktif && path !== "/login" && path !== "/" && path !== "/ana") {
       navigate('/');
     }
-  }, [gunAktif, path, navigate]);
+  }, [gunAktif, path, navigate, isGunSonuRaporSayfasi]);
 
   const handleGunBaslatClick = () => {
     if (onGunBaslat) {
       onGunBaslat();
       setShowGunBaslatModal(false);
+      setGunSonuYapildi(false);
     }
   };
 
   const handleModalClose = () => {
-    // Modal kapatılamaz, sadece Gün Başlat'a basılabilir
-    // Kullanıcıyı çıkışa yönlendirebiliriz
     if (window.confirm("Gün başlatmadan devam edemezsiniz. Çıkış yapmak ister misiniz?")) {
       localStorage.removeItem("mc_user");
       navigate("/login");
@@ -510,8 +553,8 @@ function Layout({ children, gunAktif, onGunBaslat }) {
   
   return (
     <>
-      {/* GÜN BAŞLAT MODAL'ı */}
-      {showGunBaslatModal && (
+      {/* GÜN BAŞLAT MODAL'ı - GÜN SONU RAPOR SAYFASINDA GÖSTERME */}
+      {showGunBaslatModal && !isGunSonuRaporSayfasi && !gunSonuYapildi && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -651,9 +694,10 @@ function Layout({ children, gunAktif, onGunBaslat }) {
           flexDirection: "row",
           background: "#f5e7d0",
           color: "#4b2e05",
-          filter: showGunBaslatModal ? 'blur(5px)' : 'none',
-          opacity: showGunBaslatModal ? 0.3 : 1,
-          pointerEvents: showGunBaslatModal ? 'none' : 'auto',
+          // GÜN SONU RAPOR SAYFASINDA BLUR VE OPACITY UYGULAMA
+          filter: (showGunBaslatModal && !isGunSonuRaporSayfasi) ? 'blur(5px)' : 'none',
+          opacity: (showGunBaslatModal && !isGunSonuRaporSayfasi) ? 0.3 : 1,
+          pointerEvents: (showGunBaslatModal && !isGunSonuRaporSayfasi) ? 'none' : 'auto',
           transition: 'all 0.3s ease'
         }}
       >
@@ -664,9 +708,10 @@ function Layout({ children, gunAktif, onGunBaslat }) {
             flex: 1,
             marginLeft: hideSidebar ? 0 : 280,
             padding: "25px",
-            opacity: isLoginPage ? 1 : (gunAktif ? 1 : 0.5),
+            // GÜN SONU RAPOR SAYFASI ÖZEL DURUM
+            opacity: isLoginPage ? 1 : (isGunSonuRaporSayfasi ? 1 : (gunAktif ? 1 : 0.5)),
             transition: 'opacity 0.3s ease',
-            pointerEvents: isLoginPage ? 'auto' : (gunAktif ? 'auto' : 'none'),
+            pointerEvents: isLoginPage ? 'auto' : (isGunSonuRaporSayfasi ? 'auto' : (gunAktif ? 'auto' : 'none')),
           }}
         >
           {children}

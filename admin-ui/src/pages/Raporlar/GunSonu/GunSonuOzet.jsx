@@ -14,7 +14,7 @@ export default function GunSonuOzet() {
   const [sayfa, setSayfa] = useState(1);
   const [toplamSayfa, setToplamSayfa] = useState(1);
   
-  // Demo Data (API'den gelecek)
+  // Demo Data (API'den gelecek) - SIFIRLANDI
   const [gunListesi, setGunListesi] = useState([]);
   const [istatistikler, setIstatistikler] = useState({
     toplamGun: 0,
@@ -23,22 +23,88 @@ export default function GunSonuOzet() {
     aktifMasa: 0
   });
 
+  // Masa listesini localStorage'dan al
+  const [masaListesi, setMasaListesi] = useState([]);
+
+  useEffect(() => {
+    // localStorage'dan masaları al
+    const masalar = JSON.parse(localStorage.getItem('mc_masalar')) || [];
+    setMasaListesi(masalar);
+  }, []);
+
   // Filtreleme fonksiyonu
   const handleFiltrele = async () => {
     setYukleniyor(true);
     try {
-      // DEMO DATA
-      setTimeout(() => {
-        setGunListesi(demoGunListesi);
-        setIstatistikler({
-          toplamGun: 12,
-          toplamCiro: 84560,
-          ortalamaKar: 3240,
-          aktifMasa: 8
+      // localStorage'dan gün sonu raporlarını al
+      const raporlar = JSON.parse(localStorage.getItem('mc_gunsonu_raporlar')) || [];
+      
+      // Filtreleme işlemleri
+      let filtrelenmis = [...raporlar];
+      
+      // Tarih filtresi
+      if (filtreTarih) {
+        filtrelenmis = filtrelenmis.filter(rapor => 
+          new Date(rapor.tarih).toISOString().split('T')[0] === filtreTarih
+        );
+      }
+      
+      // Masa filtresi
+      if (filtreMasa) {
+        filtrelenmis = filtrelenmis.filter(rapor =>
+          rapor.masaHareketleri?.some(masa => masa.masa === filtreMasa)
+        );
+      }
+      
+      // Ödeme tipi filtresi
+      if (filtreOdemeTipi) {
+        filtrelenmis = filtrelenmis.filter(rapor => {
+          if (filtreOdemeTipi === 'nakit') return rapor.ozet?.toplamNakit > 0;
+          if (filtreOdemeTipi === 'kart') return rapor.ozet?.toplamKart > 0;
+          if (filtreOdemeTipi === 'hesap') return rapor.ozet?.toplamHesap > 0;
+          return true;
         });
-        setToplamSayfa(3);
-        setYukleniyor(false);
-      }, 800);
+      }
+      
+      // Sıralama
+      filtrelenmis.sort((a, b) => {
+        switch (siralama) {
+          case 'tarih_desc':
+            return new Date(b.tarih) - new Date(a.tarih);
+          case 'tarih_asc':
+            return new Date(a.tarih) - new Date(b.tarih);
+          case 'ciro_desc':
+            return (b.ozet?.toplamCiro || 0) - (a.ozet?.toplamCiro || 0);
+          case 'ciro_asc':
+            return (a.ozet?.toplamCiro || 0) - (b.ozet?.toplamCiro || 0);
+          case 'kar_desc':
+            return (b.ozet?.netKar || 0) - (a.ozet?.netKar || 0);
+          case 'kar_asc':
+            return (a.ozet?.netKar || 0) - (b.ozet?.netKar || 0);
+          default:
+            return 0;
+        }
+      });
+      
+      // Sayfalama
+      const baslangic = (sayfa - 1) * 10;
+      const bitis = baslangic + 10;
+      const sayfalaraAyrilmis = filtrelenmis.slice(baslangic, bitis);
+      
+      setGunListesi(sayfalaraAyrilmis);
+      
+      // İstatistikler
+      setIstatistikler({
+        toplamGun: filtrelenmis.length,
+        toplamCiro: filtrelenmis.reduce((sum, rapor) => sum + (rapor.ozet?.toplamCiro || 0), 0),
+        ortalamaKar: filtrelenmis.length > 0 
+          ? filtrelenmis.reduce((sum, rapor) => sum + (rapor.ozet?.netKar || 0), 0) / filtrelenmis.length
+          : 0,
+        aktifMasa: filtrelenmis.reduce((sum, rapor) => sum + (rapor.masaHareketleri?.length || 0), 0) / Math.max(filtrelenmis.length, 1)
+      });
+      
+      setToplamSayfa(Math.ceil(filtrelenmis.length / 10));
+      setYukleniyor(false);
       
     } catch (error) {
       console.error('Filtreleme hatası:', error);
@@ -53,6 +119,7 @@ export default function GunSonuOzet() {
     setFiltreOdemeTipi('');
     setSiralama('tarih_desc');
     setSayfa(1);
+    handleFiltrele();
   };
 
   // Sayfa değiştir
@@ -61,10 +128,8 @@ export default function GunSonuOzet() {
     setSayfa(yeniSayfa);
   };
 
-  // Kart tıklama fonksiyonu - DÜZELTİLDİ
+  // Kart tıklama fonksiyonu
   const handleKartTikla = (gunId) => {
-    console.log('Kart tıklandı, ID:', gunId);
-    // Doğru route'a yönlendir
     navigate(`/gun-sonu-rapor/${gunId}`);
   };
 
@@ -73,81 +138,30 @@ export default function GunSonuOzet() {
     handleFiltrele();
   }, [sayfa]);
 
-  // Demo Data
-  const demoGunListesi = [
-    {
-      id: 1,
-      tarih: "20 Nisan 2024",
-      gunAdi: "Cumartesi",
-      acilis: "08:15",
-      kapanis: "23:45",
-      toplamCiro: 12450,
-      nakit: 6450,
-      kart: 4800,
-      hesabaYaz: 1200,
-      gider: 6750,
-      netKar: 5700,
-      masaSayisi: 12,
-      ortalamaMasaSuresi: "1:45",
-      enCokSatilanUrun: "Çay",
-      odemeDagilimi: { nakit: 52, kart: 38, hesap: 10 },
-      rozetler: ["Yüksek Kar", "Yoğun Gün", "Rekor Satış"]
-    },
-    {
-      id: 2,
-      tarih: "19 Nisan 2024",
-      gunAdi: "Cuma",
-      acilis: "08:30",
-      kapanis: "23:30",
-      toplamCiro: 9850,
-      nakit: 5200,
-      kart: 3650,
-      hesabaYaz: 1000,
-      gider: 5200,
-      netKar: 4650,
-      masaSayisi: 10,
-      ortalamaMasaSuresi: "1:30",
-      enCokSatilanUrun: "Tost",
-      odemeDagilimi: { nakit: 53, kart: 37, hesap: 10 },
-      rozetler: ["Normal", "İyi Satış"]
-    },
-    {
-      id: 3,
-      tarih: "18 Nisan 2024",
-      gunAdi: "Perşembe",
-      acilis: "09:00",
-      kapanis: "22:45",
-      toplamCiro: 7560,
-      nakit: 4200,
-      kart: 2860,
-      hesabaYaz: 500,
-      gider: 4100,
-      netKar: 3460,
-      masaSayisi: 8,
-      ortalamaMasaSuresi: "1:20",
-      enCokSatilanUrun: "Oralet",
-      odemeDagilimi: { nakit: 56, kart: 38, hesap: 6 },
-      rozetler: ["Orta", "Az Gider"]
-    },
-    {
-      id: 4,
-      tarih: "17 Nisan 2024",
-      gunAdi: "Çarşamba",
-      acilis: "09:15",
-      kapanis: "22:30",
-      toplamCiro: 8920,
-      nakit: 5100,
-      kart: 3320,
-      hesabaYaz: 500,
-      gider: 4800,
-      netKar: 4120,
-      masaSayisi: 9,
-      ortalamaMasaSuresi: "1:25",
-      enCokSatilanUrun: "Çay",
-      odemeDagilimi: { nakit: 57, kart: 37, hesap: 6 },
-      rozetler: ["İyi", "Stabil"]
+  // Gün adını al
+  const getGunAdi = (tarihStr) => {
+    const gunler = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+    const tarih = new Date(tarihStr);
+    return gunler[tarih.getDay()];
+  };
+
+  // Rozet belirle
+  const getRozetler = (rapor) => {
+    const rozetler = [];
+    const netKar = rapor.ozet?.netKar || 0;
+    const toplamCiro = rapor.ozet?.toplamCiro || 0;
+    
+    if (netKar > 2000) rozetler.push("Yüksek Kar");
+    if (netKar < 500) rozetler.push("Düşük Kar");
+    if (toplamCiro > 10000) rozetler.push("Rekor Satış");
+    if ((rapor.masaHareketleri?.length || 0) > 15) rozetler.push("Yoğun Gün");
+    
+    if (rozetler.length === 0) {
+      rozetler.push("Normal");
     }
-  ];
+    
+    return rozetler;
+  };
 
   return (
     <div className="gun-sonu-ozet-container">
@@ -188,12 +202,11 @@ export default function GunSonuOzet() {
             className="filtre-select"
           >
             <option value="">Tüm Masalar</option>
-            <option value="1">Masa 1</option>
-            <option value="2">Masa 2</option>
-            <option value="3">Masa 3</option>
-            <option value="4">Masa 4</option>
-            <option value="5">Masa 5</option>
-            <option value="bilardo">Bilardo Masaları</option>
+            {masaListesi.map((masa) => (
+              <option key={masa.id} value={masa.masaNo}>
+                {masa.masaNo} {masa.tip === 'bilardo' ? '(Bilardo)' : ''}
+              </option>
+            ))}
           </select>
         </div>
         
@@ -257,32 +270,32 @@ export default function GunSonuOzet() {
         <div className="istatistik-kutu">
           <h4>Toplam Gün</h4>
           <div className="deger">{istatistikler.toplamGun}</div>
-          <div className="degisim artis">
-            <i className="fas fa-arrow-up"></i> +2 geçen aya göre
+          <div className="degisim">
+            {istatistikler.toplamGun > 0 ? '📊 Kayıtlı' : '📭 Yok'}
           </div>
         </div>
         
         <div className="istatistik-kutu">
           <h4>Toplam Ciro</h4>
           <div className="deger">{istatistikler.toplamCiro.toLocaleString()} ₺</div>
-          <div className="degisim artis">
-            <i className="fas fa-arrow-up"></i> %12.5 artış
+          <div className="degisim">
+            {istatistikler.toplamCiro > 0 ? '💰 Gelir' : '💸 Yok'}
           </div>
         </div>
         
         <div className="istatistik-kutu">
           <h4>Ortalama Günlük Kar</h4>
-          <div className="deger">{istatistikler.ortalamaKar.toLocaleString()} ₺</div>
-          <div className="degisim artis">
-            <i className="fas fa-arrow-up"></i> %8.3 artış
+          <div className="deger">{Math.round(istatistikler.ortalamaKar).toLocaleString()} ₺</div>
+          <div className="degisim">
+            {istatistikler.ortalamaKar > 0 ? '📈 Pozitif' : '📉 Negatif'}
           </div>
         </div>
         
         <div className="istatistik-kutu">
-          <h4>Aktif Masa Ort.</h4>
-          <div className="deger">{istatistikler.aktifMasa}</div>
-          <div className="degisim azalis">
-            <i className="fas fa-arrow-down"></i> %5 azalma
+          <h4>Ort. Aktif Masa</h4>
+          <div className="deger">{Math.round(istatistikler.aktifMasa)}</div>
+          <div className="degisim">
+            {istatistikler.aktifMasa > 5 ? '👥 Yoğun' : '👤 Normal'}
           </div>
         </div>
       </div>
@@ -298,8 +311,9 @@ export default function GunSonuOzet() {
           <div className="empty-icon">📊</div>
           <div className="empty-text">Gün sonu raporu bulunamadı</div>
           <div className="empty-subtext">
-            Seçtiğiniz filtre kriterlerine uygun gün sonu raporu bulunamadı.
-            Lütfen farklı tarih veya filtrelerle tekrar deneyin.
+            {filtreTarih || filtreMasa || filtreOdemeTipi 
+              ? "Seçtiğiniz filtre kriterlerine uygun gün sonu raporu bulunamadı."
+              : "Henüz kayıtlı gün sonu raporu bulunmuyor."}
           </div>
         </div>
       ) : (
@@ -309,42 +323,42 @@ export default function GunSonuOzet() {
               <div 
                 className="gun-karti" 
                 key={gun.id}
-                onClick={() => handleKartTikla(gun.id)} // DÜZELTİLDİ
+                onClick={() => handleKartTikla(gun.id)}
               >
                 <div className="gun-karti-header">
-                  <h4>{gun.tarih}</h4>
-                  <div className="gun-karti-tarih">{gun.gunAdi}</div>
+                  <h4>{new Date(gun.tarih).toLocaleDateString('tr-TR')}</h4>
+                  <div className="gun-karti-tarih">{getGunAdi(gun.tarih)}</div>
                 </div>
                 
-                <div className="toplam">{gun.netKar.toLocaleString()} ₺</div>
+                <div className="toplam">{gun.ozet?.netKar?.toLocaleString() || 0} ₺</div>
                 
                 <div className="meta">
                   <div className="meta-item">
                     <i className="fas fa-cash-register"></i>
-                    <span>Ciro: {gun.toplamCiro.toLocaleString()} ₺</span>
+                    <span>Ciro: {(gun.ozet?.toplamCiro || 0).toLocaleString()} ₺</span>
                   </div>
                   <div className="meta-item">
                     <i className="fas fa-clock"></i>
-                    <span>{gun.acilis} - {gun.kapanis}</span>
+                    <span>{gun.acilis || '09:00'} - {gun.kapanis || '23:00'}</span>
                   </div>
                   <div className="meta-item">
                     <i className="fas fa-chair"></i>
-                    <span>{gun.masaSayisi} Masa</span>
+                    <span>{(gun.masaHareketleri?.length || 0)} Masa</span>
                   </div>
                 </div>
                 
                 <div className="istatistik-bar">
                   <div 
                     className="istatistik-dolum" 
-                    style={{ width: `${(gun.netKar / 10000) * 100}%` }}
+                    style={{ width: `${Math.min(((gun.ozet?.netKar || 0) / 10000) * 100, 100)}%` }}
                   ></div>
                 </div>
                 
                 <div className="rozetler">
-                  {gun.rozetler.map((rozet, index) => {
+                  {getRozetler(gun).map((rozet, index) => {
                     let tip = "neutral";
-                    if (rozet.includes("Yüksek") || rozet.includes("Rekor")) tip = "positive";
-                    if (rozet.includes("Düşük") || rozet.includes("Az")) tip = "negative";
+                    if (rozet.includes("Yüksek") || rozet.includes("Rekor") || rozet.includes("Yoğun")) tip = "positive";
+                    if (rozet.includes("Düşük")) tip = "negative";
                     
                     return (
                       <span key={index} className={`rozet ${tip}`}>
@@ -352,11 +366,7 @@ export default function GunSonuOzet() {
                         {rozet === "Yoğun Gün" && <i className="fas fa-users"></i>}
                         {rozet === "Rekor Satış" && <i className="fas fa-trophy"></i>}
                         {rozet === "Normal" && <i className="fas fa-check"></i>}
-                        {rozet === "İyi Satış" && <i className="fas fa-thumbs-up"></i>}
-                        {rozet === "Orta" && <i className="fas fa-minus"></i>}
-                        {rozet === "Az Gider" && <i className="fas fa-coins"></i>}
-                        {rozet === "İyi" && <i className="fas fa-smile"></i>}
-                        {rozet === "Stabil" && <i className="fas fa-balance-scale"></i>}
+                        {rozet === "Düşük Kar" && <i className="fas fa-arrow-down"></i>}
                         {rozet}
                       </span>
                     );

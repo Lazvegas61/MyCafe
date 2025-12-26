@@ -1038,3 +1038,109 @@
     page-break-inside: avoid;
   }
 }
+/* 3 SÜTUNLU YAPISI */
+.rapor-ana-icerik-full {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 eşit sütun */
+  gap: 24px;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.rapor-kolon-full {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rapor-bolum-full {
+  background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
+  padding: 24px;
+  border-radius: 18px;
+  box-shadow: 0 6px 20px rgba(139, 94, 60, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.rapor-bolum-full h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #3a2c1a;
+  padding-bottom: 12px;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* TABLO YÜKSEKLİK AYARI */
+.table-responsive-full {
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  flex: 1;
+  min-height: 0;
+}
+
+.rapor-tablosu-full {
+  width: 100%;
+  min-width: 700px;
+}
+
+/* LİSTE YÜKSEKLİK AYARLARI */
+.urun-listesi-full,
+.gider-listesi-full {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* RESPONSIVE DÜZENLEMELER */
+@media (max-width: 1200px) {
+  .rapor-ana-icerik-full {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .rapor-ana-icerik-full {
+    grid-template-columns: 1fr;
+  }
+  
+  .rapor-bolum-full {
+    height: auto;
+    min-height: 400px;
+  }
+}
+
+/* BOŞ DURUM GÖRSELLERİ */
+.rapor-bolum-full .bos-durum {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b4e2e;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  opacity: 0.7;
+}
+
+.bos-durum i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #d4af37;
+  opacity: 0.5;
+}
+
+.bos-durum span {
+  font-size: 14px;
+  font-weight: 500;
+}
