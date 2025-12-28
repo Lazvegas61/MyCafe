@@ -33,6 +33,9 @@ export default function Adisyon() {
     const [seciliUrun, setSeciliUrun] = useState(null);
     const [adetPanelAcik, setAdetPanelAcik] = useState(false);
     const [adet, setAdet] = useState(1);
+    
+    // ÜRÜN ARAMA - YENİ EKLENDİ
+    const [urunArama, setUrunArama] = useState("");
 
     // SİPARİŞ YEMEK alanı
     const [siparisYemekFiyat, setSiparisYemekFiyat] = useState("");
@@ -721,19 +724,49 @@ export default function Adisyon() {
         }
     }, [kategoriler, aktifKategori]);
 
+    // --------------------------------------------------
+    // ARANAN ÜRÜNLERİ FİLTRELE - TÜM KATEGORİLERDE ARAMA
+    // --------------------------------------------------
     const filtreliUrunler = useMemo(() => {
+        // Tüm kategorilerde arama yap
+        if (urunArama.trim() !== "") {
+            const aramaTerimi = urunArama.toLowerCase();
+            
+            // Tüm ürünlerde arama yap
+            let tumUrunlerArama = urunler.filter((u) =>
+                u.ad.toLowerCase().includes(aramaTerimi)
+            );
+            
+            // SİPARİŞ YEMEK özel durumu
+            if (aramaTerimi.includes("sipariş") || aramaTerimi.includes("yemek")) {
+                tumUrunlerArama.unshift({
+                    id: "siparis-yemek",
+                    ad: "SİPARİŞ YEMEK",
+                    kategori: "SİPARİŞ YEMEK",
+                    satis: 0
+                });
+            }
+            
+            return tumUrunlerArama;
+        }
+        
+        // Arama yoksa, aktif kategorideki ürünleri göster
         if (!aktifKategori) return [];
+        
         if (aktifKategori === "SİPARİŞ YEMEK") {
             return [
                 {
                     id: "siparis-yemek",
                     ad: "SİPARİŞ YEMEK",
                     kategori: "SİPARİŞ YEMEK",
+                    satis: 0
                 },
             ];
         }
+        
+        // Aktif kategorideki ürünleri göster
         return urunler.filter((u) => u.kategori === aktifKategori);
-    }, [urunler, aktifKategori]);
+    }, [urunler, aktifKategori, urunArama]);
 
     // --------------------------------------------------
     // ADET PANEL EKLE FONKSİYONU - EKLENDİ
@@ -3210,6 +3243,80 @@ export default function Adisyon() {
                     MENÜ (Ürünler)
                 </div>
 
+                {/* ÜRÜN ARAMA KUTUSU - YENİ EKLENDİ */}
+                <div style={{ marginBottom: "12px" }}>
+                    <div style={{ position: "relative" }}>
+                        <input
+                            type="text"
+                            placeholder="🔍 Tüm ürünlerde ara..."
+                            value={urunArama}
+                            onChange={(e) => setUrunArama(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                paddingLeft: "36px", // İkon için boşluk
+                                borderRadius: "8px",
+                                border: "1px solid #d0b48c",
+                                fontSize: "14px",
+                                background: "#fff",
+                                color: "#4b2e05",
+                                outline: "none",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                            }}
+                        />
+                        <div style={{
+                            position: "absolute",
+                            left: "12px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            fontSize: "16px",
+                            color: "#8d7b5f"
+                        }}>
+                            🔍
+                        </div>
+                        {urunArama && (
+                            <button
+                                onClick={() => setUrunArama("")}
+                                style={{
+                                    position: "absolute",
+                                    right: "10px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "#ff6b6b",
+                                    cursor: "pointer",
+                                    fontSize: "18px",
+                                    padding: "0",
+                                    width: "24px",
+                                    height: "24px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                                title="Aramayı temizle"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+                    {urunArama && (
+                        <div style={{
+                            fontSize: "12px",
+                            color: "#8d7b5f",
+                            marginTop: "4px",
+                            textAlign: "center"
+                        }}>
+                            "{urunArama}" için {filtreliUrunler.length} ürün bulundu
+                            {aktifKategori && aktifKategori !== "SİPARİŞ YEMEK" && (
+                                <span style={{ marginLeft: "8px", fontStyle: "italic" }}>
+                                    (Tüm kategorilerde aranıyor)
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* ÜRÜN LİSTESİ */}
                 <div
                     style={{
@@ -3222,7 +3329,16 @@ export default function Adisyon() {
                     }}
                 >
                     {filtreliUrunler.length === 0 ? (
-                        <div style={{ fontSize: "14px" }}>Bu kategoride ürün yok.</div>
+                        <div style={{ 
+                            textAlign: "center", 
+                            padding: "20px",
+                            color: "#8d7b5f"
+                        }}>
+                            {urunArama ? 
+                                `"${urunArama}" için ürün bulunamadı` : 
+                                "Bu kategoride ürün yok."
+                            }
+                        </div>
                     ) : (
                         <div
                             style={{
@@ -3444,7 +3560,10 @@ export default function Adisyon() {
                     {kategoriler.map((kat) => (
                         <button
                             key={kat}
-                            onClick={() => setAktifKategori(kat)}
+                            onClick={() => {
+                                setAktifKategori(kat);
+                                setUrunArama(""); // Kategori değiştirince aramayı temizle
+                            }}
                             style={{
                                 padding: "15px 5px",
                                 borderRadius: "8px",

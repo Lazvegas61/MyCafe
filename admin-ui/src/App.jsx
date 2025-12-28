@@ -1,6 +1,6 @@
-// App.jsx - TÜM GÜNCELLEMELERLE BİRLİKTE
+// App.jsx - TÜM GÜNCELLEMELERLE BİRLİKTE (DETAYLI RAPOR EKLENDİ)
 /* ------------------------------------------------------------
-   📌 App.jsx — MyCafe (FINAL - GÜN BAŞLATMA SİSTEMİ ENTEGRE)
+   📌 App.jsx — MyCafe (FINAL - DETAYLI RAPOR ENTEGRE)
 ------------------------------------------------------------ */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -410,7 +410,7 @@ function initializeGlobalEventListeners() {
 }
 
 /* ------------------------------------------------------------
-   📌 SAYFA IMPORTLARI — YENİ RAPOR YAPISI İLE
+   📌 SAYFA IMPORTLARI — DETAYLI RAPOR EKLENDİ
 ------------------------------------------------------------ */
 import Login from "./pages/Login/Login.jsx";
 import AnaEkran from "./pages/AnaEkran/AnaEkran.jsx";
@@ -437,8 +437,8 @@ import KategoriBazliSatis from "./pages/Raporlar/KategoriRaporlari/KategoriBazli
 import GunlukGiderler from "./pages/Raporlar/GiderRaporlari/GunlukGiderler.jsx";
 import MasaAnalizi from "./pages/Raporlar/MasaRaporlari/MasaAnalizi.jsx";
 
-// KASA RAPORU KARTI - IMPORT EKLENDİ
-import KasaRaporuKartı from "./pages/Raporlar/KasaRaporu/KasaRaporuKartı.jsx";
+// DETAYLI RAPOR SAYFASI IMPORT EKLENDİ
+import DetayliRapor from "./pages/Raporlar/DetayliRapor/DetayliRapor.jsx";
 
 /* ------------------------------------------------------------
    📌 LAYOUT — Sidebar login harici HER YERDE görünsün
@@ -456,11 +456,13 @@ function Layout({ children, gunAktif, onGunBaslat }) {
 
   // Gün sonu sayfası kontrolü (özel durum)
   const isGunSonuRaporSayfasi = path.includes("/gun-sonu-rapor/");
+  // Detaylı rapor sayfası kontrolü (özel durum)
+  const isDetayliRaporSayfasi = path.includes("/raporlar/detayli-rapor");
 
   // Kullanıcı giriş yaptıktan sonra Gün Başlat modal'ını göster
   useEffect(() => {
-    // EĞER GÜN SONU RAPOR SAYFASINDAYSAK MODAL GÖSTERME
-    if (isGunSonuRaporSayfasi) {
+    // EĞER GÜN SONU RAPOR SAYFASINDAYSAK VEYA DETAYLI RAPOR SAYFASINDAYSAK MODAL GÖSTERME
+    if (isGunSonuRaporSayfasi || isDetayliRaporSayfasi) {
       setShowGunBaslatModal(false);
       return;
     }
@@ -479,7 +481,7 @@ function Layout({ children, gunAktif, onGunBaslat }) {
       
       return () => clearTimeout(timer);
     }
-  }, [user, path, gunAktif, isGunSonuRaporSayfasi, gunSonuYapildi]);
+  }, [user, path, gunAktif, isGunSonuRaporSayfasi, isDetayliRaporSayfasi, gunSonuYapildi]);
 
   // Gün sonu event'ini dinle
   useEffect(() => {
@@ -518,14 +520,14 @@ function Layout({ children, gunAktif, onGunBaslat }) {
   // Gün aktif değilse ve ana sayfa/login hariç diğer sayfalardaysak, ana sayfaya yönlendir
   useEffect(() => {
     // GÜN SONU RAPOR SAYFASI ÖZEL İSTİSNA
-    if (isGunSonuRaporSayfasi) {
-      return; // Gün sonu rapor sayfasına gitmeye izin ver
+    if (isGunSonuRaporSayfasi || isDetayliRaporSayfasi) {
+      return; // Gün sonu rapor sayfasına veya detaylı rapor sayfasına gitmeye izin ver
     }
     
     if (user && !gunAktif && path !== "/login" && path !== "/" && path !== "/ana") {
       navigate('/');
     }
-  }, [gunAktif, path, navigate, isGunSonuRaporSayfasi, user]);
+  }, [gunAktif, path, navigate, isGunSonuRaporSayfasi, isDetayliRaporSayfasi, user]);
 
   const handleGunBaslatClick = () => {
     if (onGunBaslat) {
@@ -547,8 +549,8 @@ function Layout({ children, gunAktif, onGunBaslat }) {
   
   return (
     <>
-      {/* GÜN BAŞLAT MODAL'ı - GÜN SONU RAPOR SAYFASINDA GÖSTERME */}
-      {showGunBaslatModal && !isGunSonuRaporSayfasi && !gunSonuYapildi && (
+      {/* GÜN BAŞLAT MODAL'ı - GÜN SONU RAPOR VEYA DETAYLI RAPOR SAYFASINDA GÖSTERME */}
+      {showGunBaslatModal && !isGunSonuRaporSayfasi && !isDetayliRaporSayfasi && !gunSonuYapildi && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -688,10 +690,10 @@ function Layout({ children, gunAktif, onGunBaslat }) {
           flexDirection: "row",
           background: "#f5e7d0",
           color: "#4b2e05",
-          // GÜN SONU RAPOR SAYFASINDA BLUR VE OPACITY UYGULAMA
-          filter: (showGunBaslatModal && !isGunSonuRaporSayfasi) ? 'blur(5px)' : 'none',
-          opacity: (showGunBaslatModal && !isGunSonuRaporSayfasi) ? 0.3 : 1,
-          pointerEvents: (showGunBaslatModal && !isGunSonuRaporSayfasi) ? 'none' : 'auto',
+          // GÜN SONU RAPOR VEYA DETAYLI RAPOR SAYFASINDA BLUR VE OPACITY UYGULAMA
+          filter: (showGunBaslatModal && !isGunSonuRaporSayfasi && !isDetayliRaporSayfasi) ? 'blur(5px)' : 'none',
+          opacity: (showGunBaslatModal && !isGunSonuRaporSayfasi && !isDetayliRaporSayfasi) ? 0.3 : 1,
+          pointerEvents: (showGunBaslatModal && !isGunSonuRaporSayfasi && !isDetayliRaporSayfasi) ? 'none' : 'auto',
           transition: 'all 0.3s ease'
         }}
       >
@@ -702,10 +704,10 @@ function Layout({ children, gunAktif, onGunBaslat }) {
             flex: 1,
             marginLeft: hideSidebar ? 0 : 280,
             padding: "25px",
-            // GÜN SONU RAPOR SAYFASI ÖZEL DURUM
-            opacity: isLoginPage ? 1 : (isGunSonuRaporSayfasi ? 1 : (gunAktif ? 1 : 0.5)),
+            // GÜN SONU RAPOR VEYA DETAYLI RAPOR SAYFASI ÖZEL DURUM
+            opacity: isLoginPage ? 1 : ((isGunSonuRaporSayfasi || isDetayliRaporSayfasi) ? 1 : (gunAktif ? 1 : 0.5)),
             transition: 'opacity 0.3s ease',
-            pointerEvents: isLoginPage ? 'auto' : (isGunSonuRaporSayfasi ? 'auto' : (gunAktif ? 'auto' : 'none')),
+            pointerEvents: isLoginPage ? 'auto' : ((isGunSonuRaporSayfasi || isDetayliRaporSayfasi) ? 'auto' : (gunAktif ? 'auto' : 'none')),
           }}
         >
           {children}
@@ -901,7 +903,7 @@ function App() {
             <Route path="/masa-detay/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaDetay /></Layout>} />
             <Route path="/bilardo-adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><BilardoAdisyon /></Layout>} />
             
-            {/* 3. RAPOR ROUTE'LARI */}
+            {/* 3. RAPOR ROUTE'LARI - DETAYLI RAPOR EKLENDİ */}
             <Route path="/gun-sonu-rapor/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuRapor /></Layout>} />
             <Route path="/raporlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
             <Route path="/raporlar/dashboard" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
@@ -911,7 +913,8 @@ function App() {
             <Route path="/raporlar/urun-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunBazliSatis /></Layout>} />
             <Route path="/raporlar/kategori-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><KategoriBazliSatis /></Layout>} />
             <Route path="/raporlar/gunluk-giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunlukGiderler /></Layout>} />
-            <Route path="/raporlar/kasa" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><KasaRaporuKartı /></Layout>} />
+            {/* DETAYLI RAPOR ROUTE'U EKLENDİ */}
+            <Route path="/raporlar/detayli-rapor" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><DetayliRapor /></Layout>} />
             
             {/* 4. ANA SAYFALAR */}
             <Route path="/" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />

@@ -7,7 +7,7 @@ const UrunBazliSatis = () => {
   // State'ler
   const [filtreBaslangic, setFiltreBaslangic] = useState(new Date());
   const [filtreBitis, setFiltreBitis] = useState(new Date());
-  const [filtreUrun, setFiltreUrun] = useState('');
+  const [filtreUrun, setFiltreUrun] = useState('Tüm Ürünler');
   const [filtreOdemeTuru, setFiltreOdemeTuru] = useState('Tümü');
   const [siralama, setSiralama] = useState('satis_desc');
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -79,65 +79,6 @@ const UrunBazliSatis = () => {
     });
   };
 
-  // Hızlı tarih seçenekleri
-  const hizliTarihSecenekleri = useMemo(() => [
-    { 
-      label: 'Bugün', 
-      onClick: () => {
-        const today = new Date();
-        setFiltreBaslangic(today);
-        setFiltreBitis(today);
-      }
-    },
-    { 
-      label: 'Dün', 
-      onClick: () => {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        setFiltreBaslangic(yesterday);
-        setFiltreBitis(yesterday);
-      }
-    },
-    { 
-      label: 'Son 7 Gün', 
-      onClick: () => {
-        const lastWeek = new Date();
-        lastWeek.setDate(lastWeek.getDate() - 7);
-        setFiltreBaslangic(lastWeek);
-        setFiltreBitis(new Date());
-      }
-    },
-    { 
-      label: 'Son 30 Gün', 
-      onClick: () => {
-        const lastMonth = new Date();
-        lastMonth.setDate(lastMonth.getDate() - 30);
-        setFiltreBaslangic(lastMonth);
-        setFiltreBitis(new Date());
-      }
-    },
-    { 
-      label: 'Bu Ay', 
-      onClick: () => {
-        const today = new Date();
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        setFiltreBaslangic(firstDay);
-        setFiltreBitis(lastDay);
-      }
-    },
-    { 
-      label: 'Geçen Ay', 
-      onClick: () => {
-        const today = new Date();
-        const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
-        setFiltreBaslangic(firstDay);
-        setFiltreBitis(lastDay);
-      }
-    }
-  ], []);
-
   // API'den satış verilerini çekme fonksiyonu
   const satisVerileriniGetir = useCallback(async () => {
     // Burada gerçek API çağrısı yapılacak
@@ -172,9 +113,6 @@ const UrunBazliSatis = () => {
           urunAdi: urun.name || "Bilinmeyen Ürün",
           kategori: urun.categoryName || "Kategori Yok",
           barkod: urun.barkod || "-",
-          stok: urun.stock || 0,
-          kritikStok: urun.critical || 0,
-          stokDurumu: urun.stock <= (urun.critical || 0) ? "KRITIK" : "YETERLI",
           toplamSatis: 0, // Gerçek API'den gelecek
           toplamKar: 0, // Gerçek API'den gelecek
           satisAdedi: 0, // Gerçek API'den gelecek
@@ -185,12 +123,7 @@ const UrunBazliSatis = () => {
             ((urun.salePrice - urun.costPrice) / urun.salePrice * 100).toFixed(1) : 0,
           maliyet: urun.costPrice || 0,
           maliyetsizUrun: !urun.costPrice || urun.costPrice === 0,
-          trend: "stabil",
-          odemeDagilimi: {
-            NAKIT: 0,
-            KREDI_KARTI: 0,
-            HESABA_YAZ: 0
-          }
+          trend: "stabil"
         }));
       } else {
         // API'den gelen gerçek verileri kullan
@@ -303,12 +236,12 @@ const UrunBazliSatis = () => {
         'Ürün Adı': urun.urunAdi,
         'Kategori': urun.kategori,
         'Barkod': urun.barkod,
-        'Stok': urun.stok,
         'Toplam Satış (₺)': urun.toplamSatis,
         'Toplam Kar (₺)': urun.toplamKar,
         'Satış Adedi': urun.satisAdedi,
         'Ortalama Fiyat (₺)': urun.ortalamaFiyat,
-        'Kar Oranı (%)': urun.karOrani
+        'Kar Oranı (%)': urun.karOrani,
+        'Maliyet (₺)': urun.maliyet
       }));
       
       // CSV formatında indirme (gerçek uygulamada Excel kütüphanesi kullanılabilir)
@@ -464,34 +397,6 @@ const UrunBazliSatis = () => {
     .urun-btn:hover:not(:disabled) {
       transform: translateY(-3px);
       box-shadow: 0 8px 20px rgba(52, 152, 219, 0.3);
-    }
-
-    /* HIZLI TARİH BUTONLARI */
-    .hizli-tarih-grup {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .hizli-tarih-btn {
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 1px solid rgba(52, 152, 219, 0.2);
-      background: white;
-      color: #3498db;
-      font-size: clamp(11px, 1.2vw, 12px);
-      flex: 1;
-      min-width: 80px;
-      text-align: center;
-    }
-
-    .hizli-tarih-btn:hover {
-      background: rgba(52, 152, 219, 0.1);
-      border-color: #3498db;
     }
 
     /* FİLTRE BAR */
@@ -743,32 +648,6 @@ const UrunBazliSatis = () => {
       background: rgba(52, 152, 219, 0.05);
     }
 
-    /* STOK DURUMU BADGE */
-    .stok-badge {
-      padding: 6px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-
-    .stok-yeterli {
-      background: rgba(46, 204, 113, 0.1);
-      color: #27ae60;
-      border: 1px solid rgba(46, 204, 113, 0.3);
-    }
-
-    .stok-kritik {
-      background: rgba(231, 76, 60, 0.1);
-      color: #e74c3c;
-      border: 1px solid rgba(231, 76, 60, 0.3);
-    }
-
     /* MALİYETSİZ BADGE */
     .maliyetsiz-badge {
       padding: 4px 8px;
@@ -781,34 +660,60 @@ const UrunBazliSatis = () => {
       margin-left: 8px;
     }
 
-    /* ÖDEME DAĞILIMI */
-    .odeme-dagilimi {
+    /* MALİYET VE SATIŞ SÜTUNLARI */
+    .maliyet-satis-container {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      min-width: 120px;
-    }
-
-    .odeme-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
       gap: 8px;
     }
 
-    .odeme-label {
-      color: #6b4e2e;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .maliyet-row, .satis-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
-    .odeme-deger {
-      color: #3498db;
+    .maliyet-label {
+      font-size: 11px;
+      color: #7f8c8d;
+      font-weight: 600;
+    }
+
+    .maliyet-deger {
+      font-size: 14px;
+      color: #e74c3c;
       font-weight: 700;
-      white-space: nowrap;
+    }
+
+    .satis-deger {
+      font-size: 16px;
+      color: #2c3e50;
+      font-weight: 800;
+    }
+
+    .maliyetsiz-satis-deger {
+      font-size: 18px;
+      color: #3498db;
+      font-weight: 900;
+    }
+
+    /* KAR BİLGİLERİ */
+    .kar-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .kar-deger {
+      color: #27ae60;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .kar-orani {
+      font-size: 12px;
+      color: #666;
+      font-weight: 600;
     }
 
     /* ÖZET KART */
@@ -1040,18 +945,6 @@ const UrunBazliSatis = () => {
         overflow-x: auto;
       }
       
-      .hizli-tarih-grup {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding-bottom: 8px;
-        margin-bottom: 12px;
-      }
-      
-      .hizli-tarih-btn {
-        flex: 0 0 auto;
-        min-width: 80px;
-      }
-      
       .sayfalama {
         flex-direction: column;
         gap: 12px;
@@ -1177,18 +1070,6 @@ const UrunBazliSatis = () => {
           </h1>
         </div>
 
-        <div className="hizli-tarih-grup">
-          {hizliTarihSecenekleri.map((secenek, index) => (
-            <button
-              key={index}
-              className="hizli-tarih-btn"
-              onClick={secenek.onClick}
-            >
-              {secenek.label}
-            </button>
-          ))}
-        </div>
-
         <div className="urun-btn-group">
           <button 
             className="urun-btn urun-btn-primary" 
@@ -1253,23 +1134,6 @@ const UrunBazliSatis = () => {
               {urunListesi.map((urun, index) => (
                 <option key={index} value={urun}>
                   {urun}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="urun-filtre-grup">
-            <label className="urun-filtre-label">
-              <i className="fas fa-credit-card"></i>
-              Ödeme Türü
-            </label>
-            <select
-              value={filtreOdemeTuru}
-              onChange={(e) => setFiltreOdemeTuru(e.target.value)}
-            >
-              {odemeTurleri.map((tur, index) => (
-                <option key={index} value={tur.value}>
-                  {tur.label}
                 </option>
               ))}
             </select>
@@ -1349,10 +1213,9 @@ const UrunBazliSatis = () => {
                 <thead>
                   <tr>
                     <th>Ürün Bilgisi</th>
-                    <th>Stok Durumu</th>
                     <th>Satış Bilgileri</th>
+                    <th>Maliyet & Satış</th>
                     <th>Kar Bilgileri</th>
-                    <th>Ödeme Dağılımı</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1371,17 +1234,6 @@ const UrunBazliSatis = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span className={`stok-badge stok-${urun.stokDurumu.toLowerCase()}`}>
-                            {urun.stokDurumu === 'YETERLI' && '✓ Yeterli'}
-                            {urun.stokDurumu === 'KRITIK' && '⚠ Kritik'}
-                          </span>
-                          <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                            {urun.stok} adet
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div>
                             <strong>{urun.toplamSatis.toLocaleString('tr-TR')} ₺</strong>
                           </div>
@@ -1394,37 +1246,46 @@ const UrunBazliSatis = () => {
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ color: '#27ae60', fontWeight: '700' }}>
-                            {urun.toplamKar.toLocaleString('tr-TR')} ₺
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                            %{urun.karOrani} kar oranı
-                          </div>
-                          {urun.maliyet > 0 && (
-                            <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
-                              Maliyet: {urun.maliyet.toFixed(2)} ₺
+                        <div className="maliyet-satis-container">
+                          {urun.maliyetsizUrun ? (
+                            <div className="satis-row">
+                              <div className="maliyet-label">Satış Tutarı:</div>
+                              <div className="maliyetsiz-satis-deger">
+                                {urun.toplamSatis.toLocaleString('tr-TR')} ₺
+                              </div>
                             </div>
+                          ) : (
+                            <>
+                              <div className="maliyet-row">
+                                <div className="maliyet-label">Maliyet:</div>
+                                <div className="maliyet-deger">
+                                  {urun.maliyet.toFixed(2)} ₺
+                                </div>
+                              </div>
+                              <div className="satis-row">
+                                <div className="maliyet-label">Satış:</div>
+                                <div className="satis-deger">
+                                  {urun.toplamSatis.toLocaleString('tr-TR')} ₺
+                                </div>
+                              </div>
+                            </>
                           )}
                         </div>
                       </td>
                       <td>
-                        {urun.odemeDagilimi ? (
-                          <div className="odeme-dagilimi">
-                            {Object.entries(urun.odemeDagilimi).map(([tur, tutar]) => (
-                              <div key={tur} className="odeme-item">
-                                <span className="odeme-label">
-                                  {tur === 'NAKIT' ? 'Nakit' : 
-                                   tur === 'KREDI_KARTI' ? 'Kart' : 
-                                   tur === 'HESABA_YAZ' ? 'Hesap' : tur}
-                                </span>
-                                <span className="odeme-deger">{tutar} ₺</span>
-                              </div>
-                            ))}
+                        <div className="kar-container">
+                          <div className="kar-deger">
+                            {urun.toplamKar.toLocaleString('tr-TR')} ₺
                           </div>
-                        ) : (
-                          <div style={{ fontSize: '12px', color: '#666' }}>Veri yok</div>
-                        )}
+                          <div className="kar-orani">
+                            %{urun.karOrani} kar oranı
+                          </div>
+                          {urun.maliyet > 0 && (
+                            <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
+                              Ort. Fiyat: {urun.ortalamaFiyat.toFixed(2)} ₺
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
