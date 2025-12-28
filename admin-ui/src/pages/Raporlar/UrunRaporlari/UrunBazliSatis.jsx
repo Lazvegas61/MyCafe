@@ -7,15 +7,12 @@ const UrunBazliSatis = () => {
   // State'ler
   const [filtreBaslangic, setFiltreBaslangic] = useState(new Date());
   const [filtreBitis, setFiltreBitis] = useState(new Date());
-  const [filtreKategori, setFiltreKategori] = useState('Tüm Kategoriler');
   const [filtreUrun, setFiltreUrun] = useState('');
-  const [filtreStokDurumu, setFiltreStokDurumu] = useState('Tümü');
-  const [filtreSatirTipi, setFiltreSatirTipi] = useState('Tümü');
   const [filtreOdemeTuru, setFiltreOdemeTuru] = useState('Tümü');
   const [siralama, setSiralama] = useState('satis_desc');
   const [yukleniyor, setYukleniyor] = useState(false);
   const [sayfa, setSayfa] = useState(1);
-  const [sayfaBoyutu, setSayfaBoyutu] = useState(20);
+  const [sayfaBoyutu] = useState(20); // Sabit sayfa boyutu
   const [toplamKayit, setToplamKayit] = useState(0);
   
   // Veriler
@@ -27,284 +24,33 @@ const UrunBazliSatis = () => {
     ortalamaSatis: 0,
     enCokSatisUrun: '',
     enKarliUrun: '',
-    kritikStokUrunSayisi: 0,
-    stoktaToplamUrun: 0,
     toplamSatirAdedi: 0,
     aktifUrunSayisi: 0
   });
 
-  // Demo veriler
-  const demoUrunler = useMemo(() => [
-    {
-      urunId: 1,
-      urunAdi: "Çay",
-      kategori: "Sıcak İçecekler",
-      barkod: "CH001",
-      stok: 150,
-      kritikStok: 20,
-      stokDurumu: "YETERLI",
-      toplamSatis: 1250,
-      toplamKar: 875,
-      satisAdedi: 425,
-      iptalAdedi: 5,
-      ikramAdedi: 15,
-      ortalamaFiyat: 2,
-      karOrani: 70,
-      maliyet: 0,
-      maliyetsizUrun: true,
-      trend: "artis",
-      renk: "#e74c3c",
-      odemeDagilimi: {
-        NAKIT: 800,
-        KREDI_KARTI: 350,
-        HESABA_YAZ: 100
-      },
-      gunBazliSatislar: [
-        { gun: '20 Nisan 2024', satis: 45, kar: 31.5 },
-        { gun: '19 Nisan 2024', satis: 42, kar: 29.4 },
-        { gun: '18 Nisan 2024', satis: 38, kar: 26.6 }
-      ]
-    },
-    {
-      urunId: 2,
-      urunAdi: "Nescafe",
-      kategori: "Sıcak İçecekler",
-      barkod: "NF002",
-      stok: 45,
-      kritikStok: 15,
-      stokDurumu: "YETERLI",
-      toplamSatis: 980,
-      toplamKar: 686,
-      satisAdedi: 98,
-      iptalAdedi: 2,
-      ikramAdedi: 3,
-      ortalamaFiyat: 8,
-      karOrani: 70,
-      maliyet: 2.4,
-      maliyetsizUrun: false,
-      trend: "stabil",
-      renk: "#f39c12",
-      odemeDagilimi: {
-        NAKIT: 500,
-        KREDI_KARTI: 480
+  // LocalStorage'dan ürün verilerini çek
+  const urunler = useMemo(() => {
+    try {
+      const storedUrunler = localStorage.getItem("mc_urunler");
+      if (storedUrunler) {
+        const parsed = JSON.parse(storedUrunler);
+        return Array.isArray(parsed) ? parsed : [];
       }
-    },
-    {
-      urunId: 3,
-      urunAdi: "Tost",
-      kategori: "Yiyecekler",
-      barkod: "TO003",
-      stok: 28,
-      kritikStok: 10,
-      stokDurumu: "YETERLI",
-      toplamSatis: 2150,
-      toplamKar: 1505,
-      satisAdedi: 143,
-      iptalAdedi: 3,
-      ikramAdedi: 2,
-      ortalamaFiyat: 15,
-      karOrani: 70,
-      maliyet: 4.5,
-      maliyetsizUrun: false,
-      trend: "artis",
-      renk: "#2ecc71",
-      odemeDagilimi: {
-        NAKIT: 1000,
-        KREDI_KARTI: 950,
-        HESABA_YAZ: 200
-      }
-    },
-    {
-      urunId: 4,
-      urunAdi: "Kola",
-      kategori: "Soğuk İçecekler",
-      barkod: "CL004",
-      stok: 12,
-      kritikStok: 15,
-      stokDurumu: "KRITIK",
-      toplamSatis: 780,
-      toplamKar: 546,
-      satisAdedi: 120,
-      iptalAdedi: 4,
-      ikramAdedi: 6,
-      ortalamaFiyat: 6.5,
-      karOrani: 70,
-      maliyet: 1.95,
-      maliyetsizUrun: false,
-      trend: "artis",
-      renk: "#3498db",
-      odemeDagilimi: {
-        NAKIT: 400,
-        KREDI_KARTI: 380
-      }
-    },
-    {
-      urunId: 5,
-      urunAdi: "Su",
-      kategori: "Soğuk İçecekler",
-      barkod: "SW005",
-      stok: 85,
-      kritikStok: 20,
-      stokDurumu: "YETERLI",
-      toplamSatis: 420,
-      toplamKar: 294,
-      satisAdedi: 140,
-      iptalAdedi: 0,
-      ikramAdedi: 10,
-      ortalamaFiyat: 3,
-      karOrani: 70,
-      maliyet: 0.9,
-      maliyetsizUrun: false,
-      trend: "stabil",
-      renk: "#1abc9c",
-      odemeDagilimi: {
-        NAKIT: 300,
-        KREDI_KARTI: 120
-      }
-    },
-    {
-      urunId: 6,
-      urunAdi: "Bilardo Saati",
-      kategori: "Bilardo",
-      barkod: "BL006",
-      stok: 0,
-      kritikStok: 0,
-      stokDurumu: "STOKTA_YOK",
-      toplamSatis: 1850,
-      toplamKar: 1665,
-      satisAdedi: 210,
-      iptalAdedi: 8,
-      ikramAdedi: 0,
-      ortalamaFiyat: 40.5,
-      karOrani: 90,
-      maliyet: 4.05,
-      maliyetsizUrun: false,
-      trend: "stabil",
-      renk: "#34495e",
-      odemeDagilimi: {
-        NAKIT: 900,
-        KREDI_KARTI: 850,
-        HESABA_YAZ: 100
-      }
-    },
-    {
-      urunId: 7,
-      urunAdi: "Sütlaç",
-      kategori: "Tatlılar",
-      barkod: "ST007",
-      stok: 8,
-      kritikStok: 5,
-      stokDurumu: "KRITIK",
-      toplamSatis: 650,
-      toplamKar: 455,
-      satisAdedi: 50,
-      iptalAdedi: 1,
-      ikramAdedi: 4,
-      ortalamaFiyat: 13,
-      karOrani: 70,
-      maliyet: 3.9,
-      maliyetsizUrun: false,
-      trend: "azalis",
-      renk: "#9b59b6",
-      odemeDagilimi: {
-        NAKIT: 350,
-        KREDI_KARTI: 300
-      }
-    },
-    {
-      urunId: 8,
-      urunAdi: "Patates Kızartması",
-      kategori: "Atıştırmalıklar",
-      barkod: "PK008",
-      stok: 32,
-      kritikStok: 10,
-      stokDurumu: "YETERLI",
-      toplamSatis: 950,
-      toplamKar: 665,
-      satisAdedi: 95,
-      iptalAdedi: 2,
-      ikramAdedi: 3,
-      ortalamaFiyat: 10,
-      karOrani: 70,
-      maliyet: 3,
-      maliyetsizUrun: false,
-      trend: "artis",
-      renk: "#d35400",
-      odemeDagilimi: {
-        NAKIT: 600,
-        KREDI_KARTI: 350
-      }
-    },
-    {
-      urunId: 9,
-      urunAdi: "Meyve Tabağı",
-      kategori: "Meyveler",
-      barkod: "MT009",
-      stok: 5,
-      kritikStok: 3,
-      stokDurumu: "KRITIK",
-      toplamSatis: 320,
-      toplamKar: 224,
-      satisAdedi: 16,
-      iptalAdedi: 0,
-      ikramAdedi: 2,
-      ortalamaFiyat: 20,
-      karOrani: 70,
-      maliyet: 6,
-      maliyetsizUrun: false,
-      trend: "azalis",
-      renk: "#27ae60",
-      odemeDagilimi: {
-        NAKIT: 200,
-        KREDI_KARTI: 120
-      }
-    },
-    {
-      urunId: 10,
-      urunAdi: "Kahvaltı Tabağı",
-      kategori: "Özel Servisler",
-      barkod: "KT010",
-      stok: 15,
-      kritikStok: 5,
-      stokDurumu: "YETERLI",
-      toplamSatis: 1250,
-      toplamKar: 875,
-      satisAdedi: 25,
-      iptalAdedi: 1,
-      ikramAdedi: 1,
-      ortalamaFiyat: 50,
-      karOrani: 70,
-      maliyet: 15,
-      maliyetsizUrun: false,
-      trend: "artis",
-      renk: "#8e44ad",
-      odemeDagilimi: {
-        NAKIT: 800,
-        KREDI_KARTI: 450
-      }
+    } catch (error) {
+      console.error("Ürün verileri okunurken hata:", error);
     }
-  ], []);
+    return [];
+  }, []);
 
-  // Filtre seçenekleri
-  const kategoriListesi = useMemo(() => [
-    "Tüm Kategoriler",
-    "Sıcak İçecekler",
-    "Soğuk İçecekler",
-    "Yiyecekler",
-    "Tatlılar",
-    "Bilardo",
-    "Atıştırmalıklar",
-    "Meyveler",
-    "Özel Servisler"
-  ], []);
-
-  const satirTipleri = useMemo(() => [
-    { value: 'Tümü', label: 'Tüm Satırlar' },
-    { value: 'SATIS', label: 'Satış' },
-    { value: 'IKRAM', label: 'İkram' },
-    { value: 'IPTAL', label: 'İptal' },
-    { value: 'SILINEN', label: 'Silinen Satırlar' }
-  ], []);
+  // Filtre seçenekleri - Ürün listesi
+  const urunListesi = useMemo(() => {
+    const urunAdlari = urunler
+      .map(urun => urun.name)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    
+    return ["Tüm Ürünler", ...urunAdlari];
+  }, [urunler]);
 
   const odemeTurleri = useMemo(() => [
     { value: 'Tümü', label: 'Tüm Ödeme Türleri' },
@@ -314,22 +60,13 @@ const UrunBazliSatis = () => {
     { value: 'DIGER', label: 'Diğer' }
   ], []);
 
-  const stokDurumlari = useMemo(() => [
-    { value: 'Tümü', label: 'Tüm Stok Durumları' },
-    { value: 'YETERLI', label: 'Stok Yeterli' },
-    { value: 'KRITIK', label: 'Kritik Stok' },
-    { value: 'STOKTA_YOK', label: 'Stokta Yok' }
-  ], []);
-
   const siralamaSecenekleri = useMemo(() => [
     { value: 'satis_desc', label: 'Satış (Yüksek → Düşük)' },
     { value: 'satis_asc', label: 'Satış (Düşük → Yüksek)' },
     { value: 'kar_desc', label: 'Kar (Yüksek → Düşük)' },
     { value: 'kar_asc', label: 'Kar (Düşük → Yüksek)' },
     { value: 'satisAdedi_desc', label: 'Satış Adedi (Çok → Az)' },
-    { value: 'satisAdedi_asc', label: 'Satış Adedi (Az → Çok)' },
-    { value: 'stok_desc', label: 'Stok (Yüksek → Düşük)' },
-    { value: 'stok_asc', label: 'Stok (Düşük → Yüksek)' }
+    { value: 'satisAdedi_asc', label: 'Satış Adedi (Az → Çok)' }
   ], []);
 
   // Tarih formatlama fonksiyonu
@@ -401,126 +138,153 @@ const UrunBazliSatis = () => {
     }
   ], []);
 
+  // API'den satış verilerini çekme fonksiyonu
+  const satisVerileriniGetir = useCallback(async () => {
+    // Burada gerçek API çağrısı yapılacak
+    // Şu an için simüle edilmiş veri döndürüyoruz
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // Bu kısımda gerçek API entegrasyonu yapılacak
+        // Örnek veri yapısı:
+        resolve([]);
+      }, 500);
+    });
+  }, []);
+
   // Filtreleme fonksiyonu
   const handleFiltrele = useCallback(async () => {
     setYukleniyor(true);
     
     try {
-      // Simüle edilmiş API çağrısı
-      setTimeout(() => {
-        let filtrelenmisUrunler = [...demoUrunler];
-        
-        // Kategori filtresi
-        if (filtreKategori !== 'Tüm Kategoriler') {
-          filtrelenmisUrunler = filtrelenmisUrunler.filter(
-            urun => urun.kategori === filtreKategori
-          );
-        }
-        
-        // Stok durumu filtresi
-        if (filtreStokDurumu !== 'Tümü') {
-          filtrelenmisUrunler = filtrelenmisUrunler.filter(
-            urun => urun.stokDurumu === filtreStokDurumu
-          );
-        }
-        
-        // Sıralama
-        filtrelenmisUrunler.sort((a, b) => {
-          switch (siralama) {
-            case 'satis_desc':
-              return b.toplamSatis - a.toplamSatis;
-            case 'satis_asc':
-              return a.toplamSatis - b.toplamSatis;
-            case 'kar_desc':
-              return b.toplamKar - a.toplamKar;
-            case 'kar_asc':
-              return a.toplamKar - b.toplamKar;
-            case 'satisAdedi_desc':
-              return b.satisAdedi - a.satisAdedi;
-            case 'satisAdedi_asc':
-              return a.satisAdedi - b.satisAdedi;
-            case 'stok_desc':
-              return b.stok - a.stok;
-            case 'stok_asc':
-              return a.stok - b.stok;
-            default:
-              return b.toplamSatis - a.toplamSatis;
+      // Gerçek API'den satış verilerini çek
+      const satisVerileri = await satisVerileriniGetir();
+      
+      // API'den gelen verileri kullanarak rapor oluştur
+      // Bu kısımda gerçek satış verileri ile ürün bazlı raporlama yapılacak
+      
+      // Simüle edilmiş veriler (gerçek API entegrasyonu yapılınca kaldırılacak)
+      let raporVerileri = [];
+      
+      // Eğer API'den veri gelmezse, ürün listesinden temel bir rapor oluştur
+      if (satisVerileri.length === 0 && urunler.length > 0) {
+        raporVerileri = urunler.map((urun, index) => ({
+          urunId: index + 1,
+          urunAdi: urun.name || "Bilinmeyen Ürün",
+          kategori: urun.categoryName || "Kategori Yok",
+          barkod: urun.barkod || "-",
+          stok: urun.stock || 0,
+          kritikStok: urun.critical || 0,
+          stokDurumu: urun.stock <= (urun.critical || 0) ? "KRITIK" : "YETERLI",
+          toplamSatis: 0, // Gerçek API'den gelecek
+          toplamKar: 0, // Gerçek API'den gelecek
+          satisAdedi: 0, // Gerçek API'den gelecek
+          iptalAdedi: 0,
+          ikramAdedi: 0,
+          ortalamaFiyat: urun.salePrice || 0,
+          karOrani: urun.salePrice && urun.costPrice ? 
+            ((urun.salePrice - urun.costPrice) / urun.salePrice * 100).toFixed(1) : 0,
+          maliyet: urun.costPrice || 0,
+          maliyetsizUrun: !urun.costPrice || urun.costPrice === 0,
+          trend: "stabil",
+          odemeDagilimi: {
+            NAKIT: 0,
+            KREDI_KARTI: 0,
+            HESABA_YAZ: 0
           }
-        });
-        
-        // Sayfalama
-        const baslangicIndex = (sayfa - 1) * sayfaBoyutu;
-        const sayfalanmisUrunler = filtrelenmisUrunler.slice(
-          baslangicIndex, 
-          baslangicIndex + sayfaBoyutu
+        }));
+      } else {
+        // API'den gelen gerçek verileri kullan
+        raporVerileri = satisVerileri;
+      }
+      
+      // Ürün filtresi
+      if (filtreUrun !== '' && filtreUrun !== 'Tüm Ürünler') {
+        raporVerileri = raporVerileri.filter(
+          urun => urun.urunAdi === filtreUrun
         );
-        
-        // İstatistik hesapla
-        const toplamSatis = filtrelenmisUrunler.reduce((sum, u) => sum + u.toplamSatis, 0);
-        const toplamKar = filtrelenmisUrunler.reduce((sum, u) => sum + u.toplamKar, 0);
-        const toplamSatirAdedi = filtrelenmisUrunler.reduce(
-          (sum, u) => sum + u.satisAdedi + u.iptalAdedi + u.ikramAdedi, 0
-        );
-        
-        const enCokSatis = filtrelenmisUrunler.reduce((max, u) => 
-          u.toplamSatis > max.toplamSatis ? u : max, 
-          filtrelenmisUrunler[0] || { urunAdi: '' }
-        );
-        
-        const enKarli = filtrelenmisUrunler.reduce((max, u) => 
-          u.toplamKar > max.toplamKar ? u : max, 
-          filtrelenmisUrunler[0] || { urunAdi: '' }
-        );
-        
-        const kritikStokUrunSayisi = filtrelenmisUrunler.filter(
-          u => u.stokDurumu === 'KRITIK' || u.stokDurumu === 'STOKTA_YOK'
-        ).length;
-        
-        const stoktaToplamUrun = filtrelenmisUrunler.reduce((sum, u) => sum + u.stok, 0);
-        
-        setUrunRaporlari(sayfalanmisUrunler);
-        setToplamKayit(filtrelenmisUrunler.length);
-        setIstatistikler({
-          toplamSatis,
-          toplamKar,
-          toplamTahsilat: toplamSatis * 0.95, // %5 iptal/ikram varsayımı
-          ortalamaSatis: filtrelenmisUrunler.length > 0 ? toplamSatis / filtrelenmisUrunler.length : 0,
-          enCokSatisUrun: enCokSatis.urunAdi || '',
-          enKarliUrun: enKarli.urunAdi || '',
-          kritikStokUrunSayisi,
-          stoktaToplamUrun,
-          toplamSatirAdedi,
-          aktifUrunSayisi: filtrelenmisUrunler.length
-        });
-        
-        setYukleniyor(false);
-      }, 500);
+      }
+      
+      // Sıralama
+      raporVerileri.sort((a, b) => {
+        switch (siralama) {
+          case 'satis_desc':
+            return b.toplamSatis - a.toplamSatis;
+          case 'satis_asc':
+            return a.toplamSatis - b.toplamSatis;
+          case 'kar_desc':
+            return b.toplamKar - a.toplamKar;
+          case 'kar_asc':
+            return a.toplamKar - b.toplamKar;
+          case 'satisAdedi_desc':
+            return b.satisAdedi - a.satisAdedi;
+          case 'satisAdedi_asc':
+            return a.satisAdedi - b.satisAdedi;
+          default:
+            return b.toplamSatis - a.toplamSatis;
+        }
+      });
+      
+      // Sayfalama
+      const baslangicIndex = (sayfa - 1) * sayfaBoyutu;
+      const sayfalanmisUrunler = raporVerileri.slice(
+        baslangicIndex, 
+        baslangicIndex + sayfaBoyutu
+      );
+      
+      // İstatistik hesapla
+      const toplamSatis = raporVerileri.reduce((sum, u) => sum + u.toplamSatis, 0);
+      const toplamKar = raporVerileri.reduce((sum, u) => sum + u.toplamKar, 0);
+      const toplamSatirAdedi = raporVerileri.reduce(
+        (sum, u) => sum + u.satisAdedi + u.iptalAdedi + u.ikramAdedi, 0
+      );
+      
+      const enCokSatis = raporVerileri.reduce((max, u) => 
+        u.toplamSatis > max.toplamSatis ? u : max, 
+        raporVerileri[0] || { urunAdi: '' }
+      );
+      
+      const enKarli = raporVerileri.reduce((max, u) => 
+        u.toplamKar > max.toplamKar ? u : max, 
+        raporVerileri[0] || { urunAdi: '' }
+      );
+      
+      setUrunRaporlari(sayfalanmisUrunler);
+      setToplamKayit(raporVerileri.length);
+      setIstatistikler({
+        toplamSatis,
+        toplamKar,
+        toplamTahsilat: toplamSatis, // İptal/ikram düşülmüş hali
+        ortalamaSatis: raporVerileri.length > 0 ? toplamSatis / raporVerileri.length : 0,
+        enCokSatisUrun: enCokSatis.urunAdi || '',
+        enKarliUrun: enKarli.urunAdi || '',
+        toplamSatirAdedi,
+        aktifUrunSayisi: raporVerileri.length
+      });
+      
+      setYukleniyor(false);
       
     } catch (error) {
-      console.error('Filtreleme hatası:', error);
+      console.error('Veri çekme hatası:', error);
       setYukleniyor(false);
+      alert('Satış verileri yüklenirken bir hata oluştu.');
     }
   }, [
-    demoUrunler, 
-    filtreKategori, 
-    filtreStokDurumu, 
-    siralama, 
-    sayfa, 
-    sayfaBoyutu
+    filtreUrun,
+    siralama,
+    sayfa,
+    sayfaBoyutu,
+    urunler,
+    satisVerileriniGetir
   ]);
 
   // Filtreleri sıfırla
   const handleSifirla = () => {
     setFiltreBaslangic(new Date());
     setFiltreBitis(new Date());
-    setFiltreKategori('Tüm Kategoriler');
-    setFiltreUrun('');
-    setFiltreStokDurumu('Tümü');
-    setFiltreSatirTipi('Tümü');
+    setFiltreUrun('Tüm Ürünler');
     setFiltreOdemeTuru('Tümü');
     setSiralama('satis_desc');
     setSayfa(1);
-    setSayfaBoyutu(20);
   };
 
   // Sayfa değiştir
@@ -529,32 +293,42 @@ const UrunBazliSatis = () => {
     setSayfa(yeniSayfa);
   };
 
-  // Excel export (simülasyon)
+  // Excel export
   const handleExcelExport = () => {
     setYukleniyor(true);
     
     setTimeout(() => {
-      alert('Excel export işlemi başarılı! Demo veriler için export hazır.');
+      // Excel export işlemi
+      const dataToExport = urunRaporlari.map(urun => ({
+        'Ürün Adı': urun.urunAdi,
+        'Kategori': urun.kategori,
+        'Barkod': urun.barkod,
+        'Stok': urun.stok,
+        'Toplam Satış (₺)': urun.toplamSatis,
+        'Toplam Kar (₺)': urun.toplamKar,
+        'Satış Adedi': urun.satisAdedi,
+        'Ortalama Fiyat (₺)': urun.ortalamaFiyat,
+        'Kar Oranı (%)': urun.karOrani
+      }));
+      
+      // CSV formatında indirme (gerçek uygulamada Excel kütüphanesi kullanılabilir)
+      const csvContent = [
+        Object.keys(dataToExport[0] || {}).join(','),
+        ...dataToExport.map(row => Object.values(row).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `urun-satis-raporu-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
       setYukleniyor(false);
     }, 1000);
-  };
-
-  // Ürün detay sayfasına git
-  const handleUrunDetay = (urunId) => {
-    alert(`Ürün detay sayfasına yönlendiriliyor... (Ürün ID: ${urunId})`);
-    // navigate(`/raporlar/urun-detay/${urunId}`);
-  };
-
-  // Stok güncelle
-  const handleStokGuncelle = (urunId) => {
-    alert(`Stok güncelleme sayfasına yönlendiriliyor... (Ürün ID: ${urunId})`);
-    // navigate(`/stok/urun/${urunId}/guncelle`);
-  };
-
-  // Ürün düzenle
-  const handleUrunDuzenle = (urunId) => {
-    alert(`Ürün düzenleme sayfasına yönlendiriliyor... (Ürün ID: ${urunId})`);
-    // navigate(`/urunler/${urunId}/duzenle`);
   };
 
   // İlk yükleme ve filtre değişikliklerinde
@@ -722,11 +496,10 @@ const UrunBazliSatis = () => {
 
     /* FİLTRE BAR */
     .urun-filtre-bar {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 16px;
       margin-bottom: 24px;
-      align-items: flex-end;
-      flex-wrap: wrap;
       padding: 20px;
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 248, 245, 0.9) 100%);
       border-radius: 18px;
@@ -738,8 +511,8 @@ const UrunBazliSatis = () => {
     }
 
     .urun-filtre-grup {
-      flex: 1;
-      min-width: 180px;
+      display: flex;
+      flex-direction: column;
     }
 
     .urun-filtre-label {
@@ -935,7 +708,7 @@ const UrunBazliSatis = () => {
       overflow: hidden;
       background: linear-gradient(135deg, #f9f5f0 0%, #f2ebe1 100%);
       box-shadow: 0 4px 15px rgba(52, 152, 219, 0.05);
-      min-width: 1200px;
+      min-width: 900px;
     }
 
     .urun-tablo thead {
@@ -970,52 +743,6 @@ const UrunBazliSatis = () => {
       background: rgba(52, 152, 219, 0.05);
     }
 
-    .urun-aksiyon-butonlar {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .urun-aksiyon-btn {
-      padding: 6px 10px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      border: none;
-      font-size: 12px;
-      white-space: nowrap;
-      flex: 1;
-      min-width: 70px;
-      justify-content: center;
-    }
-
-    .urun-aksiyon-btn-detay {
-      background: rgba(52, 152, 219, 0.1);
-      color: #3498db;
-      border: 1px solid rgba(52, 152, 219, 0.3);
-    }
-
-    .urun-aksiyon-btn-stok {
-      background: rgba(46, 204, 113, 0.1);
-      color: #27ae60;
-      border: 1px solid rgba(46, 204, 113, 0.3);
-    }
-
-    .urun-aksiyon-btn-duzenle {
-      background: rgba(243, 156, 18, 0.1);
-      color: #f39c12;
-      border: 1px solid rgba(243, 156, 18, 0.3);
-    }
-
-    .urun-aksiyon-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
     /* STOK DURUMU BADGE */
     .stok-badge {
       padding: 6px 10px;
@@ -1040,44 +767,6 @@ const UrunBazliSatis = () => {
       background: rgba(231, 76, 60, 0.1);
       color: #e74c3c;
       border: 1px solid rgba(231, 76, 60, 0.3);
-    }
-
-    .stok-yok {
-      background: rgba(149, 165, 166, 0.1);
-      color: #7f8c8d;
-      border: 1px solid rgba(149, 165, 166, 0.3);
-    }
-
-    /* TREND BADGE */
-    .trend-badge {
-      padding: 6px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-
-    .trend-artis {
-      background: rgba(46, 204, 113, 0.1);
-      color: #27ae60;
-      border: 1px solid rgba(46, 204, 113, 0.3);
-    }
-
-    .trend-azalis {
-      background: rgba(231, 76, 60, 0.1);
-      color: #e74c3c;
-      border: 1px solid rgba(231, 76, 60, 0.3);
-    }
-
-    .trend-stabil {
-      background: rgba(243, 156, 18, 0.1);
-      color: #f39c12;
-      border: 1px solid rgba(243, 156, 18, 0.3);
     }
 
     /* MALİYETSİZ BADGE */
@@ -1220,30 +909,6 @@ const UrunBazliSatis = () => {
       color: #f39c12;
     }
 
-    /* KRİTİK STOK UYARISI */
-    .kritik-stok-container {
-      background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
-      padding: 24px;
-      border-radius: 18px;
-      box-shadow: 0 6px 20px rgba(139, 94, 60, 0.08);
-      border: 1px solid rgba(212, 175, 55, 0.12);
-      width: 100%;
-      margin-top: 24px;
-      border-left: 4px solid #e74c3c;
-      box-sizing: border-box;
-    }
-
-    .kritik-stok-container h3 {
-      margin: 0 0 20px 0;
-      font-size: 18px;
-      font-weight: 800;
-      color: #3a2c1a;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
     /* SAYFALAMA */
     .sayfalama {
       display: flex;
@@ -1353,13 +1018,8 @@ const UrunBazliSatis = () => {
       }
       
       .urun-filtre-bar {
-        flex-direction: column;
-        align-items: stretch;
+        grid-template-columns: 1fr;
         gap: 12px;
-      }
-      
-      .urun-filtre-grup {
-        min-width: 100%;
       }
       
       .urun-btn-group {
@@ -1392,14 +1052,6 @@ const UrunBazliSatis = () => {
         min-width: 80px;
       }
       
-      .urun-aksiyon-butonlar {
-        flex-direction: column;
-      }
-      
-      .urun-aksiyon-btn {
-        width: 100%;
-      }
-      
       .sayfalama {
         flex-direction: column;
         gap: 12px;
@@ -1409,14 +1061,6 @@ const UrunBazliSatis = () => {
         order: -1;
         width: 100%;
         margin-bottom: 8px;
-      }
-      
-      .urun-filtre-label span {
-        display: none;
-      }
-      
-      .urun-filtre-label i {
-        margin-right: 0;
       }
     }
 
@@ -1434,11 +1078,6 @@ const UrunBazliSatis = () => {
       .urun-tablo th,
       .urun-tablo td {
         padding: 12px 8px;
-      }
-      
-      .kritik-stok-container {
-        padding: 16px;
-        margin-top: 16px;
       }
     }
 
@@ -1460,10 +1099,6 @@ const UrunBazliSatis = () => {
       .urun-header {
         padding: 16px;
       }
-      
-      .urun-filtre-bar {
-        grid-template-columns: repeat(3, 1fr);
-      }
     }
 
     /* KOYU MOD DESTEĞİ (opsiyonel) */
@@ -1475,8 +1110,7 @@ const UrunBazliSatis = () => {
       
       .urun-header,
       .urun-istatistik-kutu,
-      .urun-tablo-container,
-      .kritik-stok-container {
+      .urun-tablo-container {
         background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%);
         border-color: rgba(52, 152, 219, 0.2);
         color: #e0e0e0;
@@ -1506,7 +1140,6 @@ const UrunBazliSatis = () => {
         color: #e0e0e0;
       }
       
-      .kritik-stok-container h3,
       .urun-tablo-container h2 {
         color: #e0e0e0;
       }
@@ -1539,7 +1172,7 @@ const UrunBazliSatis = () => {
           <h1>
             Ürün Bazlı Satış Raporları
             <span className="alt-baslik">
-              Adisyon satırı bazlı detaylı ürün performans analizi
+              Gerçek zamanlı ürün satış performans analizi
             </span>
           </h1>
         </div>
@@ -1563,7 +1196,7 @@ const UrunBazliSatis = () => {
             disabled={yukleniyor}
           >
             <i className="fas fa-filter"></i>
-            {yukleniyor ? 'Yükleniyor...' : 'Filtrele'}
+            {yukleniyor ? 'Yükleniyor...' : 'Raporu Getir'}
           </button>
           <button 
             className="urun-btn urun-btn-secondary" 
@@ -1576,7 +1209,7 @@ const UrunBazliSatis = () => {
           <button 
             className="urun-btn urun-btn-tertiary"
             onClick={handleExcelExport}
-            disabled={yukleniyor}
+            disabled={yukleniyor || urunRaporlari.length === 0}
           >
             <i className="fas fa-file-export"></i>
             Excel'e Aktar
@@ -1610,33 +1243,16 @@ const UrunBazliSatis = () => {
 
           <div className="urun-filtre-grup">
             <label className="urun-filtre-label">
-              <i className="fas fa-tags"></i>
-              Kategori
+              <i className="fas fa-cube"></i>
+              Ürün
             </label>
             <select
-              value={filtreKategori}
-              onChange={(e) => setFiltreKategori(e.target.value)}
+              value={filtreUrun}
+              onChange={(e) => setFiltreUrun(e.target.value)}
             >
-              {kategoriListesi.map((kategori, index) => (
-                <option key={index} value={kategori}>
-                  {kategori}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="urun-filtre-grup">
-            <label className="urun-filtre-label">
-              <i className="fas fa-receipt"></i>
-              Satır Tipi
-            </label>
-            <select
-              value={filtreSatirTipi}
-              onChange={(e) => setFiltreSatirTipi(e.target.value)}
-            >
-              {satirTipleri.map((tip, index) => (
-                <option key={index} value={tip.value}>
-                  {tip.label}
+              {urunListesi.map((urun, index) => (
+                <option key={index} value={urun}>
+                  {urun}
                 </option>
               ))}
             </select>
@@ -1661,23 +1277,6 @@ const UrunBazliSatis = () => {
 
           <div className="urun-filtre-grup">
             <label className="urun-filtre-label">
-              <i className="fas fa-box"></i>
-              Stok Durumu
-            </label>
-            <select
-              value={filtreStokDurumu}
-              onChange={(e) => setFiltreStokDurumu(e.target.value)}
-            >
-              {stokDurumlari.map((durum, index) => (
-                <option key={index} value={durum.value}>
-                  {durum.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="urun-filtre-grup">
-            <label className="urun-filtre-label">
               <i className="fas fa-sort-amount-down"></i>
               Sıralama
             </label>
@@ -1690,22 +1289,6 @@ const UrunBazliSatis = () => {
                   {secenek.label}
                 </option>
               ))}
-            </select>
-          </div>
-
-          <div className="urun-filtre-grup">
-            <label className="urun-filtre-label">
-              <i className="fas fa-list-ol"></i>
-              Sayfa Boyutu
-            </label>
-            <select
-              value={sayfaBoyutu}
-              onChange={(e) => setSayfaBoyutu(Number(e.target.value))}
-            >
-              <option value={10}>10 kayıt</option>
-              <option value={20}>20 kayıt</option>
-              <option value={50}>50 kayıt</option>
-              <option value={100}>100 kayıt</option>
             </select>
           </div>
         </div>
@@ -1721,9 +1304,9 @@ const UrunBazliSatis = () => {
           <div className="urun-empty-icon">
             <i className="fas fa-chart-bar"></i>
           </div>
-          <div className="urun-empty-text">Ürün verisi bulunamadı</div>
+          <div className="urun-empty-text">Satış verisi bulunamadı</div>
           <div className="urun-empty-subtext">
-            Seçtiğiniz filtre kriterlerine uygun ürün verisi bulunamadı.
+            Seçtiğiniz filtre kriterlerine uygun satış verisi bulunamadı.
             Lütfen farklı tarih veya filtrelerle tekrar deneyin.
           </div>
         </div>
@@ -1749,14 +1332,14 @@ const UrunBazliSatis = () => {
               <div className="urun-istatistik-kutu">
                 <h4>Aktif Ürün</h4>
                 <div className="deger">{istatistikler.aktifUrunSayisi}</div>
-                <div className="aciklama">{istatistikler.kritikStokUrunSayisi} kritik</div>
+                <div className="aciklama">Raporda listelenen</div>
               </div>
             </div>
 
             <div className="urun-tablo-container">
               <h2>
                 <i className="fas fa-chart-line"></i>
-                Ürün Satış Performansı (Adisyon Satırı Bazlı)
+                Ürün Satış Performansı
                 <span style={{ fontSize: '14px', color: '#8b5e3c', marginLeft: '10px' }}>
                   {formatTarih(filtreBaslangic)} - {formatTarih(filtreBitis)}
                 </span>
@@ -1766,13 +1349,10 @@ const UrunBazliSatis = () => {
                 <thead>
                   <tr>
                     <th>Ürün Bilgisi</th>
-                    <th>Stok</th>
+                    <th>Stok Durumu</th>
                     <th>Satış Bilgileri</th>
                     <th>Kar Bilgileri</th>
-                    <th>İşlem Dağılımı</th>
                     <th>Ödeme Dağılımı</th>
-                    <th>Trend</th>
-                    <th>Aksiyonlar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1794,10 +1374,9 @@ const UrunBazliSatis = () => {
                           <span className={`stok-badge stok-${urun.stokDurumu.toLowerCase()}`}>
                             {urun.stokDurumu === 'YETERLI' && '✓ Yeterli'}
                             {urun.stokDurumu === 'KRITIK' && '⚠ Kritik'}
-                            {urun.stokDurumu === 'STOKTA_YOK' && '✗ Stok Yok'}
                           </span>
                           <div style={{ fontSize: '12px', color: '#666', textAlign: 'center' }}>
-                            {urun.stok} / {urun.kritikStok}
+                            {urun.stok} adet
                           </div>
                         </div>
                       </td>
@@ -1830,13 +1409,6 @@ const UrunBazliSatis = () => {
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontSize: '12px' }}>
-                          <div>Satış: {urun.satisAdedi}</div>
-                          <div style={{ color: '#e74c3c' }}>İptal: {urun.iptalAdedi}</div>
-                          <div style={{ color: '#3498db' }}>İkram: {urun.ikramAdedi}</div>
-                        </div>
-                      </td>
-                      <td>
                         {urun.odemeDagilimi ? (
                           <div className="odeme-dagilimi">
                             {Object.entries(urun.odemeDagilimi).map(([tur, tutar]) => (
@@ -1853,41 +1425,6 @@ const UrunBazliSatis = () => {
                         ) : (
                           <div style={{ fontSize: '12px', color: '#666' }}>Veri yok</div>
                         )}
-                      </td>
-                      <td>
-                        <span className={`trend-badge trend-${urun.trend}`}>
-                          {urun.trend === 'artis' && '↑ Artış'}
-                          {urun.trend === 'azalis' && '↓ Azalış'}
-                          {urun.trend === 'stabil' && '→ Stabil'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="urun-aksiyon-butonlar">
-                          <button 
-                            className="urun-aksiyon-btn urun-aksiyon-btn-detay"
-                            onClick={() => handleUrunDetay(urun.urunId)}
-                            title="Detaylı rapor"
-                          >
-                            <i className="fas fa-chart-bar"></i>
-                            Detay
-                          </button>
-                          <button 
-                            className="urun-aksiyon-btn urun-aksiyon-btn-stok"
-                            onClick={() => handleStokGuncelle(urun.urunId)}
-                            title="Stok güncelle"
-                          >
-                            <i className="fas fa-box"></i>
-                            Stok
-                          </button>
-                          <button 
-                            className="urun-aksiyon-btn urun-aksiyon-btn-duzenle"
-                            onClick={() => handleUrunDuzenle(urun.urunId)}
-                            title="Ürün düzenle"
-                          >
-                            <i className="fas fa-edit"></i>
-                            Düzenle
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1918,19 +1455,6 @@ const UrunBazliSatis = () => {
                 </div>
               )}
             </div>
-
-            {istatistikler.kritikStokUrunSayisi > 0 && (
-              <div className="kritik-stok-container">
-                <h3>
-                  <i className="fas fa-exclamation-triangle" style={{ color: '#e74c3c' }}></i>
-                  Kritik Stok Uyarısı
-                </h3>
-                <p>
-                  <strong>{istatistikler.kritikStokUrunSayisi} ürün</strong> kritik stok seviyesinde 
-                  veya stokta bulunmuyor. Acil stok takviyesi gerekiyor.
-                </p>
-              </div>
-            )}
           </div>
 
           <div className="urun-sag-taraf">
@@ -1987,16 +1511,6 @@ const UrunBazliSatis = () => {
                 </span>
                 <span className="value">{istatistikler.aktifUrunSayisi}</span>
               </div>
-              
-              <div className="urun-ozet-row">
-                <span className="label">
-                  <i className="fas fa-exclamation-circle"></i>
-                  Kritik Stok
-                </span>
-                <span className="value" style={{ color: '#e74c3c' }}>
-                  {istatistikler.kritikStokUrunSayisi}
-                </span>
-              </div>
 
               <div className="urun-ozet-row">
                 <span className="label">
@@ -2005,6 +1519,16 @@ const UrunBazliSatis = () => {
                 </span>
                 <span className="value" style={{ fontSize: '14px' }}>
                   {formatTarih(filtreBaslangic)} - {formatTarih(filtreBitis)}
+                </span>
+              </div>
+
+              <div className="urun-ozet-row">
+                <span className="label">
+                  <i className="fas fa-filter"></i>
+                  Filtreler
+                </span>
+                <span className="value" style={{ fontSize: '14px' }}>
+                  {filtreUrun === 'Tüm Ürünler' ? 'Tüm Ürünler' : filtreUrun}
                 </span>
               </div>
             </div>

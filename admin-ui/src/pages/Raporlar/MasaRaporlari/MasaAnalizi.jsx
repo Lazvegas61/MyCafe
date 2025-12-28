@@ -22,7 +22,8 @@ import {
   Activity,
   Target,
   TrendingDown,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 
 const MasaAnalizi = () => {
@@ -43,6 +44,17 @@ const MasaAnalizi = () => {
   const [sortBy, setSortBy] = useState('ciro-yuksek');
   const [activeFilters, setActiveFilters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Veri state'leri (demo veriler kaldırıldı, API'den gelecek)
+  const [masaData, setMasaData] = useState({
+    toplamAnaliz: {},
+    masaPerformans: [],
+    oturumAnalizi: [],
+    odemeDagilimi: [],
+    kritikMasalar: []
+  });
 
   // Responsive state
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -57,51 +69,94 @@ const MasaAnalizi = () => {
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
   const isDesktop = windowWidth >= 1024;
 
-  // Demo verileri (VIP masalar kaldırıldı)
-  const masaData = {
-    toplamAnaliz: {
-      toplamMasa: 35,
-      aktifMasa: 8,
-      ortalamaOturum: 65,
-      toplamCiro: 12450.75,
-      ortalamaCiro: 311.27,
-      dolulukOrani: 72,
-      toplamOturum: 148
-    },
-    masaPerformans: [
-      { id: 1, no: "Masa 5", oturumSayisi: 4, toplamSure: 185, ortalamaSure: 46, toplamCiro: 1250.50, ortalamaCiro: 312.63, renk: "#10b981", tip: "normal" },
-      { id: 2, no: "Masa 7", oturumSayisi: 3, toplamSure: 150, ortalamaSure: 50, toplamCiro: 980.00, ortalamaCiro: 326.67, renk: "#3b82f6", tip: "normal" },
-      { id: 3, no: "Masa 12", oturumSayisi: 5, toplamSure: 225, ortalamaSure: 45, toplamCiro: 1560.25, ortalamaCiro: 312.05, renk: "#8b5cf6", tip: "normal" },
-      { id: 4, no: "Bilardo 2", oturumSayisi: 2, toplamSure: 180, ortalamaSure: 90, toplamCiro: 320.00, ortalamaCiro: 160.00, renk: "#f59e0b", tip: "bilardo" },
-      { id: 5, no: "Masa 3", oturumSayisi: 3, toplamSure: 135, ortalamaSure: 45, toplamCiro: 890.50, ortalamaCiro: 296.83, renk: "#ef4444", tip: "normal" },
-      { id: 6, no: "Masa 8", oturumSayisi: 4, toplamSure: 200, ortalamaSure: 50, toplamCiro: 1340.75, ortalamaCiro: 335.19, renk: "#6366f1", tip: "normal" },
-      { id: 7, no: "Bilardo 5", oturumSayisi: 1, toplamSure: 120, ortalamaSure: 120, toplamCiro: 240.00, ortalamaCiro: 240.00, renk: "#ec4899", tip: "bilardo" },
-      { id: 8, no: "Masa 10", oturumSayisi: 3, toplamSure: 165, ortalamaSure: 55, toplamCiro: 1120.50, ortalamaCiro: 373.50, renk: "#06b6d4", tip: "normal" },
-      { id: 9, no: "Masa 15", oturumSayisi: 4, toplamSure: 190, ortalamaSure: 48, toplamCiro: 1420.25, ortalamaCiro: 355.06, renk: "#84cc16", tip: "normal" },
-      { id: 10, no: "Bilardo 8", oturumSayisi: 2, toplamSure: 175, ortalamaSure: 88, toplamCiro: 380.75, ortalamaCiro: 190.38, renk: "#f97316", tip: "bilardo" }
-    ],
-    oturumAnalizi: [
-      { saat: "08:00-10:00", oturum: 12, ortalamaSure: 45, ciro: 2850.50 },
-      { saat: "10:00-12:00", oturum: 18, ortalamaSure: 55, ciro: 4320.75 },
-      { saat: "12:00-14:00", oturum: 24, ortalamaSure: 65, ciro: 6250.25 },
-      { saat: "14:00-16:00", oturum: 15, ortalamaSure: 50, ciro: 3120.00 },
-      { saat: "16:00-18:00", oturum: 20, ortalamaSure: 60, ciro: 4850.50 },
-      { saat: "18:00-20:00", oturum: 22, ortalamaSure: 70, ciro: 6780.25 },
-      { saat: "20:00-22:00", oturum: 16, ortalamaSure: 65, ciro: 4120.50 },
-      { saat: "22:00-24:00", oturum: 8, ortalamaSure: 40, ciro: 1850.00 }
-    ],
-    odemeDagilimi: [
-      { tip: "Nakit", oran: 45, miktar: 5602.84, renk: "#10b981" },
-      { tip: "Kredi Kartı", oran: 35, miktar: 4357.76, renk: "#3b82f6" },
-      { tip: "Hesaba Yaz", oran: 15, miktar: 1867.61, renk: "#8b5cf6" },
-      { tip: "Diğer", oran: 5, miktar: 622.54, renk: "#f59e0b" }
-    ],
-    kritikMasalar: [
-      { masa: "Masa 5", sebep: "Yüksek bekleme süresi", oneri: "Servis hızını artır", tip: "normal" },
-      { masa: "Bilardo 2", sebep: "Düşük ciro", oneri: "Promosyon uygula", tip: "bilardo" },
-      { masa: "Masa 3", sebep: "Sık boş kalma", oneri: "Konum değiştir", tip: "normal" }
-    ]
+  // Verileri API'den çek
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // API endpoint'leri (gerçek API endpoint'lerinizi buraya ekleyin)
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      
+      // Tarih formatını düzenle
+      const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
+      const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
+      
+      // Tüm verileri paralel olarak çek
+      const [
+        analizResponse,
+        performansResponse,
+        oturumResponse,
+        odemeResponse,
+        kritikResponse
+      ] = await Promise.all([
+        // Toplam analiz verileri (silinen masalar dahil)
+        fetch(`${baseUrl}/masa-analizi/toplam?startDate=${formattedStartDate}&endDate=${formattedEndDate}&includeDeleted=true`),
+        
+        // Masa performans verileri (silinen masalar dahil)
+        fetch(`${baseUrl}/masa-analizi/performans?startDate=${formattedStartDate}&endDate=${formattedEndDate}&includeDeleted=true&type=${selectedMasa}&sort=${sortBy}`),
+        
+        // Oturum analizi verileri
+        fetch(`${baseUrl}/masa-analizi/oturum?startDate=${formattedStartDate}&endDate=${formattedEndDate}`),
+        
+        // Ödeme dağılımı verileri
+        fetch(`${baseUrl}/masa-analizi/odeme?startDate=${formattedStartDate}&endDate=${formattedEndDate}`),
+        
+        // Kritik masalar verileri
+        fetch(`${baseUrl}/masa-analizi/kritik?startDate=${formattedStartDate}&endDate=${formattedEndDate}`)
+      ]);
+
+      // Tüm responseları kontrol et
+      if (!analizResponse.ok || !performansResponse.ok || !oturumResponse.ok || 
+          !odemeResponse.ok || !kritikResponse.ok) {
+        throw new Error('API yanıt vermedi');
+      }
+
+      // JSON'a çevir
+      const [
+        analizData,
+        performansData,
+        oturumData,
+        odemeData,
+        kritikData
+      ] = await Promise.all([
+        analizResponse.json(),
+        performansResponse.json(),
+        oturumResponse.json(),
+        odemeResponse.json(),
+        kritikResponse.json()
+      ]);
+
+      // State'i güncelle
+      setMasaData({
+        toplamAnaliz: analizData,
+        masaPerformans: performansData,
+        oturumAnalizi: oturumData,
+        odemeDagilimi: odemeData,
+        kritikMasalar: kritikData
+      });
+
+    } catch (err) {
+      console.error('Veri çekme hatası:', err);
+      setError('Veriler yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
+      
+      // Fallback olarak boş veri yapısı
+      setMasaData({
+        toplamAnaliz: {},
+        masaPerformans: [],
+        oturumAnalizi: [],
+        odemeDagilimi: [],
+        kritikMasalar: []
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // İlk yüklemede ve filtre değişikliklerinde verileri çek
+  useEffect(() => {
+    fetchData();
+  }, [startDate, endDate, selectedMasa, sortBy]);
 
   // Filtreleri uygula
   const applyFilters = () => {
@@ -123,12 +178,15 @@ const MasaAnalizi = () => {
       const sortLabel = {
         'ciro-dusuk': 'Ciro (Düşükten)',
         'oturum-yuksek': 'Oturum (Yüksekten)',
-        'oturum-dusuk': 'Oturum (Düşükten)'
+        'oturum-dusuk': 'Oturum (Düşükten)',
+        'sure-yuksek': 'Süre (Yüksekten)',
+        'sure-dusuk': 'Süre (Düşükten)'
       }[sortBy] || sortBy;
       filters.push(`Sıralama: ${sortLabel}`);
     }
     
     setActiveFilters(filters);
+    fetchData(); // Filtre uygulandığında verileri yeniden çek
   };
 
   // Filtreleri temizle
@@ -144,6 +202,9 @@ const MasaAnalizi = () => {
     setSortBy('ciro-yuksek');
     setActiveFilters([]);
     setSearchQuery('');
+    
+    // Filtreler temizlendiğinde verileri yeniden çek
+    setTimeout(() => fetchData(), 100);
   };
 
   // Yardımcı fonksiyonlar
@@ -157,12 +218,14 @@ const MasaAnalizi = () => {
   };
 
   const formatSure = (dakika) => {
+    if (!dakika) return '0:00';
     const saat = Math.floor(dakika / 60);
     const dk = dakika % 60;
     return `${saat}:${dk.toString().padStart(2, '0')}`;
   };
 
   const formatPara = (miktar) => {
+    if (!miktar) return '₺0,00';
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
       currency: 'TRY',
@@ -171,17 +234,20 @@ const MasaAnalizi = () => {
   };
 
   // Hızlı tarih seçenekleri
-  const handleQuickDate = (days) => {
+  const handleQuickDate = (days, rangeType) => {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - days);
     
     setStartDate(start.toISOString().split('T')[0]);
     setEndDate(end.toISOString().split('T')[0]);
-    setTimeRange('ozel-tarih');
+    setTimeRange(rangeType);
+    
+    // Tarih değiştiğinde verileri yeniden çek
+    setTimeout(() => fetchData(), 100);
   };
 
-  // Verileri filtrele
+  // Verileri filtrele (istemci tarafında arama için)
   const filteredMasaData = masaData.masaPerformans.filter(masa => {
     // Masa tipine göre filtrele
     if (selectedMasa === 'normal-masalar' && masa.tip !== 'normal') return false;
@@ -195,32 +261,108 @@ const MasaAnalizi = () => {
     return true;
   });
 
-  // Sıralama uygula
+  // Sıralama uygula (sunucu tarafında yapılıyor, burada yedek olarak)
   const sortedMasaData = [...filteredMasaData].sort((a, b) => {
     switch (sortBy) {
       case 'ciro-yuksek':
-        return b.toplamCiro - a.toplamCiro;
+        return (b.toplamCiro || 0) - (a.toplamCiro || 0);
       case 'ciro-dusuk':
-        return a.toplamCiro - b.toplamCiro;
+        return (a.toplamCiro || 0) - (b.toplamCiro || 0);
       case 'oturum-yuksek':
-        return b.oturumSayisi - a.oturumSayisi;
+        return (b.oturumSayisi || 0) - (a.oturumSayisi || 0);
       case 'oturum-dusuk':
-        return a.oturumSayisi - b.oturumSayisi;
+        return (a.oturumSayisi || 0) - (b.oturumSayisi || 0);
       case 'sure-yuksek':
-        return b.toplamSure - a.toplamSure;
+        return (b.toplamSure || 0) - (a.toplamSure || 0);
       case 'sure-dusuk':
-        return a.toplamSure - b.toplamSure;
+        return (a.toplamSure || 0) - (b.toplamSure || 0);
       default:
-        return b.toplamCiro - a.toplamCiro;
+        return (b.toplamCiro || 0) - (a.toplamCiro || 0);
     }
   });
 
   // Performans renk hesaplama
   const getPerformanceColor = (ortalamaCiro) => {
+    if (!ortalamaCiro) return '#6b7280';
     if (ortalamaCiro > 300) return '#10b981';
     if (ortalamaCiro > 250) return '#f59e0b';
     return '#ef4444';
   };
+
+  // Yükleme durumunda gösterilecek bileşen
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#fef3c7',
+        backgroundImage: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 50%, #fde68a 100%)',
+        padding: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+      }}>
+        <div style={{
+          textAlign: 'center',
+          backgroundColor: 'white',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+        }}>
+          <Loader2 size={48} className="animate-spin" color="#d97706" />
+          <p style={{ marginTop: '16px', color: '#4b2e05' }}>
+            Veriler yükleniyor...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Hata durumunda gösterilecek bileşen
+  if (error) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#fef3c7',
+        backgroundImage: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 50%, #fde68a 100%)',
+        padding: '24px',
+        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+      }}>
+        <div style={{
+          textAlign: 'center',
+          backgroundColor: 'white',
+          padding: '40px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          maxWidth: '600px',
+          margin: '0 auto'
+        }}>
+          <AlertCircle size={48} color="#ef4444" />
+          <h2 style={{ color: '#ef4444', marginTop: '16px' }}>
+            Hata Oluştu
+          </h2>
+          <p style={{ color: '#4b2e05', margin: '16px 0' }}>
+            {error}
+          </p>
+          <button 
+            onClick={fetchData}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#d97706',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            <RefreshCw size={16} style={{ marginRight: '8px' }} />
+            Tekrar Dene
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -420,7 +562,7 @@ const MasaAnalizi = () => {
                 flexWrap: 'wrap'
               }}>
                 <button 
-                  onClick={() => handleQuickDate(1)}
+                  onClick={() => handleQuickDate(1, 'bugun')}
                   style={{
                     padding: '10px 16px',
                     backgroundColor: timeRange === 'bugun' ? '#d97706' : '#fef3c7',
@@ -436,7 +578,7 @@ const MasaAnalizi = () => {
                   Bugün
                 </button>
                 <button 
-                  onClick={() => handleQuickDate(7)}
+                  onClick={() => handleQuickDate(7, 'bu-hafta')}
                   style={{
                     padding: '10px 16px',
                     backgroundColor: timeRange === 'bu-hafta' ? '#d97706' : '#fef3c7',
@@ -452,7 +594,7 @@ const MasaAnalizi = () => {
                   Son 7 Gün
                 </button>
                 <button 
-                  onClick={() => handleQuickDate(30)}
+                  onClick={() => handleQuickDate(30, 'bu-ay')}
                   style={{
                     padding: '10px 16px',
                     backgroundColor: timeRange === 'bu-ay' ? '#d97706' : '#fef3c7',
@@ -557,7 +699,11 @@ const MasaAnalizi = () => {
               </div>
               <select 
                 value={selectedMasa}
-                onChange={(e) => setSelectedMasa(e.target.value)}
+                onChange={(e) => {
+                  setSelectedMasa(e.target.value);
+                  // Masa tipi değiştiğinde verileri yeniden çek
+                  setTimeout(() => fetchData(), 100);
+                }}
                 style={{
                   padding: '10px',
                   borderRadius: '8px',
@@ -569,7 +715,7 @@ const MasaAnalizi = () => {
                   cursor: 'pointer'
                 }}
               >
-                <option value="tum-masalar">Tüm Masalar</option>
+                <option value="tum-masalar">Tüm Masalar (Silinenler Dahil)</option>
                 <option value="normal-masalar">Normal Masalar</option>
                 <option value="bilardo-masalar">Bilardo Masaları</option>
               </select>
@@ -589,7 +735,11 @@ const MasaAnalizi = () => {
               </div>
               <select 
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => {
+                  setSortBy(e.target.value);
+                  // Sıralama değiştiğinde verileri yeniden çek
+                  setTimeout(() => fetchData(), 100);
+                }}
                 style={{
                   padding: '10px',
                   borderRadius: '8px',
@@ -712,6 +862,23 @@ const MasaAnalizi = () => {
           </div>
         </div>
 
+        {/* Yükleme durumu */}
+        {loading && (
+          <div style={{
+            textAlign: 'center',
+            padding: '20px',
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            marginBottom: '24px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+          }}>
+            <Loader2 size={24} className="animate-spin" color="#d97706" />
+            <p style={{ marginTop: '12px', color: '#4b2e05' }}>
+              Veriler güncelleniyor...
+            </p>
+          </div>
+        )}
+
         {/* Genel İstatistikler */}
         <div style={{
           display: 'grid',
@@ -747,7 +914,7 @@ const MasaAnalizi = () => {
               color: '#1f2937',
               margin: '4px 0'
             }}>
-              {masaData.toplamAnaliz.toplamMasa}
+              {masaData.toplamAnaliz.toplamMasa || 0}
             </div>
             <div style={{
               fontSize: '14px',
@@ -786,7 +953,7 @@ const MasaAnalizi = () => {
               color: '#1f2937',
               margin: '4px 0'
             }}>
-              {masaData.toplamAnaliz.aktifMasa}
+              {masaData.toplamAnaliz.aktifMasa || 0}
             </div>
             <div style={{
               fontSize: '14px',
@@ -825,7 +992,7 @@ const MasaAnalizi = () => {
               color: '#1f2937',
               margin: '4px 0'
             }}>
-              {formatSure(masaData.toplamAnaliz.ortalamaOturum)}
+              {formatSure(masaData.toplamAnaliz.ortalamaOturum || 0)}
             </div>
             <div style={{
               fontSize: '14px',
@@ -864,7 +1031,7 @@ const MasaAnalizi = () => {
               color: '#1f2937',
               margin: '4px 0'
             }}>
-              {formatPara(masaData.toplamAnaliz.toplamCiro)}
+              {formatPara(masaData.toplamAnaliz.toplamCiro || 0)}
             </div>
             <div style={{
               fontSize: '14px',
@@ -903,7 +1070,7 @@ const MasaAnalizi = () => {
               color: '#1f2937',
               margin: '4px 0'
             }}>
-              {masaData.toplamAnaliz.dolulukOrani}%
+              {masaData.toplamAnaliz.dolulukOrani || 0}%
             </div>
             <div style={{
               fontSize: '14px',
@@ -952,212 +1119,235 @@ const MasaAnalizi = () => {
             </div>
           </div>
           
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              minWidth: isMobile ? '800px' : 'auto'
+          {sortedMasaData.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '40px',
+              color: '#6b7280'
             }}>
-              <thead>
-                <tr>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Masa No</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Tip</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Oturum</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Toplam Süre</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Ort. Süre</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Toplam Ciro</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Ort. Ciro</th>
-                  <th style={{
-                    backgroundColor: '#fef3c7',
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4b2e05',
-                    borderBottom: '2px solid #fed7aa'
-                  }}>Performans</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedMasaData.map((masa) => (
-                  <tr 
-                    key={masa.id}
-                    style={{ 
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s ease'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <td style={{
+              <p>Bu filtrelerle eşleşen masa bulunamadı.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                minWidth: isMobile ? '800px' : 'auto'
+              }}>
+                <thead>
+                  <tr>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
                       padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
-                      fontSize: '14px',
-                      color: '#4b2e05'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          backgroundColor: masa.renk
-                        }} />
-                        <strong>{masa.no}</strong>
-                      </div>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
-                      fontSize: '14px',
-                      color: '#4b2e05'
-                    }}>
-                      <span style={{
-                        padding: '4px 12px',
-                        backgroundColor: masa.tip === 'normal' ? '#dbeafe' : '#f3e8ff',
-                        color: masa.tip === 'normal' ? '#1e40af' : '#7c3aed',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: '500'
-                      }}>
-                        {masa.tip === 'normal' ? 'Normal' : 'Bilardo'}
-                      </span>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
-                      fontSize: '14px',
-                      color: '#4b2e05'
-                    }}>
-                      <span style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#f3f4f6',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: '600'
-                      }}>
-                        {masa.oturumSayisi}
-                      </span>
-                    </td>
-                    <td style={{
-                      padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
-                      fontSize: '14px',
-                      color: '#4b2e05'
-                    }}>{formatSure(masa.toplamSure)}</td>
-                    <td style={{
-                      padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
-                      fontSize: '14px',
-                      color: '#4b2e05'
-                    }}>{formatSure(masa.ortalamaSure)}</td>
-                    <td style={{
-                      padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
+                      textAlign: 'left',
                       fontSize: '14px',
                       fontWeight: '600',
-                      color: '#059669'
-                    }}>
-                      {formatPara(masa.toplamCiro)}
-                    </td>
-                    <td style={{
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Masa No</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
                       padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
+                      textAlign: 'left',
                       fontSize: '14px',
                       fontWeight: '600',
-                      color: '#4b2e05'
-                    }}>
-                      {formatPara(masa.ortalamaCiro)}
-                    </td>
-                    <td style={{
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Tip</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
                       padding: '16px',
-                      borderBottom: '1px solid #f3f4f6',
+                      textAlign: 'left',
                       fontSize: '14px',
-                      color: '#4b2e05'
-                    }}>
-                      <div style={{
-                        height: '6px',
-                        backgroundColor: '#e5e7eb',
-                        borderRadius: '3px',
-                        overflow: 'hidden',
-                        width: '100%'
-                      }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${Math.min((masa.ortalamaCiro / 350) * 100, 100)}%`,
-                          backgroundColor: getPerformanceColor(masa.ortalamaCiro),
-                          borderRadius: '3px'
-                        }} />
-                      </div>
-                      <div style={{
-                        fontSize: '11px',
-                        color: getPerformanceColor(masa.ortalamaCiro),
-                        marginTop: '4px',
-                        fontWeight: '600'
-                      }}>
-                        {masa.ortalamaCiro > 300 ? 'Yüksek' : masa.ortalamaCiro > 250 ? 'Orta' : 'Düşük'}
-                      </div>
-                    </td>
+                      fontWeight: '600',
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Oturum</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Toplam Süre</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Ort. Süre</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Toplam Ciro</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Ort. Ciro</th>
+                    <th style={{
+                      backgroundColor: '#fef3c7',
+                      padding: '16px',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#4b2e05',
+                      borderBottom: '2px solid #fed7aa'
+                    }}>Performans</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {sortedMasaData.map((masa) => (
+                    <tr 
+                      key={masa.id}
+                      style={{ 
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s ease'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        color: '#4b2e05'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            backgroundColor: masa.renk || '#6b7280'
+                          }} />
+                          <strong>{masa.no || 'Bilinmeyen Masa'}</strong>
+                          {masa.silindi && (
+                            <span style={{
+                              fontSize: '10px',
+                              color: '#ef4444',
+                              backgroundColor: '#fef2f2',
+                              padding: '2px 6px',
+                              borderRadius: '4px'
+                            }}>
+                              Silindi
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        color: '#4b2e05'
+                      }}>
+                        <span style={{
+                          padding: '4px 12px',
+                          backgroundColor: masa.tip === 'normal' ? '#dbeafe' : masa.tip === 'bilardo' ? '#f3e8ff' : '#f3f4f6',
+                          color: masa.tip === 'normal' ? '#1e40af' : masa.tip === 'bilardo' ? '#7c3aed' : '#6b7280',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}>
+                          {masa.tip === 'normal' ? 'Normal' : masa.tip === 'bilardo' ? 'Bilardo' : 'Diğer'}
+                        </span>
+                      </td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        color: '#4b2e05'
+                      }}>
+                        <span style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#f3f4f6',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          {masa.oturumSayisi || 0}
+                        </span>
+                      </td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        color: '#4b2e05'
+                      }}>{formatSure(masa.toplamSure || 0)}</td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        color: '#4b2e05'
+                      }}>{formatSure(masa.ortalamaSure || 0)}</td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#059669'
+                      }}>
+                        {formatPara(masa.toplamCiro || 0)}
+                      </td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#4b2e05'
+                      }}>
+                        {formatPara(masa.ortalamaCiro || 0)}
+                      </td>
+                      <td style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '14px',
+                        color: '#4b2e05'
+                      }}>
+                        <div style={{
+                          height: '6px',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '3px',
+                          overflow: 'hidden',
+                          width: '100%'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${Math.min(((masa.ortalamaCiro || 0) / 350) * 100, 100)}%`,
+                            backgroundColor: getPerformanceColor(masa.ortalamaCiro),
+                            borderRadius: '3px'
+                          }} />
+                        </div>
+                        <div style={{
+                          fontSize: '11px',
+                          color: getPerformanceColor(masa.ortalamaCiro),
+                          marginTop: '4px',
+                          fontWeight: '600'
+                        }}>
+                          {!masa.ortalamaCiro ? 'Veri Yok' : 
+                           masa.ortalamaCiro > 300 ? 'Yüksek' : 
+                           masa.ortalamaCiro > 250 ? 'Orta' : 'Düşük'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* İki Kolon Layout */}
@@ -1186,34 +1376,44 @@ const MasaAnalizi = () => {
               <Clock size={20} />
               Zaman Bazlı Oturum Analizi
             </h2>
-            <div>
-              {masaData.oturumAnalizi.map((zaman, index) => (
-                <div key={index} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 0',
-                  borderBottom: '1px solid #f3f4f6'
-                }}>
-                  <div>
-                    <strong style={{ display: 'block', color: '#1f2937', fontSize: '14px' }}>
-                      {zaman.saat}
-                    </strong>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      {zaman.oturum} oturum • Ort. {formatSure(zaman.ortalamaSure)}
-                    </span>
+            {masaData.oturumAnalizi.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px',
+                color: '#6b7280'
+              }}>
+                <p>Bu tarih aralığında oturum verisi bulunamadı.</p>
+              </div>
+            ) : (
+              <div>
+                {masaData.oturumAnalizi.map((zaman, index) => (
+                  <div key={index} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 0',
+                    borderBottom: '1px solid #f3f4f6'
+                  }}>
+                    <div>
+                      <strong style={{ display: 'block', color: '#1f2937', fontSize: '14px' }}>
+                        {zaman.saat || 'Bilinmeyen Saat'}
+                      </strong>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {zaman.oturum || 0} oturum • Ort. {formatSure(zaman.ortalamaSure || 0)}
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <strong style={{ display: 'block', color: '#059669', fontSize: '14px' }}>
+                        {formatPara(zaman.ciro || 0)}
+                      </strong>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                        {Math.round(((zaman.ciro || 0) / (masaData.toplamAnaliz.toplamCiro || 1)) * 100)}%
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <strong style={{ display: 'block', color: '#059669', fontSize: '14px' }}>
-                      {formatPara(zaman.ciro)}
-                    </strong>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      {Math.round((zaman.ciro / masaData.toplamAnaliz.toplamCiro) * 100)}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sağ Kolon - Ödeme Dağılımı ve Kritik Masalar */}
@@ -1241,27 +1441,37 @@ const MasaAnalizi = () => {
                 <CreditCard size={20} />
                 Ödeme Dağılımı
               </h2>
-              <div>
-                {masaData.odemeDagilimi.map((odeme, index) => (
-                  <div key={index} style={{ marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: '600', color: '#1f2937', fontSize: '14px' }}>
-                        {odeme.tip}
-                      </span>
-                      <span style={{ color: '#6b7280', fontSize: '14px' }}>
-                        {odeme.oran}% • {formatPara(odeme.miktar)}
-                      </span>
+              {masaData.odemeDagilimi.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280'
+                }}>
+                  <p>Ödeme dağılımı verisi bulunamadı.</p>
+                </div>
+              ) : (
+                <div>
+                  {masaData.odemeDagilimi.map((odeme, index) => (
+                    <div key={index} style={{ marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: '600', color: '#1f2937', fontSize: '14px' }}>
+                          {odeme.tip || 'Bilinmeyen'}
+                        </span>
+                        <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                          {odeme.oran || 0}% • {formatPara(odeme.miktar || 0)}
+                        </span>
+                      </div>
+                      <div style={{
+                        height: '8px',
+                        width: `${odeme.oran || 0}%`,
+                        backgroundColor: odeme.renk || '#6b7280',
+                        borderRadius: '4px',
+                        margin: '8px 0'
+                      }} />
                     </div>
-                    <div style={{
-                      height: '8px',
-                      width: `${odeme.oran}%`,
-                      backgroundColor: odeme.renk,
-                      borderRadius: '4px',
-                      margin: '8px 0'
-                    }} />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Kritik Masalar */}
@@ -1283,44 +1493,54 @@ const MasaAnalizi = () => {
                 <AlertCircle size={20} color="#ef4444" />
                 Kritik Durumdaki Masalar
               </h2>
-              <div>
-                {masaData.kritikMasalar.map((kritik, index) => (
-                  <div key={index} style={{
-                    backgroundColor: '#fef2f2',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    marginBottom: '12px',
-                    borderLeft: '4px solid #ef4444'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '8px'
+              {masaData.kritikMasalar.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: '#6b7280'
+                }}>
+                  <p>Kritik durumda masa bulunamadı.</p>
+                </div>
+              ) : (
+                <div>
+                  {masaData.kritikMasalar.map((kritik, index) => (
+                    <div key={index} style={{
+                      backgroundColor: '#fef2f2',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      marginBottom: '12px',
+                      borderLeft: '4px solid #ef4444'
                     }}>
-                      <strong style={{ display: 'block', color: '#1f2937', fontSize: '14px' }}>
-                        {kritik.masa}
-                      </strong>
-                      <span style={{
-                        padding: '2px 8px',
-                        backgroundColor: kritik.tip === 'normal' ? '#dbeafe' : '#f3e8ff',
-                        color: kritik.tip === 'normal' ? '#1e40af' : '#7c3aed',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: '500'
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: '8px'
                       }}>
-                        {kritik.tip === 'normal' ? 'Normal' : 'Bilardo'}
-                      </span>
+                        <strong style={{ display: 'block', color: '#1f2937', fontSize: '14px' }}>
+                          {kritik.masa || 'Bilinmeyen Masa'}
+                        </strong>
+                        <span style={{
+                          padding: '2px 8px',
+                          backgroundColor: kritik.tip === 'normal' ? '#dbeafe' : '#f3e8ff',
+                          color: kritik.tip === 'normal' ? '#1e40af' : '#7c3aed',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '500'
+                        }}>
+                          {kritik.tip === 'normal' ? 'Normal' : 'Bilardo'}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 8px 0' }}>
+                        {kritik.sebep || 'Bilinmeyen sebep'}
+                      </p>
+                      <p style={{ fontSize: '12px', color: '#059669', margin: 0 }}>
+                        💡 Öneri: {kritik.oneri || 'Öneri yok'}
+                      </p>
                     </div>
-                    <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 8px 0' }}>
-                      {kritik.sebep}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#059669', margin: 0 }}>
-                      💡 Öneri: {kritik.oneri}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1345,7 +1565,7 @@ const MasaAnalizi = () => {
               <strong style={{ color: '#4b2e05' }}>📊 Rapor Bilgileri:</strong> 
               <span style={{ marginLeft: '8px' }}>
                 {formatDate(startDate)} - {formatDate(endDate)} tarihleri arası masa analizi
-                • Toplam {masaData.toplamAnaliz.toplamOturum} oturum kaydedildi
+                • Toplam {(masaData.toplamAnaliz.toplamOturum || 0)} oturum kaydedildi
               </span>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -1361,19 +1581,22 @@ const MasaAnalizi = () => {
                 <FileText size={14} style={{ marginRight: '6px' }} />
                 Detaylı Rapor
               </button>
-              <button style={{
-                padding: '8px 16px',
-                backgroundColor: '#d97706',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
+              <button 
+                onClick={fetchData}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#d97706',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
                 <RefreshCw size={14} />
                 Güncelle
               </button>

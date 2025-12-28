@@ -83,17 +83,6 @@ const RaporlarDashboard = () => {
       gradient: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
       badge: "Maliyet",
       stats: "₺ 2.3K"
-    },
-    {
-      id: 6,
-      title: "Kasa Raporları",
-      description: "Kasa hareketleri ve nakit akış analizi",
-      icon: <CreditCard />,
-      path: "/raporlar/kasa-raporlari",
-      color: "#8b5cf6",
-      gradient: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-      badge: "Nakit",
-      stats: "₺ 8.7K"
     }
   ];
 

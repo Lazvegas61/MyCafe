@@ -15,6 +15,7 @@ import {
 import Sidebar from "./components/Sidebar";
 import GlobalSureBittiPopup from "./components/GlobalSureBittiPopup";
 import syncService from "./services/syncService";
+import { AuthProvider, useAuth } from "./context/AuthContext"; // useAuth'i de import et
 
 /* ------------------------------------------------------------
    🔧 İlk Kurulum Verileri
@@ -330,14 +331,6 @@ function ensureDemoAdmin() {
   }
 }
 
-const getUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem("mc_user") || "null");
-  } catch {
-    return null;
-  }
-};
-
 /* ------------------------------------------------------------
    📌 GLOBAL EVENT LISTENER FONKSİYONU
 ------------------------------------------------------------ */
@@ -444,6 +437,9 @@ import KategoriBazliSatis from "./pages/Raporlar/KategoriRaporlari/KategoriBazli
 import GunlukGiderler from "./pages/Raporlar/GiderRaporlari/GunlukGiderler.jsx";
 import MasaAnalizi from "./pages/Raporlar/MasaRaporlari/MasaAnalizi.jsx";
 
+// KASA RAPORU KARTI - IMPORT EKLENDİ
+import KasaRaporuKartı from "./pages/Raporlar/KasaRaporu/KasaRaporuKartı.jsx";
+
 /* ------------------------------------------------------------
    📌 LAYOUT — Sidebar login harici HER YERDE görünsün
 ------------------------------------------------------------ */
@@ -451,7 +447,7 @@ function Layout({ children, gunAktif, onGunBaslat }) {
   const location = useLocation();
   const navigate = useNavigate();
   const path = location.pathname;
-  const user = getUser();
+  const { user } = useAuth(); // useAuth hook'unu direkt kullan
   const hideSidebar = path === "/login";
   const initializedRef = useRef(false);
   const eventListenersInitializedRef = useRef(false);
@@ -521,17 +517,15 @@ function Layout({ children, gunAktif, onGunBaslat }) {
 
   // Gün aktif değilse ve ana sayfa/login hariç diğer sayfalardaysak, ana sayfaya yönlendir
   useEffect(() => {
-    const userLoggedIn = !!getUser();
-    
     // GÜN SONU RAPOR SAYFASI ÖZEL İSTİSNA
     if (isGunSonuRaporSayfasi) {
       return; // Gün sonu rapor sayfasına gitmeye izin ver
     }
     
-    if (userLoggedIn && !gunAktif && path !== "/login" && path !== "/" && path !== "/ana") {
+    if (user && !gunAktif && path !== "/login" && path !== "/" && path !== "/ana") {
       navigate('/');
     }
-  }, [gunAktif, path, navigate, isGunSonuRaporSayfasi]);
+  }, [gunAktif, path, navigate, isGunSonuRaporSayfasi, user]);
 
   const handleGunBaslatClick = () => {
     if (onGunBaslat) {
@@ -724,7 +718,7 @@ function Layout({ children, gunAktif, onGunBaslat }) {
 /* ------------------------------------------------------------
    🚀 ROOT APP — ANA SAYFA
 ------------------------------------------------------------ */
-export default function App() {
+function App() {
   const syncInitializedRef = useRef(false);
   const [globalSureBittiPopup, setGlobalSureBittiPopup] = useState(null);
   const [gunAktif, setGunAktif] = useState(() => {
@@ -887,69 +881,74 @@ export default function App() {
   }, [globalSureBittiPopup]);
 
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        {globalSureBittiPopup && (
-          <GlobalSureBittiPopup
-            data={globalSureBittiPopup}
-            onClose={() => setGlobalSureBittiPopup(null)}
-          />
-        )}
-        
-        <Routes>
-          {/* 1. ÖZEL ROUTE'LAR */}
-          <Route path="/login" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Login /></Layout>} />
+    <AuthProvider>
+      <ErrorBoundary>
+        <BrowserRouter>
+          {globalSureBittiPopup && (
+            <GlobalSureBittiPopup
+              data={globalSureBittiPopup}
+              onClose={() => setGlobalSureBittiPopup(null)}
+            />
+          )}
           
-          {/* 2. PARAMETRELİ ROUTE'LAR */}
-          <Route path="/adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Adisyon /></Layout>} />
-          <Route path="/adisyondetay/:masaNo" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Adisyon /></Layout>} />
-          <Route path="/masa-detay/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaDetay /></Layout>} />
-          <Route path="/bilardo-adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><BilardoAdisyon /></Layout>} />
-          
-          {/* 3. RAPOR ROUTE'LARI */}
-          <Route path="/gun-sonu-rapor/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuRapor /></Layout>} />
-          <Route path="/raporlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
-          <Route path="/raporlar/dashboard" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
-          <Route path="/raporlar/masa-analizi" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaAnalizi /></Layout>} />
-          <Route path="/raporlar/gun-sonu" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuOzet /></Layout>} />
-          <Route path="/raporlar/gun-sonu-detay" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuDetay /></Layout>} />
-          <Route path="/raporlar/urun-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunBazliSatis /></Layout>} />
-          <Route path="/raporlar/kategori-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><KategoriBazliSatis /></Layout>} />
-          <Route path="/raporlar/gunluk-giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunlukGiderler /></Layout>} />
-          
-          {/* 4. ANA SAYFALAR */}
-          <Route path="/" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />
-          <Route path="/ana" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />
-          <Route path="/masalar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Masalar /></Layout>} />
-          <Route path="/musteri-islemleri" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MusteriIslemleri /></Layout>} />
-          <Route path="/urun-stok" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunStokYonetimi /></Layout>} />
-          <Route path="/giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Giderler /></Layout>} />
-          <Route path="/personel" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Personel /></Layout>} />
-          <Route path="/ayarlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Ayarlar /></Layout>} />
-          <Route path="/bilardo" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Bilardo /></Layout>} />
-          
-          {/* 5. 404 - EN ALTA */}
-          <Route
-            path="*"
-            element={
-              <Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}>
-                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-                  <div className="text-center">
-                    <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
-                    <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
-                    <a 
-                      href="/" 
-                      className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
-                    >
-                      Ana Sayfaya Dön
-                    </a>
-                  </div>
+          <Routes>
+            {/* 1. ÖZEL ROUTE'LAR */}
+            <Route path="/login" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Login /></Layout>} />
+            
+            {/* 2. PARAMETRELİ ROUTE'LAR */}
+            <Route path="/adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Adisyon /></Layout>} />
+            <Route path="/adisyondetay/:masaNo" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Adisyon /></Layout>} />
+            <Route path="/masa-detay/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaDetay /></Layout>} />
+            <Route path="/bilardo-adisyon/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><BilardoAdisyon /></Layout>} />
+            
+            {/* 3. RAPOR ROUTE'LARI */}
+            <Route path="/gun-sonu-rapor/:id" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuRapor /></Layout>} />
+            <Route path="/raporlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
+            <Route path="/raporlar/dashboard" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><RaporlarDashboard /></Layout>} />
+            <Route path="/raporlar/masa-analizi" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MasaAnalizi /></Layout>} />
+            <Route path="/raporlar/gun-sonu" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuOzet /></Layout>} />
+            <Route path="/raporlar/gun-sonu-detay" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunSonuDetay /></Layout>} />
+            <Route path="/raporlar/urun-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunBazliSatis /></Layout>} />
+            <Route path="/raporlar/kategori-bazli" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><KategoriBazliSatis /></Layout>} />
+            <Route path="/raporlar/gunluk-giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><GunlukGiderler /></Layout>} />
+            <Route path="/raporlar/kasa" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><KasaRaporuKartı /></Layout>} />
+            
+            {/* 4. ANA SAYFALAR */}
+            <Route path="/" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />
+            <Route path="/ana" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><AnaEkran setGunAktif={setGunAktif} /></Layout>} />
+            <Route path="/masalar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Masalar /></Layout>} />
+            <Route path="/musteri-islemleri" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><MusteriIslemleri /></Layout>} />
+            <Route path="/urun-stok" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><UrunStokYonetimi /></Layout>} />
+            <Route path="/giderler" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Giderler /></Layout>} />
+            <Route path="/personel" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Personel /></Layout>} />
+            <Route path="/ayarlar" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Ayarlar /></Layout>} />
+            <Route path="/bilardo" element={<Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}><Bilardo /></Layout>} />
+            
+            {/* 5. 404 - EN ALTA */}
+            <Route
+              path="*"
+              element={
+                <Layout gunAktif={gunAktif} onGunBaslat={handleGunBaslat}>
+                  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
+                    <div className="text-center">
+                      <h1 className="text-6xl font-bold text-amber-900 mb-4">404</h1>
+                      <p className="text-xl text-amber-700 mb-8">Sayfa bulunamadı</p>
+                      <a 
+                        href="/" 
+                        className="px-8 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-lg font-medium"
+                      >
+                        Ana Sayfaya Dön
+                      </a>
+                    </div>
                 </div>
-              </Layout>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
-    </ErrorBoundary>
+                </Layout>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </AuthProvider>
   );
 }
+
+export default App;
