@@ -492,17 +492,18 @@ export default function Giderler() {
   };
 
   // -----------------------------------------
-  //   KATEGORİLER
-  // -----------------------------------------
-  const kategoriler = [
-    "Mutfak",
-    "Temizlik",
-    "Personel",
-    "Kira",
-    "Fatura",
-    "Bakım",
-    "Diğer"
-  ];
+//   KATEGORİLER
+// -----------------------------------------
+const kategoriler = [
+  "Mutfak",
+  "Temizlik",
+  "Personel",
+  "Kira",
+  "Fatura",
+  "Bakım",
+  "TOPTANCI",  // <--- YENİ EKLENDİ
+  "Diğer"
+];
 
   // -----------------------------------------
   //   FİLTRE TEMİZLE

@@ -55,9 +55,12 @@ export default function Adisyon() {
     const [odemeSozuPopup, setOdemeSozuPopup] = useState(null);
 
     // --------------------------------------------------
-    // HESABI AYIR (SPLIT BILL) STATE'LERİ
+    // ÇOKLU HESABI AYIR (MULTIPLE SPLIT BILL) STATE'LERİ
     // --------------------------------------------------
-    const [splitAdisyon, setSplitAdisyon] = useState(null); // ESKİ ADİSYON (KİLİTLİ)
+    const [splitAdisyonlar, setSplitAdisyonlar] = useState([]); // ESKİ ADİSYONLAR (KİLİTLİ)
+    const [splitAciklamaInput, setSplitAciklamaInput] = useState(""); // Yeni split için açıklama
+    const [splitTutarInput, setSplitTutarInput] = useState(""); // Yeni split için manuel tutar girişi
+    const [splitOranInput, setSplitOranInput] = useState(""); // Yeni split için oran girişi
 
     // --------------------------------------------------
     // SYNC SERVICE KONTROLÜ - YENİ EKLENDİ
@@ -269,7 +272,7 @@ export default function Adisyon() {
     }, []);
 
     // --------------------------------------------------
-    // ADİSYON YÜKLE (Yeni ve Eski) - DÜZELTİLDİ
+    // ADİSYON YÜKLE (Yeni ve Eski) - ÇOKLU SPLIT İÇİN DÜZELTİLDİ
     // --------------------------------------------------
     useEffect(() => {
         if (!masaNo || !gercekMasaNo) return;
@@ -388,19 +391,19 @@ export default function Adisyon() {
 
         setAdisyon(yeniAdisyon);
 
-        // 2. Eski (Split) Adisyonu Bul
-        const eskiAdisyon = adisyonlar.find(
+        // 2. Eski (Split) Adisyonları Bul (ÇOKLU SPLIT)
+        const eskiAdisyonlar = adisyonlar.filter(
             (a) =>
                 (a.masaNo === masaNo || a.masaNum === gercekMasaNo ||
                     (isBilardo && a.masaNo?.includes("BİLARDO"))) &&
                 !a.kapali &&
                 a.isSplit
         );
-        setSplitAdisyon(eskiAdisyon || null);
+        setSplitAdisyonlar(eskiAdisyonlar || []);
 
         console.log('✅ Adisyon yüklendi:', {
             yeniAdisyonId: yeniAdisyon.id,
-            splitAdisyon: eskiAdisyon ? eskiAdisyon.id : 'YOK',
+            splitAdisyonSayisi: eskiAdisyonlar.length,
             isBilardo,
             bilardoTransfer: yeniAdisyon.bilardoTransfer || false
         });
@@ -481,7 +484,7 @@ export default function Adisyon() {
         guncelAdisyonLocal(guncel);
 
         // Masa güncelle
-        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon, isBilardo);
+        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
         alert(`Bilardo süresi doldu! ${bilardoUcret} TL bilardo ücreti eklendi.`);
     };
@@ -547,7 +550,7 @@ export default function Adisyon() {
     }, []);
 
     // --------------------------------------------------
-    // ADİSYON TOPLAM ve KALAN HESABI - GÜNCELLENDİ
+    // ADİSYON TOPLAM ve KALAN HESABI - ÇOKLU SPLIT İÇİN GÜNCELLENDİ
     // --------------------------------------------------
     useEffect(() => {
         // 1. YENİ adisyon toplamları
@@ -572,16 +575,19 @@ export default function Adisyon() {
             0
         );
         const yeniIndirim = indirim || 0;
-        const yeniKalan = Math.max(yeniSatirToplam - yeniIndirim - yeniOdemelerToplam, 0);
 
-        // 2. ESKİ adisyon toplamları (SADECE SATIR TOPLAMI)
-        const eskiSatirToplam = (splitAdisyon?.kalemler || []).reduce(
-            (sum, k) => sum + (Number(k.toplam) || 0),
-            0
-        );
+        // 2. ESKİ adisyonlar toplamları (ÇOKLU SPLIT)
+        const eskiToplamlar = splitAdisyonlar.map(split => {
+            return (split?.kalemler || []).reduce(
+                (sum, k) => sum + (Number(k.toplam) || 0),
+                0
+            );
+        });
+        
+        const eskiToplam = eskiToplamlar.reduce((sum, tutar) => sum + tutar, 0);
 
-        // 3. TOPLAM değerler (YENİ + ESKİ)
-        const toplamSatir = yeniSatirToplam + eskiSatirToplam;
+        // 3. TOPLAM değerler (YENİ + TÜM ESKİ SPLIT'LER)
+        const toplamSatir = yeniSatirToplam + eskiToplam;
         const toplamOdemeler = yeniOdemelerToplam; // Sadece yeni adisyondaki ödemeler
         const toplamKalan = Math.max(toplamSatir - yeniIndirim - toplamOdemeler, 0);
 
@@ -593,8 +599,9 @@ export default function Adisyon() {
             toplamSatir,
             toplamKalan,
             yeniSatirToplam,
-            eskiSatirToplam,
-            bilardoUcret
+            eskiToplam,
+            bilardoUcret,
+            splitSayisi: splitAdisyonlar.length
         });
 
         // =============================
@@ -603,15 +610,19 @@ export default function Adisyon() {
         if (adisyon?.id && gercekMasaNo) {
             try {
                 // 1. Ana adisyon toplamını localStorage'a kaydet
-                localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, toplamSatir.toString());
+                localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, yeniSatirToplam.toString());
 
-                // 2. Split adisyon varsa, onun da toplamını kaydet
-                if (splitAdisyon?.id) {
-                    localStorage.setItem(`mc_adisyon_toplam_${splitAdisyon.id}`, eskiSatirToplam.toString());
-                }
+                // 2. Split adisyonlar varsa, her birinin toplamını kaydet
+                splitAdisyonlar.forEach((split, index) => {
+                    const splitToplam = (split.kalemler || []).reduce(
+                        (sum, k) => sum + (Number(k.toplam) || 0),
+                        0
+                    );
+                    localStorage.setItem(`mc_adisyon_toplam_${split.id}`, splitToplam.toString());
+                });
 
-                // 3. Masa için toplam tutarı kaydet (ana + split)
-                const masaToplamTutar = toplamSatir; // zaten yeni + eski toplamı
+                // 3. Masa için toplam tutarı kaydet (ana + tüm split'ler)
+                const masaToplamTutar = toplamSatir;
                 localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
 
                 // 4. Masalar sayfasını güncellemek için event gönder
@@ -620,7 +631,7 @@ export default function Adisyon() {
                         masaNo: gercekMasaNo,
                         toplamTutar: masaToplamTutar,
                         adisyonId: adisyon.id,
-                        splitAdisyonId: splitAdisyon?.id,
+                        splitAdisyonSayisi: splitAdisyonlar.length,
                         isBilardo: isBilardo
                     }
                 }));
@@ -629,6 +640,7 @@ export default function Adisyon() {
                     masaNo: gercekMasaNo,
                     toplamTutar: masaToplamTutar,
                     adisyonId: adisyon.id,
+                    splitSayisi: splitAdisyonlar.length,
                     isBilardo: isBilardo
                 });
 
@@ -640,7 +652,7 @@ export default function Adisyon() {
         // YENİ EKLENEN KOD SONU
         // =============================
 
-    }, [adisyon, splitAdisyon, indirim, isBilardo, bilardoUcret]);
+    }, [adisyon, splitAdisyonlar, indirim, isBilardo, bilardoUcret]);
 
     // --------------------------------------------------
     // MENÜ ÜRÜNLERİNİ YÜKLE ve SIRALA
@@ -799,7 +811,7 @@ export default function Adisyon() {
             guncelAdisyonLocal(guncel);
 
             // Masa güncelle - Bilardo kontrolü ile
-            guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon, isBilardo);
+            guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
             // =============================
             // YENİ EKLENEN KOD: Sipariş yemek eklendiğinde masalar sayfasını güncelle
@@ -810,8 +822,11 @@ export default function Adisyon() {
                         (sum, k) => sum + (Number(k.toplam) || 0),
                         0
                     );
-                    const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                        (sum, k) => sum + (Number(k.toplam) || 0),
+                    const eskiToplam = splitAdisyonlar.reduce(
+                        (sum, split) => sum + ((split?.kalemler || []).reduce(
+                            (s, k) => s + (Number(k.toplam) || 0),
+                            0
+                        )),
                         0
                     );
                     const masaToplamTutar = toplamTutar + eskiToplam;
@@ -856,8 +871,11 @@ export default function Adisyon() {
             );
 
             // Eski adisyon toplamını da ekle
-            const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                (sum, k) => sum + (Number(k.toplam) || 0),
+            const eskiToplam = splitAdisyonlar.reduce(
+                (sum, split) => sum + ((split?.kalemler || []).reduce(
+                    (s, k) => s + (Number(k.toplam) || 0),
+                    0
+                )),
                 0
             );
 
@@ -974,25 +992,31 @@ export default function Adisyon() {
 
         // Masa güncellemesini yap - GERÇEK MASA NO İLE
         console.log('🔄 Manuel masa güncellemesi:', { gercekMasaNo, adisyonId: adisyon.id, isBilardo });
-        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon, isBilardo);
+        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
     };
 
     // MASA BİLGİSİNİ GÜNCELLEYEN FONKSİYON - SYNC SERVICE ENTEGRASYONLU (GÜNCELLENDİ)
-    const guncelMasaLocal = (masaNum, anaAdisyonId, splitAdisyonObj, isBilardoMasa = false) => {
+    const guncelMasaLocal = (masaNum, anaAdisyonId, splitAdisyonList, isBilardoMasa = false) => {
         // GERÇEK MASA NO'YU KULLAN
         const gercekMasaNoToUse = masaNum;
 
         console.log('🔄 Masa güncelleniyor:', {
             gercekMasaNo: gercekMasaNoToUse,
             anaAdisyonId,
-            splitAdisyonObj,
+            splitAdisyonSayisi: splitAdisyonList.length,
             isBilardo: isBilardoMasa,
             currentGercekMasaNo: gercekMasaNo // State'deki değer
         });
 
         // Toplam tutarı hesapla
         const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-        const eskiToplam = (splitAdisyonObj?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+        const eskiToplam = splitAdisyonList.reduce(
+            (sum, split) => sum + ((split?.kalemler || []).reduce(
+                (s, k) => s + (Number(k.toplam) || 0),
+                0
+            )),
+            0
+        );
         const toplamTutar = yeniToplam + eskiToplam;
 
         console.log('💰 Toplam Tutar Hesaplandı:', { yeniToplam, eskiToplam, toplamTutar: toplamTutar.toFixed(2) });
@@ -1002,7 +1026,7 @@ export default function Adisyon() {
             console.log('🔄 SyncService ile masa güncelleniyor:', gercekMasaNoToUse);
 
             // SyncService'e toplam tutarı da gönder
-            window.syncService.guncelMasa(gercekMasaNoToUse, anaAdisyonId, splitAdisyonObj, toplamTutar.toFixed(2), isBilardoMasa);
+            window.syncService.guncelMasa(gercekMasaNoToUse, anaAdisyonId, splitAdisyonList, toplamTutar.toFixed(2), isBilardoMasa);
             return;
         }
 
@@ -1028,15 +1052,16 @@ export default function Adisyon() {
         if (masaIdx !== -1) {
             const masaAdi = isBilardoMasa ? `BİLARDO ${gercekMasaNoToUse}` : `MASA ${gercekMasaNoToUse}`;
 
+            // Split adisyon ID'lerini topla
+            const splitAdisyonIds = splitAdisyonList.map(split => split.id).filter(Boolean);
+            
             masalar[masaIdx] = {
                 ...masalar[masaIdx],
                 masaNo: masaAdi,
                 masaNum: gercekMasaNoToUse,
                 adisyonId: anaAdisyonId,
-                ayirId: splitAdisyonObj ? splitAdisyonObj.id : null,
-                ayirToplam: splitAdisyonObj ?
-                    Number(splitAdisyonObj.kalemler.reduce((sum, k) => sum + (Number(k.toplam) || 0), 0)).toFixed(2)
-                    : null,
+                splitAdisyonIds: splitAdisyonIds.length > 0 ? splitAdisyonIds : null,
+                splitAdisyonSayisi: splitAdisyonList.length,
                 toplamTutar: toplamTutar.toFixed(2), // MASALAR SAYFASINDA GÖRÜNECEK TUTAR
                 durum: "DOLU", // DOLU OLARAK İŞARETLE
                 renk: "red", // KIRMIZI RENK
@@ -1071,7 +1096,7 @@ export default function Adisyon() {
         guncelAdisyonLocal(guncel);
 
         // Masa güncellemesini yap - GERÇEK MASA NO İLE
-        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon, isBilardo);
+        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
         // =============================
         // YENİ EKLENEN KOD: Satır silindiğinde masalar sayfasını güncelle
@@ -1082,8 +1107,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1116,7 +1144,7 @@ export default function Adisyon() {
         guncelAdisyonLocal(guncel);
 
         // Masa güncellemesini yap - GERÇEK MASA NO İLE
-        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon, isBilardo);
+        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
         // =============================
         // YENİ EKLENEN KOD: Adet artırıldığında masalar sayfasını güncelle
@@ -1127,8 +1155,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1167,7 +1198,7 @@ export default function Adisyon() {
         guncelAdisyonLocal(guncel);
 
         // Masa güncellemesini yap - GERÇEK MASA NO İLE
-        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyon, isBilardo);
+        guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
         // =============================
         // YENİ EKLENEN KOD: Adet azaltıldığında masalar sayfasını güncelle
@@ -1178,8 +1209,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1223,8 +1257,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1264,8 +1301,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1299,8 +1339,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1386,8 +1429,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1572,8 +1618,11 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
                     0
                 );
                 const masaToplamTutar = toplamTutar + eskiToplam;
@@ -1603,7 +1652,7 @@ export default function Adisyon() {
     };
 
     // --------------------------------------------------
-    // HESABI AYIR (YENİ MANTIK - ESKİ ADİSYON KİLİTLİ)
+    // ÇOKLU HESABI AYIR (ÇOKLU SPLIT BILL) - YENİ MANTIK
     // --------------------------------------------------
     const hesabiAyir = () => {
         // Eğer adisyon boşsa, hiçbir şey yapma
@@ -1612,9 +1661,9 @@ export default function Adisyon() {
             return;
         }
 
-        // Eğer zaten eski adisyon varsa, uyarı ver
-        if (splitAdisyon) {
-            alert("Bu masa için zaten bir eski adisyon mevcut!");
+        // Açıklama kontrolü
+        if (!splitAciklamaInput.trim()) {
+            alert("Lütfen hesap ayırma işlemi için bir açıklama giriniz (Örn: 'Kişi1', 'Çocuklar', 'Özel Hesap' vb.)");
             return;
         }
 
@@ -1624,6 +1673,9 @@ export default function Adisyon() {
             id: adisyon.id,
             isSplit: true, // Artık ESKİ adisyon
             durum: "KİLİTLİ",
+            splitAciklama: splitAciklamaInput.trim(), // Açıklama kaydet
+            splitTarihi: new Date().toISOString(),
+            splitIndex: splitAdisyonlar.length // Hangi sırada ayrıldığını kaydet
         };
 
         // YENİ bir adisyon oluştur
@@ -1644,13 +1696,17 @@ export default function Adisyon() {
             isBilardo: isBilardo // Bilardo masası mı?
         };
 
-        // 1. Eski adisyonu split olarak kaydet
-        setSplitAdisyon(eskiAdisyon);
+        // 1. Eski adisyonu split listesine ekle
+        const yeniSplitList = [...splitAdisyonlar, eskiAdisyon];
+        setSplitAdisyonlar(yeniSplitList);
 
         // 2. Yeni adisyonu aktif adisyon olarak ayarla
         setAdisyon(yeniAdisyon);
         setIndirim(0); // Yeni adisyon için indirimi sıfırla
         setIndirimInput("");
+        setSplitAciklamaInput(""); // Açıklama alanını temizle
+        setSplitTutarInput(""); // Tutar alanını temizle
+        setSplitOranInput(""); // Oran alanını temizle
 
         // 3. LocalStorage'ı güncelle
         let adisyonlar = okuJSON(ADISYON_KEY, []);
@@ -1666,7 +1722,7 @@ export default function Adisyon() {
         yazJSON(ADISYON_KEY, adisyonlar);
 
         // 4. Masa kaydını güncelle - GERÇEK MASA NO İLE
-        guncelMasaLocal(gercekMasaNo, yeniAdisyon.id, eskiAdisyon, isBilardo);
+        guncelMasaLocal(gercekMasaNo, yeniAdisyon.id, yeniSplitList, isBilardo);
 
         // =============================
         // YENİ EKLENEN KOD: Hesap ayrıldığında masalar sayfasını güncelle
@@ -1677,21 +1733,57 @@ export default function Adisyon() {
                     (sum, k) => sum + (Number(k.toplam) || 0),
                     0
                 );
-                const eskiToplam = (eskiAdisyon.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
-                    0
+                const eskiToplamlar = yeniSplitList.map(split => 
+                    (split.kalemler || []).reduce(
+                        (sum, k) => sum + (Number(k.toplam) || 0),
+                        0
+                    )
                 );
+                const eskiToplam = eskiToplamlar.reduce((sum, tutar) => sum + tutar, 0);
                 const masaToplamTutar = yeniToplam + eskiToplam;
 
                 localStorage.setItem(`mc_adisyon_toplam_${yeniAdisyon.id}`, yeniToplam.toString());
-                localStorage.setItem(`mc_adisyon_toplam_${eskiAdisyon.id}`, eskiToplam.toString());
+                
+                // Tüm split adisyonların toplamını kaydet
+                yeniSplitList.forEach((split, index) => {
+                    const splitToplam = (split.kalemler || []).reduce(
+                        (sum, k) => sum + (Number(k.toplam) || 0),
+                        0
+                    );
+                    localStorage.setItem(`mc_adisyon_toplam_${split.id}`, splitToplam.toString());
+                });
+                
                 localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
+                
+                alert(`✅ Hesap başarıyla ayrıldı!\nAçıklama: "${splitAciklamaInput.trim()}"\nToplam ${yeniSplitList.length} adet ayrılmış hesap mevcut.`);
             }, 100);
         }
         // =============================
         // YENİ EKLENEN KOD SONU
         // =============================
+    };
+
+    // --------------------------------------------------
+    // SPLİT ADİSYON SİLME
+    // --------------------------------------------------
+    const splitAdisyonSil = (splitId) => {
+        if (!window.confirm("Bu ayrılmış hesabı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
+            return;
+        }
+
+        const yeniSplitList = splitAdisyonlar.filter(split => split.id !== splitId);
+        setSplitAdisyonlar(yeniSplitList);
+
+        // LocalStorage'dan da sil
+        const adisyonlar = okuJSON(ADISYON_KEY, []);
+        const guncelAdisyonlar = adisyonlar.filter(a => a.id !== splitId);
+        yazJSON(ADISYON_KEY, guncelAdisyonlar);
+
+        // Masa kaydını güncelle
+        guncelMasaLocal(gercekMasaNo, adisyon.id, yeniSplitList, isBilardo);
+
+        alert("Ayrılmış hesap silindi.");
     };
 
     // --------------------------------------------------
@@ -1737,7 +1829,7 @@ export default function Adisyon() {
     };
 
     // --------------------------------------------------
-    // ADİSYON KAPAT - SYNC SERVICE ENTEGRASYONLU (GÜNCELLENDİ)
+    // ADİSYON KAPAT - SYNC SERVICE ENTEGRASYONLU (ÇOKLU SPLIT İÇİN GÜNCELLENDİ)
     // --------------------------------------------------
     const adisyonKapat = () => {
         // Kalan tutar kontrolü
@@ -1776,7 +1868,12 @@ export default function Adisyon() {
         // =============================
         const temizlemeListesi = [];
         if (adisyon?.id) temizlemeListesi.push(`mc_adisyon_toplam_${adisyon.id}`);
-        if (splitAdisyon?.id) temizlemeListesi.push(`mc_adisyon_toplam_${splitAdisyon.id}`);
+        
+        // Tüm split adisyonların toplamlarını temizle
+        splitAdisyonlar.forEach((split, index) => {
+            if (split?.id) temizlemeListesi.push(`mc_adisyon_toplam_${split.id}`);
+        });
+        
         if (gercekMasaNo) temizlemeListesi.push(`mc_masa_toplam_${gercekMasaNo}`);
 
         temizlemeListesi.forEach(key => {
@@ -1808,21 +1905,23 @@ export default function Adisyon() {
             }
         }
 
-        // ESKİ adisyonu kapat (varsa)
-        let guncelEskiAdisyon = null;
-        if (splitAdisyon) {
-            const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === splitAdisyon.id);
+        // ESKİ adisyonları kapat (tüm split'ler)
+        const guncelEskiAdisyonlar = [];
+        splitAdisyonlar.forEach((split) => {
+            const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === split.id);
             if (eskiIdx !== -1) {
-                guncelEskiAdisyon = {
-                    ...splitAdisyon,
+                const guncelEskiAdisyon = {
+                    ...split,
                     kapali: true,
                     kapanisZamani: new Date().toISOString(),
                     durum: "KAPALI",
                 };
                 updatedAdisyonlar[eskiIdx] = guncelEskiAdisyon;
-                setSplitAdisyon(guncelEskiAdisyon);
+                guncelEskiAdisyonlar.push(guncelEskiAdisyon);
             }
-        }
+        });
+        
+        setSplitAdisyonlar(guncelEskiAdisyonlar);
 
         yazJSON(ADISYON_KEY, updatedAdisyonlar);
         console.log('✅ Adisyonlar kapatıldı');
@@ -1869,7 +1968,13 @@ export default function Adisyon() {
             if (masaIdx !== -1) {
                 // Toplam tutarı hesapla
                 const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-                const eskiToplam = (splitAdisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+                const eskiToplam = splitAdisyonlar.reduce(
+                    (sum, split) => sum + ((split?.kalemler || []).reduce(
+                        (s, k) => s + (Number(k.toplam) || 0),
+                        0
+                    )),
+                    0
+                );
                 const toplamTutar = yeniToplam + eskiToplam;
 
                 const masaAdi = isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`;
@@ -1879,8 +1984,8 @@ export default function Adisyon() {
                     masaNo: masaAdi,
                     masaNum: gercekMasaNo,
                     adisyonId: null,
-                    ayirId: null,
-                    ayirToplam: null,
+                    splitAdisyonIds: null,
+                    splitAdisyonSayisi: 0,
                     toplamTutar: toplamTutar.toFixed(2),
                     acilisZamani: null,
                     kapanisZamani: new Date().toISOString(),
@@ -1926,7 +2031,7 @@ export default function Adisyon() {
                 masaNo: gercekMasaNo,
                 masaAdi: masaAdi,
                 adisyonId: adisyon?.id,
-                aciklama: `${masaAdi} Kapatıldı`,
+                aciklama: `${masaAdi} Kapatıldı (${splitAdisyonlar.length} ayrılmış hesap ile)`,
                 giren: toplam,
                 cikan: 0,
                 bakiye: 0,
@@ -1945,7 +2050,7 @@ export default function Adisyon() {
         // ------------------------------------------------
         const masaAdi = isBilardo ? `Bilardo ${gercekMasaNo}` : `Masa ${gercekMasaNo}`;
         setKapanisMesaji(
-            `✅ ${masaAdi} başarıyla kapatıldı! Toplam: ${toplam.toFixed(2)} TL\nMasalar sayfasına yönlendiriliyorsunuz...`
+            `✅ ${masaAdi} başarıyla kapatıldı! Toplam: ${toplam.toFixed(2)} TL\n${splitAdisyonlar.length} adet ayrılmış hesap ile birlikte kapatıldı.\nMasalar sayfasına yönlendiriliyorsunuz...`
         );
 
         // 5. MASALAR SAYFASINDA GÜNCELLEME İÇİN EK SENKRONİZASYON
@@ -1962,7 +2067,7 @@ export default function Adisyon() {
             setTimeout(() => {
                 console.log('🔄 Masalar sayfasına yönlendiriliyor...');
                 masayaDon();
-            }, 1000);
+            }, 1500);
         }, 500);
     };
 
@@ -2173,6 +2278,19 @@ export default function Adisyon() {
     };
 
     // --------------------------------------------------
+    // SPLIT ADİSYONLARIN TOPLAM TUTARINI HESAPLA
+    // --------------------------------------------------
+    const splitToplamTutari = useMemo(() => {
+        return splitAdisyonlar.reduce((total, split) => {
+            const splitToplam = (split?.kalemler || []).reduce(
+                (sum, k) => sum + (Number(k.toplam) || 0),
+                0
+            );
+            return total + splitToplam;
+        }, 0);
+    }, [splitAdisyonlar]);
+
+    // --------------------------------------------------
     // RENDER
     // --------------------------------------------------
     if (!adisyon) {
@@ -2181,8 +2299,7 @@ export default function Adisyon() {
 
     // YENİ adisyon ve ESKİ adisyon toplamları
     const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-    const eskiToplam = (splitAdisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-    const toplamTutar = yeniToplam + eskiToplam;
+    const toplamTutar = yeniToplam + splitToplamTutari;
 
     // Yapılan ödemeler toplamı (SADECE YENİ ADİSYONDAN)
     const yapilanOdemeler = (adisyon?.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
@@ -2255,7 +2372,7 @@ export default function Adisyon() {
                         </span>
                     </div>
 
-                    {/* BİLARDO TRANSFER ÖZETİ - YENİ EKLENDİ */}
+                    {/* BİLARDO TRANSFER ÖZETİ */}
                     {bilardoTransferOzetiGoster()}
 
                     {/* BİLARDO SÜRESİ VE ÜCRETİ */}
@@ -2382,19 +2499,90 @@ export default function Adisyon() {
                             </span>
                         </div>
 
-                        {/* ESKİ ADİSYON SATIRI - KOYU MAVİ */}
-                        {splitAdisyon && (
+                        {/* ÇOKLU SPLIT ADİSYONLAR SATIRI - KOYU MAVİ */}
+                        {splitAdisyonlar.length > 0 && (
                             <div
                                 style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    marginBottom: "4px",
+                                    marginBottom: "8px",
+                                    padding: "8px",
+                                    background: "#e8f4fc",
+                                    borderRadius: "6px",
+                                    border: "1px solid #1a5fb4"
                                 }}
                             >
-                                <span style={{ fontWeight: "500" }}>ESKİ Adisyon:</span>
-                                <span style={{ fontWeight: "bold", color: "#1a5fb4" }}>
-                                    {eskiToplam.toFixed(2)} TL
-                                </span>
+                                <div style={{ 
+                                    fontWeight: "bold", 
+                                    marginBottom: "6px",
+                                    color: "#1a5fb4",
+                                    fontSize: "15px",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center"
+                                }}>
+                                    <span>AYRILMIŞ HESAPLAR:</span>
+                                    <span style={{ fontSize: "14px", background: "#1a5fb4", color: "white", padding: "2px 6px", borderRadius: "10px" }}>
+                                        {splitAdisyonlar.length} ADET
+                                    </span>
+                                </div>
+                                
+                                {splitAdisyonlar.map((split, index) => {
+                                    const splitToplam = (split?.kalemler || []).reduce(
+                                        (sum, k) => sum + (Number(k.toplam) || 0),
+                                        0
+                                    );
+                                    
+                                    return (
+                                        <div key={split.id} style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            marginBottom: "4px",
+                                            padding: "4px",
+                                            background: index % 2 === 0 ? "#f0f8ff" : "transparent",
+                                            borderRadius: "4px"
+                                        }}>
+                                            <div style={{ fontSize: "13px" }}>
+                                                <span style={{ fontWeight: "500" }}>
+                                                    {index + 1}. {split.splitAciklama || "Ayrılmış Hesap"}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                                <span style={{ fontWeight: "bold", color: "#1a5fb4", fontSize: "14px" }}>
+                                                    {splitToplam.toFixed(2)} TL
+                                                </span>
+                                                <button
+                                                    onClick={() => splitAdisyonSil(split.id)}
+                                                    style={{
+                                                        padding: "2px 6px",
+                                                        border: "none",
+                                                        background: "transparent",
+                                                        color: "red",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        opacity: 0.7
+                                                    }}
+                                                    title="Bu ayrılmış hesabı sil"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                
+                                <div style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    marginTop: "8px",
+                                    paddingTop: "8px",
+                                    borderTop: "1px dashed #1a5fb4",
+                                    fontWeight: "bold"
+                                }}>
+                                    <span>Split Toplam:</span>
+                                    <span style={{ color: "#1a5fb4", fontSize: "15px" }}>
+                                        {splitToplamTutari.toFixed(2)} TL
+                                    </span>
+                                </div>
                             </div>
                         )}
 
@@ -2593,31 +2781,71 @@ export default function Adisyon() {
                             </div>
                         </div>
                     )}
+
+                    {/* HESABI AYIR ALANI - ÇOKLU SPLIT İÇİN */}
+                    <div style={{ marginTop: "14px", borderTop: "1px solid #ecd3a5", paddingTop: "12px" }}>
+                        <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#c57f3e" }}>
+                            ✂️ HESABI AYIR (ÇOKLU)
+                        </div>
+                        
+                        <div style={{ marginBottom: "8px" }}>
+                            <div style={{ fontSize: "13px", marginBottom: "4px" }}>Açıklama (Zorunlu):</div>
+                            <input
+                                type="text"
+                                value={splitAciklamaInput}
+                                onChange={(e) => setSplitAciklamaInput(e.target.value)}
+                                placeholder="Örn: Kişi1, Çocuklar, Özel Hesap..."
+                                style={{
+                                    width: "100%",
+                                    padding: "8px",
+                                    borderRadius: "8px",
+                                    border: "1px solid #bfa37d",
+                                    fontSize: "14px",
+                                    background: "#fff"
+                                }}
+                            />
+                        </div>
+                        
+                        {/* HESABI AYIR butonu - Sadece YENİ adisyonda ürün varsa göster */}
+                        {adisyon && adisyon.kalemler && adisyon.kalemler.length > 0 && (
+                            <button
+                                onClick={hesabiAyir}
+                                disabled={!splitAciklamaInput.trim()}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px",
+                                    borderRadius: "10px",
+                                    border: "none",
+                                    background: !splitAciklamaInput.trim() ? "#ccc" : "#ffeedd",
+                                    color: !splitAciklamaInput.trim() ? "#999" : "#c57f3e",
+                                    cursor: !splitAciklamaInput.trim() ? "not-allowed" : "pointer",
+                                    fontSize: "16px",
+                                    fontWeight: "bold",
+                                    marginTop: "8px",
+                                }}
+                            >
+                                HESABI AYIR ✂️ ({splitAdisyonlar.length + 1}. kez)
+                            </button>
+                        )}
+                        
+                        {splitAdisyonlar.length > 0 && (
+                            <div style={{
+                                marginTop: "10px",
+                                padding: "8px",
+                                background: "#e8f4fc",
+                                borderRadius: "8px",
+                                fontSize: "12px",
+                                color: "#1a5fb4",
+                                textAlign: "center"
+                            }}>
+                                📋 <b>{splitAdisyonlar.length}</b> adet ayrılmış hesap mevcut
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* ALT BUTONLAR */}
                 <div style={{ borderTop: "1px solid #ecd3a5", paddingTop: "12px" }}>
-                    {/* HESABI AYIR - Sadece ESKİ adisyon YOKSA ve YENİ adisyonda ürün varsa göster */}
-                    {!splitAdisyon && adisyon && adisyon.kalemler && adisyon.kalemler.length > 0 && (
-                        <button
-                            onClick={hesabiAyir}
-                            style={{
-                                width: "100%",
-                                padding: "10px",
-                                borderRadius: "10px",
-                                border: "none",
-                                background: "#ffeedd",
-                                color: "#c57f3e",
-                                cursor: "pointer",
-                                fontSize: "16px",
-                                fontWeight: "bold",
-                                marginBottom: "8px",
-                            }}
-                        >
-                            HESABI AYIR ✂️
-                        </button>
-                    )}
-
                     {/* ÖDEME YAP / ADİSYON KAPAT */}
                     <button
                         onClick={adisyonKapat}
@@ -2700,15 +2928,15 @@ export default function Adisyon() {
                     {isBilardo ? `🎱 BİLARDO ${gercekMasaNo}` : `🍽️ MASA ${gercekMasaNo}`}
                 </div>
 
-                {/* ESKİ ADİSYON GÖSTERİMİ - Sadece splitAdisyon VARKEN göster */}
-                {splitAdisyon && (
+                {/* ÇOKLU SPLIT ADİSYON GÖSTERİMİ */}
+                {splitAdisyonlar.length > 0 && (
                     <div
                         style={{
                             marginBottom: "15px",
                             padding: "10px",
-                            background: "#f0f0f0",
+                            background: "#e8f4fc",
                             borderRadius: "8px",
-                            border: "2px solid #ccc",
+                            border: "2px solid #1a5fb4",
                         }}
                     >
                         <div
@@ -2716,11 +2944,116 @@ export default function Adisyon() {
                                 fontWeight: "bold",
                                 fontSize: "18px",
                                 marginBottom: "8px",
-                                color: "#1a5fb4", // KOYU MAVİ
+                                color: "#1a5fb4",
                                 textAlign: "center",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
                             }}
                         >
-                            ESKİ ADİSYON (TOPLAM: {eskiToplam.toFixed(2)} TL)
+                            <span>AYRILMIŞ HESAPLAR ({splitAdisyonlar.length} ADET)</span>
+                            <span style={{ fontSize: "14px", background: "#1a5fb4", color: "white", padding: "2px 8px", borderRadius: "10px" }}>
+                                TOPLAM: {splitToplamTutari.toFixed(2)} TL
+                            </span>
+                        </div>
+                        
+                        <div style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            maxHeight: "200px",
+                            overflowY: "auto",
+                            padding: "5px"
+                        }}>
+                            {splitAdisyonlar.map((split, index) => {
+                                const splitToplam = (split?.kalemler || []).reduce(
+                                    (sum, k) => sum + (Number(k.toplam) || 0),
+                                    0
+                                );
+                                
+                                return (
+                                    <div key={split.id} style={{
+                                        padding: "8px",
+                                        background: index % 2 === 0 ? "#f0f8ff" : "#ffffff",
+                                        borderRadius: "6px",
+                                        border: "1px solid #b3d9ff"
+                                    }}>
+                                        <div style={{
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            marginBottom: "6px"
+                                        }}>
+                                            <div>
+                                                <span style={{ fontWeight: "bold", color: "#1a5fb4", fontSize: "15px" }}>
+                                                    {index + 1}. {split.splitAciklama || "Ayrılmış Hesap"}
+                                                </span>
+                                                <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
+                                                    {split.splitTarihi ? new Date(split.splitTarihi).toLocaleTimeString('tr-TR', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    }) : ""}
+                                                </div>
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                <span style={{ fontWeight: "bold", fontSize: "16px", color: "#1a5fb4" }}>
+                                                    {splitToplam.toFixed(2)} TL
+                                                </span>
+                                                <button
+                                                    onClick={() => splitAdisyonSil(split.id)}
+                                                    style={{
+                                                        padding: "4px 8px",
+                                                        border: "none",
+                                                        background: "#ffebee",
+                                                        color: "#d32f2f",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        borderRadius: "4px",
+                                                        fontWeight: "bold"
+                                                    }}
+                                                    title="Bu ayrılmış hesabı sil"
+                                                >
+                                                    Sil
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Split adisyon içeriği (ürünler) */}
+                                        <div style={{
+                                            fontSize: "12px",
+                                            color: "#555",
+                                            maxHeight: "60px",
+                                            overflowY: "auto",
+                                            padding: "4px",
+                                            background: "#f9f9f9",
+                                            borderRadius: "4px",
+                                            border: "1px dashed #ddd"
+                                        }}>
+                                            {split.kalemler && split.kalemler.length > 0 ? (
+                                                split.kalemler.slice(0, 3).map((kalem, kIndex) => (
+                                                    <div key={kIndex} style={{
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                        marginBottom: "2px"
+                                                    }}>
+                                                        <span>{kalem.urunAd} x{kalem.adet}</span>
+                                                        <span>{kalem.toplam ? kalem.toplam.toFixed(2) : "0.00"} TL</span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div style={{ textAlign: "center", color: "#999", fontStyle: "italic" }}>
+                                                    Ürün yok
+                                                </div>
+                                            )}
+                                            {split.kalemler && split.kalemler.length > 3 && (
+                                                <div style={{ textAlign: "center", color: "#666", marginTop: "2px" }}>
+                                                    + {split.kalemler.length - 3} daha fazla ürün...
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -3243,7 +3576,7 @@ export default function Adisyon() {
                     MENÜ (Ürünler)
                 </div>
 
-                {/* ÜRÜN ARAMA KUTUSU - YENİ EKLENDİ */}
+                {/* ÜRÜN ARAMA KUTUSU */}
                 <div style={{ marginBottom: "12px" }}>
                     <div style={{ position: "relative" }}>
                         <input
