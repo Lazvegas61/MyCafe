@@ -1,0 +1,303 @@
+/* -----------------------------------------------------
+   MYCAFE GLOBAL CSS — FINAL PRO VERSION
+   Bej (#f5e7d0) — Kahve (#4b2e05) Tema Sistemi
+------------------------------------------------------*/
+
+/* 1) GENEL RESET */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #f5e7d0;
+  color: #4b2e05;
+  font-family: "Inter", sans-serif;
+  overflow-x: hidden;
+}
+
+/* -----------------------------------------------------
+   2) GLOBAL SCALE — TÜM PROJE OTOMATİK ÖLÇEKLENDİRME
+------------------------------------------------------*/
+
+html {
+  /* Varsayılan scale */
+  font-size: 100%;
+}
+
+/* 2K – büyük çözünürlükler */
+@media (min-width: 1600px) {
+  html {
+    font-size: 112%;
+  }
+}
+
+/* Laptop – ideal çözünürlük */
+@media (min-width: 1280px) and (max-width: 1599px) {
+  html {
+    font-size: 100%;
+  }
+}
+
+/* Küçük laptop / tablet */
+@media (min-width: 768px) and (max-width: 1279px) {
+  html {
+    font-size: 92%;
+  }
+}
+
+/* Mobil büyük (600–768) */
+@media (min-width: 600px) and (max-width: 767px) {
+  html {
+    font-size: 85%;
+  }
+}
+
+/* Mobil küçük */
+@media (max-width: 599px) {
+  html {
+    font-size: 75%;
+  }
+}
+
+/* -----------------------------------------------------
+   3) MYCAFE TEMA RENKLERİ
+------------------------------------------------------*/
+
+:root {
+  --bej: #f5e7d0;
+  --kahve: #4b2e05;
+  --kahve-acik: #6a4410;
+  --kahve-hover: #3a2200;
+  --panel-bg: #f8ecd8;
+  --beyaz: #ffffff;
+  --kirmizi: #c0392b;
+  --yesil: #4caf50;
+}
+
+/* -----------------------------------------------------
+   4) GENEL LAYOUT KURALLARI
+------------------------------------------------------*/
+
+.container {
+  padding: 20px;
+}
+
+.panel {
+  background: var(--panel-bg);
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+}
+
+.section-title {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: var(--kahve);
+}
+
+/* -----------------------------------------------------
+   5) GLOBAL BUTON SİSTEMİ
+------------------------------------------------------*/
+
+.btn {
+  padding: 12px 20px;
+  background: var(--kahve);
+  color: var(--beyaz);
+  border: none;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn:hover {
+  background: var(--kahve-hover);
+}
+
+/* Açık buton (sil, iptal vb.) */
+.btn-light {
+  background: var(--beyaz);
+  border: 2px solid var(--kahve);
+  color: var(--kahve);
+}
+
+.btn-light:hover {
+  background: var(--kahve);
+  color: var(--beyaz);
+}
+
+/* Kırmızı buton */
+.btn-red {
+  background: var(--kirmizi);
+}
+
+.btn-red:hover {
+  filter: brightness(0.9);
+}
+
+/* -----------------------------------------------------
+   6) INPUT – FORM SİSTEMİ
+------------------------------------------------------*/
+
+input, select, textarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--kahve);
+  border-radius: 8px;
+  background: var(--beyaz);
+  color: var(--kahve);
+  font-size: 1rem;
+  outline: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--kahve-hover);
+}
+
+/* -----------------------------------------------------
+   7) TABLO SİSTEMİ (RAPORLAR)
+------------------------------------------------------*/
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.table th {
+  background: var(--kahve);
+  color: var(--beyaz);
+  padding: 10px;
+  font-size: 1rem;
+}
+
+.table td {
+  background: var(--beyaz);
+  padding: 10px;
+  border-bottom: 2px solid var(--panel-bg);
+}
+
+/* Küçük ekranda tablo scroll */
+.table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* -----------------------------------------------------
+   8) SCROLLBAR
+------------------------------------------------------*/
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--kahve);
+  border-radius: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bej);
+}
+
+/* -----------------------------------------------------
+   9) GLOBAL CARD SİSTEMİ
+------------------------------------------------------*/
+
+.card {
+  background: var(--panel-bg);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  margin-bottom: 12px;
+}
+
+/* -----------------------------------------------------
+   10) MASALAR — KUTU SİSTEMİ
+------------------------------------------------------*/
+
+.masa-box {
+  width: 180px;
+  height: 120px;
+  background: var(--bej);
+  color: var(--kahve);
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.masa-bos {
+  background: var(--yesil);
+  color: white;
+}
+
+.masa-dolu {
+  background: var(--kirmizi);
+  color: white;
+}
+
+/* Responsive grid */
+.masa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+/* -----------------------------------------------------
+   11) ADİSYON — ÜRÜN KUTULARI
+------------------------------------------------------*/
+
+.menu-box {
+  background: var(--panel-bg);
+  padding: 14px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  cursor: pointer;
+  transition: 0.1s;
+}
+
+.menu-box:hover {
+  transform: scale(1.03);
+}
+
+/* -----------------------------------------------------
+   12) ADİSYON — SATIRLAR
+------------------------------------------------------*/
+
+.adisyon-row {
+  padding: 12px;
+  background: var(--beyaz);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.1rem;
+}
+
+/* -----------------------------------------------------
+   13) KIRMIZI UYARI (Sipariş Yemek)
+------------------------------------------------------*/
+
+.warning {
+  background: var(--kirmizi);
+  color: white;
+  padding: 8px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 1rem;
+}
+/* =========================== */
+/*  GLOBAL RESPONSIVE SCALE    */
+/* =========================== */
+
+/* ...bu bloğun tamamını sil veya
+   başına /* sonuna *\/ koyup pasifleştir... */

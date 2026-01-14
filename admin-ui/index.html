@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyCafe Admin Panel</title>
+    
+    <!-- SyncService yükleme kontrolü -->
+    <script>
+      // SyncService hazırlık kontrolü
+      window.syncServiceReady = false;
+      window.syncServiceDebug = true;
+      
+      // Sayfa yüklendiğinde syncService kontrolü
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('🔄 MyCafe Admin Panel yükleniyor...');
+        
+        // SyncService kontrolü için 2 saniye bekle
+        setTimeout(function() {
+          if (typeof window.syncService !== 'undefined') {
+            window.syncServiceReady = true;
+            console.log('✅ SyncService hazır!');
+            console.log('📋 SyncService fonksiyonları:', Object.keys(window.syncService).filter(key => typeof window.syncService[key] === 'function'));
+            
+            // Test amaçlı global fonksiyonlar ekle
+            window.testMasaBosalt = function(masaNo) {
+              if (window.syncService && window.syncService.masaBosalt) {
+                console.log('🧪 Test: Masa bosalt çağrılıyor:', masaNo);
+                return window.syncService.masaBosalt(masaNo);
+              }
+              return false;
+            };
+            
+            window.testMasaGuncelle = function(masaNo) {
+              if (window.syncService && window.syncService.guncelMasa) {
+                console.log('🧪 Test: Masa güncelle çağrılıyor:', masaNo);
+                return window.syncService.guncelMasa(masaNo, 'test-adisyon-id');
+              }
+              return false;
+            };
+            
+          } else {
+            console.error('❌ SyncService bulunamadı!');
+            console.warn('⚠️ Lütfen syncService.js dosyasının doğru yüklendiğinden emin olun.');
+          }
+        }, 2000);
+      });
+      
+      // Hata yakalama
+      window.addEventListener('error', function(event) {
+        console.error('🚨 Global hata:', event.error);
+        if (event.error.message && event.error.message.includes('syncService')) {
+          console.error('⚠️ SyncService ile ilgili hata tespit edildi!');
+        }
+      });
+    </script>
+    
+    <!-- SyncService global event listener'ları -->
+    <script>
+      // SyncService event'lerini dinle
+      document.addEventListener('DOMContentLoaded', function() {
+        const syncEvents = [
+          'masa_guncellendi',
+          'adisyon_guncellendi',
+          'urun_guncellendi',
+          'musteri_guncellendi',
+          'borc_guncellendi',
+          'senkronize_et',
+          'fiyat_guncellendi',
+          'kalem_eklendi',
+          'kalem_silindi',
+          'toplam_guncellendi'
+        ];
+        
+        syncEvents.forEach(eventName => {
+          window.addEventListener(eventName, function(event) {
+            if (window.syncServiceDebug) {
+              console.log(`📢 SyncService Event: ${eventName}`, event.detail);
+            }
+          });
+        });
+        
+        // Storage değişikliklerini dinle
+        window.addEventListener('storage', function(event) {
+          if (window.syncServiceDebug && event.key && event.key.startsWith('mc_')) {
+            console.log('💾 Storage değişti:', event.key);
+          }
+        });
+      });
+    </script>
+    
+    <!-- Debug paneli (sadece geliştirme ortamında) -->
+    <script>
+      // Debug paneli için klavye kısayolu
+      document.addEventListener('keydown', function(e) {
+        // Ctrl+Shift+D ile debug paneli aç/kapat
+        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+          e.preventDefault();
+          const debugPanel = document.getElementById('sync-debug-panel');
+          if (debugPanel) {
+            debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
+          } else {
+            createDebugPanel();
+          }
+        }
+        
+        // Ctrl+Shift+R ile syncService test et
+        if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+          e.preventDefault();
+          if (window.syncService) {
+            console.log('🧪 SyncService test ediliyor...');
+            window.syncService.senkronizeMasalar();
+          }
+        }
+      });
+      
+      function createDebugPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'sync-debug-panel';
+        panel.style.cssText = `
+          position: fixed;
+          bottom: 10px;
+          right: 10px;
+          background: rgba(0,0,0,0.9);
+          color: white;
+          padding: 15px;
+          border-radius: 8px;
+          font-family: monospace;
+          font-size: 12px;
+          z-index: 9999;
+          max-width: 300px;
+          max-height: 400px;
+          overflow-y: auto;
+        `;
+        
+        panel.innerHTML = `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>SyncService Debug</strong>
+            <button onclick="document.getElementById('sync-debug-panel').style.display='none'" style="background: red; color: white; border: none; padding: 2px 8px; border-radius: 3px;">X</button>
+          </div>
+          <div id="sync-debug-content">
+            <div>SyncService: <span id="sync-status">${window.syncService ? '✅ HAZIR' : '❌ YOK'}</span></div>
+            <div>Storage Keys:</div>
+            <div id="storage-keys"></div>
+            <hr style="margin: 10px 0;">
+            <div>
+              <button onclick="testSyncService()" style="background: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 3px; margin-right: 5px;">Test</button>
+              <button onclick="clearStorage()" style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 3px;">Clear</button>
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(panel);
+        updateDebugPanel();
+        
+        // Her 5 saniyede bir güncelle
+        setInterval(updateDebugPanel, 5000);
+      }
+      
+      function updateDebugPanel() {
+        if (!document.getElementById('sync-debug-panel')) return;
+        
+        // SyncService durumu
+        document.getElementById('sync-status').textContent = 
+          window.syncService ? '✅ HAZIR' : '❌ YOK';
+        
+        // Storage key'leri
+        const keysDiv = document.getElementById('storage-keys');
+        if (keysDiv) {
+          let html = '';
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('mc_')) {
+              try {
+                const value = JSON.parse(localStorage.getItem(key));
+                html += `<div style="font-size: 10px; margin-top: 3px;">
+                  ${key}: ${Array.isArray(value) ? value.length + ' items' : 'object'}
+                </div>`;
+              } catch {
+                html += `<div style="font-size: 10px; margin-top: 3px;">${key}: parse error</div>`;
+              }
+            }
+          }
+          keysDiv.innerHTML = html || '<div style="font-size: 10px;">No mc_ keys found</div>';
+        }
+      }
+      
+      function testSyncService() {
+        if (window.syncService) {
+          console.log('🧪 SyncService test başlatılıyor...');
+          // Masa 1'i temizle
+          window.syncService.masaBosalt("1");
+          // Senkronize et
+          setTimeout(() => window.syncService.senkronizeMasalar(), 1000);
+        } else {
+          alert('SyncService bulunamadı!');
+        }
+      }
+      
+      function clearStorage() {
+        if (confirm('Tüm mc_ prefiksl localStorage verilerini temizlemek istediğinize emin misiniz?')) {
+          const keysToRemove = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('mc_')) {
+              keysToRemove.push(key);
+            }
+          }
+          
+          keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+            console.log('🗑️ Silindi:', key);
+          });
+          
+          window.dispatchEvent(new Event('storage'));
+          alert(`${keysToRemove.length} kayıt silindi. Sayfayı yenileyin.`);
+        }
+      }
+    </script>
+    
+    <style>
+      /* SyncService debug notifikasyonları */
+      .sync-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        z-index: 9998;
+        animation: slideIn 0.3s ease;
+      }
+      
+      .sync-notification.error {
+        background: #f44336;
+      }
+      
+      .sync-notification.warning {
+        background: #ff9800;
+      }
+      
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
