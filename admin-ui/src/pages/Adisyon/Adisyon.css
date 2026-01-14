@@ -1,0 +1,906 @@
+/* =========================================================
+   GENEL 4 KOLON GRID
+========================================================= */
+.adisyon-wrapper {
+  width: 100%;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 300px 1fr 350px 200px; /* Ödeme - Adisyon - Ürün - Kategori */
+  overflow: hidden;
+  background: #f4e7d2;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #4b2e05;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 18px;
+}
+
+/* =========================================================
+   1 — ÖDEMELER PANELİ (SOL)
+========================================================= */
+.panel-odeme {
+  background: #fdf4e4;
+  padding: 15px;
+  border-right: 2px solid #d8c7a8;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-odeme h2 {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 22px;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #ecd3a5;
+  padding-bottom: 8px;
+  color: #4b2e05;
+}
+
+/* ÖDEME LİSTESİ */
+.odeme-listesi {
+  min-height: 100px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ecd3a5;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.odeme-yok {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+}
+
+.odeme-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed #f4e0c2;
+  padding: 6px 0;
+}
+
+.odeme-item:last-child {
+  border-bottom: none;
+}
+
+.odeme-sag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.odeme-sil {
+  border: none;
+  background: transparent;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+/* ÖDEME ÖZET */
+.odeme-ozet-container {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #e8d8c3;
+  border: 1px solid #bfa37d;
+}
+
+.odeme-ozet.satir {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+.odeme-ozet.satir:last-child {
+  margin-bottom: 0;
+}
+
+.eski-adisyon-toplam {
+  color: #1a5fb4 !important;
+  font-weight: bold;
+}
+
+.indirim-tutar {
+  color: #e74c3c !important;
+  font-weight: bold;
+}
+
+.odenen-tutar {
+  color: #27ae60 !important;
+  font-weight: bold;
+}
+
+.toplam-satir {
+  border-top: 1px solid #bfa37d;
+  padding-top: 8px;
+  margin-top: 8px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.kalan-satir {
+  border-top: 1px solid #bfa37d;
+  padding-top: 8px;
+  margin-top: 8px;
+  font-weight: bold;
+  font-size: 18px;
+  color: #c0392b;
+}
+
+/* ÖDEME TİPİ SEÇİMİ */
+.odeme-tipi-secim {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.odeme-tipi-btn {
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid #bfa37d;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 70px;
+}
+
+.odeme-tipi-btn.aktif {
+  border: 2px solid #c57f3e;
+  background: #f7d9a8;
+}
+
+/* ÖDEME TUTAR INPUT */
+.odeme-tutar-input {
+  margin-top: 10px;
+}
+
+.odeme-tutar-input label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.odeme-tutar-input input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #bfa37d;
+  background: #fff;
+  font-size: 15px;
+}
+
+/* ÖDEME EKLE BUTONU */
+.odeme-ekle-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #4b2e05;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.odeme-ekle-btn:hover {
+  background: #3a2204;
+}
+
+/* İNDİRİM ALANI */
+.indirim-alani {
+  margin-top: 14px;
+}
+
+.indirim-alani label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.indirim-input-container {
+  display: flex;
+  gap: 8px;
+}
+
+.indirim-input-container input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #bfa37d;
+  background: #fff;
+  font-size: 15px;
+}
+
+.indirim-sifirla-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #bfa37d;
+  background: #fdf4e4;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ALT BUTONLAR */
+.alt-butonlar {
+  border-top: 1px solid #ecd3a5;
+  padding-top: 12px;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hesabi-ayir-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #ffeedd;
+  color: #c57f3e;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.hesabi-ayir-btn.disabled {
+  background: #eee;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.masa-kapat-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #27ae60;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.masa-kapat-disabled {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #95a5a6;
+  color: #fff;
+  cursor: not-allowed;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.kapanis-mesaji {
+  padding: 8px;
+  border-radius: 8px;
+  background: #e8f8f1;
+  color: #1e8449;
+  font-size: 14px;
+  text-align: center;
+}
+
+.masaya-don-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #bfa37d;
+  background: #fdf4e4;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+/* =========================================================
+   2 — ADİSYON PANELİ (ORTA)
+========================================================= */
+.panel-adisyon {
+  background: #fff7e6;
+  padding: 15px;
+  border-right: 2px solid #d8c7a8;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.panel-adisyon h2 {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 28px;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #ecd3a5;
+  padding-bottom: 8px;
+  color: #4b2e05;
+}
+
+/* ESKİ ADİSYON CONTAINER */
+.eski-adisyon-container {
+  margin-bottom: 15px;
+  padding: 12px;
+  background: #f0f0f0;
+  border-radius: 8px;
+  border: 2px solid #ccc;
+}
+
+.eski-adisyon-baslik {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 6px;
+  color: #1a5fb4;
+  text-align: center;
+}
+
+.eski-adisyon-not {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  font-style: italic;
+}
+
+/* YENİ ADİSYON CONTAINER */
+.yeni-adisyon-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.yeni-adisyon-baslik {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 10px;
+  color: #000000;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+}
+
+.fis-baslik {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  font-weight: bold;
+  font-size: 15px;
+  padding: 8px 0;
+  border-bottom: 1px solid #ecd3a5;
+  margin-bottom: 5px;
+}
+
+.fis-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.fis-satir {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 15px;
+  border-bottom: 1px solid #f4e0c2;
+}
+
+.fis-satir:last-child {
+  border-bottom: none;
+}
+
+.urun-ad {
+  padding-left: 5px;
+}
+
+.adet-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.adet-box button {
+  padding: 4px 8px;
+  background: #7a4b2b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.birim-fiyat, .toplam-fiyat {
+  text-align: right;
+  padding-right: 10px;
+}
+
+.toplam-fiyat {
+  font-weight: bold;
+}
+
+.bos-adisyon {
+  text-align: center;
+  color: #888;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+/* HESABA YAZ MODU */
+.hesaba-yaz-modu {
+  flex: 1;
+  padding: 12px;
+}
+
+.hesaba-yaz-baslik {
+  font-weight: bold;
+  font-size: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #4b2e05;
+}
+
+.hesaba-yaz-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.musteri-secim, .yeni-musteri, .borc-tutar-input {
+  margin-bottom: 15px;
+}
+
+.musteri-label {
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.hesaba-yaz-modu select,
+.hesaba-yaz-modu input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #bfa37d;
+  margin-top: 4px;
+}
+
+.yeni-musteri input {
+  margin-bottom: 6px;
+}
+
+.yeni-musteri input:last-child {
+  margin-bottom: 0;
+}
+
+.mevcut-borc-ozet {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #e8d8c3;
+  border: 1px solid #bfa37d;
+}
+
+.borc-ozet-baslik {
+  font-weight: bold;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.borc-ozet-satir {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.net-borc {
+  border-top: 1px solid #bfa37d;
+  padding-top: 6px;
+  margin-top: 6px;
+  font-weight: bold;
+}
+
+.borc-var {
+  color: #c0392b;
+}
+
+.borc-yok {
+  color: #27ae60;
+}
+
+.borcu-kaydet-btn {
+  margin-top: 20px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #2980b9;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.borcu-kaydet-btn.disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+}
+
+.iptal-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #bfa37d;
+  background: #fff;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* =========================================================
+   3 — ÜRÜNLER PANELİ (SAĞ 1)
+========================================================= */
+.panel-urunler {
+  background: #fff7e6;
+  padding: 15px;
+  border-right: 2px solid #d8c7a8;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-urunler h2 {
+  text-align: center;
+  margin-bottom: 12px;
+  font-size: 24px;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #ecd3a5;
+  padding-bottom: 8px;
+  color: #4b2e05;
+}
+
+.urun-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.urun-yok {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #888;
+  padding: 20px;
+  font-style: italic;
+}
+
+.urun-kutu {
+  background: #ffeaa7;
+  border: 1px solid #d0b48c;
+  border-radius: 8px;
+  padding: 12px 6px;
+  min-height: 80px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.urun-kutu:hover {
+  background: #f2d998;
+  transform: translateY(-2px);
+}
+
+.urun-ad {
+  font-size: 14px;
+  margin-bottom: 4px;
+  text-align: center;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.urun-fiyat {
+  font-size: 13px;
+  color: #4b2e05;
+}
+
+/* ADET PANEL */
+.adet-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.adet-panel {
+  background: #fff;
+  border: 1px solid #bfa37d;
+  border-radius: 10px;
+  padding: 20px;
+  width: 300px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.adet-panel-baslik {
+  font-weight: bold;
+  margin-bottom: 15px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.siparis-yemek-input {
+  margin-bottom: 12px;
+}
+
+.siparis-yemek-input label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.siparis-yemek-input input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #bfa37d;
+}
+
+.adet-kontrol {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.adet-dugme-grubu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adet-dugme-grubu button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #d0b48c;
+  background: #fbe9e7;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.adet-dugme-grubu .adet-artir {
+  background: #e8f5e9;
+}
+
+.adet-deger {
+  font-weight: bold;
+  font-size: 18px;
+  min-width: 30px;
+  text-align: center;
+}
+
+.adet-panel-butonlar {
+  display: flex;
+  gap: 8px;
+}
+
+.adet-ekle-btn, .adet-iptal-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.adet-ekle-btn {
+  background: #4b2e05;
+  color: #fff;
+}
+
+.adet-iptal-btn {
+  background: #fff;
+  color: #333;
+  border: 1px solid #bfa37d !important;
+}
+
+/* =========================================================
+   4 — KATEGORİLER PANELİ (SAĞ 2)
+========================================================= */
+.panel-kategoriler {
+  background: #fff7e6;
+  padding: 15px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-kategoriler h2 {
+  text-align: center;
+  margin-bottom: 12px;
+  font-size: 24px;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #ecd3a5;
+  padding-bottom: 8px;
+  color: #4b2e05;
+}
+
+.kategori-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-content: start;
+  padding: 5px;
+}
+
+.kategori-btn {
+  background: white;
+  border: 1px solid #d6c6ac;
+  border-radius: 8px;
+  min-height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+  word-break: break-word;
+  text-align: center;
+  line-height: 1.2;
+  font-weight: bold;
+}
+
+.kategori-btn:hover {
+  background: #f2e4cc;
+}
+
+.kategori-btn.aktif {
+  border: 2px solid #c57f3e;
+  background: #f7d9a8;
+}
+
+/* =========================================================
+   ÖDEME SÖZÜ POPUP
+========================================================= */
+.odeme-sozu-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.odeme-sozu-popup {
+  background: #fff7e6;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  width: 350px;
+}
+
+.popup-baslik {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.popup-mesaj {
+  font-size: 14px;
+  margin-bottom: 15px;
+  line-height: 1.4;
+}
+
+.popup-butonlar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.popup-tamam-btn, .popup-detay-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.popup-tamam-btn {
+  border: 1px solid #bfa37d;
+  background: #fff;
+}
+
+.popup-detay-btn {
+  border: none;
+  background: #4b2e05;
+  color: #fff;
+}
+
+/* =========================================================
+   SCROLLBAR STİLLERİ
+========================================================= */
+.panel-odeme::-webkit-scrollbar,
+.panel-adisyon::-webkit-scrollbar,
+.panel-urunler::-webkit-scrollbar,
+.panel-kategoriler::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-odeme::-webkit-scrollbar-thumb,
+.panel-adisyon::-webkit-scrollbar-thumb,
+.panel-urunler::-webkit-scrollbar-thumb,
+.panel-kategoriler::-webkit-scrollbar-thumb {
+  background: #c9b79f;
+  border-radius: 6px;
+}
+
+.panel-odeme::-webkit-scrollbar-track,
+.panel-adisyon::-webkit-scrollbar-track,
+.panel-urunler::-webkit-scrollbar-track,
+.panel-kategoriler::-webkit-scrollbar-track {
+  background: #f8f0e0;
+}
+
+/* =========================================================
+   RESPONSIVE (Tablet/Mobil için temel ayarlar)
+========================================================= */
+@media (max-width: 1200px) {
+  .adisyon-wrapper {
+    grid-template-columns: 280px 1fr 300px 180px;
+  }
+}
+
+@media (max-width: 992px) {
+  .adisyon-wrapper {
+    grid-template-columns: 250px 1fr;
+    grid-template-rows: auto auto;
+  }
+  
+  .panel-urunler, .panel-kategoriler {
+    grid-column: 1 / -1;
+    height: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .adisyon-wrapper {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    height: auto;
+  }
+  
+  .panel-odeme, .panel-adisyon, .panel-urunler, .panel-kategoriler {
+    height: auto;
+    max-height: 50vh;
+  }
+  
+  .hesaba-yaz-grid {
+    grid-template-columns: 1fr;
+  }
+}

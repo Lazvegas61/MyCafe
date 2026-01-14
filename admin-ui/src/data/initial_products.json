@@ -1,0 +1,626 @@
+[
+  {
+    "categoryId": 11,
+    "categoryName": "24 ADET",
+    "products": [
+      {
+        "name": "--",
+        "price": 0.0
+      }
+    ]
+  },
+  {
+    "categoryId": 13,
+    "categoryName": "18 ADET",
+    "products": [
+      {
+        "name": "İKRAM ATIŞTIRMALIK",
+        "price": 24.0
+      },
+      {
+        "name": "KAYMAKLI BÜSKİVİ",
+        "price": 2.0
+      },
+      {
+        "name": "NEGRO KÜÇÜK",
+        "price": -2.0
+      },
+      {
+        "name": "HANIMELLER",
+        "price": -16.0
+      },
+      {
+        "name": "KOMBO BÜSKÜVİ",
+        "price": -62.0
+      }
+    ]
+  },
+  {
+    "categoryId": 16,
+    "categoryName": "Kuruyemiş",
+    "products": [
+      {
+        "name": "Fındık",
+        "price": -4067.0
+      },
+      {
+        "name": "Kuruyemiş Antep",
+        "price": -27.0
+      },
+      {
+        "name": "Kuruyemiş Fındık",
+        "price": -146.0
+      },
+      {
+        "name": "CİPS BÜYÜK BOY",
+        "price": -35.0
+      },
+      {
+        "name": "CİPS DEV BOY",
+        "price": -43.0
+      },
+      {
+        "name": "kaju",
+        "price": 0.0
+      }
+    ]
+  },
+  {
+    "categoryId": 17,
+    "categoryName": "Tost",
+    "products": [
+      {
+        "name": "Bazlama Kaşarlı",
+        "price": -1.0
+      },
+      {
+        "name": "Bazlama Yarım Kaşarlı",
+        "price": -40.0
+      },
+      {
+        "name": "Bazlama Karışık",
+        "price": -33.0
+      },
+      {
+        "name": "Bazlama Yarım Karışık",
+        "price": -91.0
+      },
+      {
+        "name": "Bazlama Kaşarlı Double",
+        "price": -7.0
+      },
+      {
+        "name": "Bazlama Yarım Kaşarlı Double",
+        "price": 0.0
+      },
+      {
+        "name": "Bazlama Karışık Double",
+        "price": -216.0
+      },
+      {
+        "name": "KÖFTE",
+        "price": -1.0
+      },
+      {
+        "name": "SANDİVİÇ KARIŞIK TOST",
+        "price": -83.0
+      },
+      {
+        "name": "SANDİVİÇ KAŞARLI",
+        "price": -57.0
+      },
+      {
+        "name": "MENEMEN",
+        "price": -2.0
+      },
+      {
+        "name": "TAVUK SOTE 2 KİŞİLİK",
+        "price": -1.0
+      }
+    ]
+  },
+  {
+    "categoryId": 18,
+    "categoryName": "Tost",
+    "products": [
+      {
+        "name": "YARIM KAV. SUC. KAŞAR",
+        "price": -120.0
+      },
+      {
+        "name": "YARIM KAVURMA KAŞAR",
+        "price": -558.0
+      },
+      {
+        "name": "BA2LAMA KAVURMALI",
+        "price": -15.0
+      },
+      {
+        "name": "Yarım kavurmalı",
+        "price": -2.0
+      },
+      {
+        "name": "SANDİVİÇ KAV. KAŞAR SUCUK",
+        "price": -1.0
+      },
+      {
+        "name": "SANDİVİNÇ KAVURMA KAŞAR",
+        "price": -14.0
+      }
+    ]
+  },
+  {
+    "categoryId": 14,
+    "categoryName": "12 adet",
+    "products": [
+      {
+        "name": "ETİ Ç.GOFRET",
+        "price": 24.0
+      },
+      {
+        "name": "Metro",
+        "price": 16.0
+      },
+      {
+        "name": "TORKU GOFRET",
+        "price": 0.0
+      },
+      {
+        "name": "Piko",
+        "price": 78.0
+      },
+      {
+        "name": "Antep Baton Fındık",
+        "price": 0.0
+      },
+      {
+        "name": "Antep Baton Sütlü",
+        "price": 0.0
+      },
+      {
+        "name": "Antep Baton Bitter",
+        "price": 0.0
+      },
+      {
+        "name": "Hoby",
+        "price": -6.0
+      },
+      {
+        "name": "Harby",
+        "price": 0.0
+      },
+      {
+        "name": "Ç.GOFRET EXTRA",
+        "price": 1.0
+      },
+      {
+        "name": "0",
+        "price": 0.0
+      },
+      {
+        "name": "TADELLE ANTEP FISTIKLI",
+        "price": 6.0
+      },
+      {
+        "name": "DİDO TRİO",
+        "price": 106.0
+      },
+      {
+        "name": "TOTAL",
+        "price": 0.0
+      },
+      {
+        "name": "ANTEP BÜYÜK",
+        "price": 0.0
+      },
+      {
+        "name": "BATON FINDIK BÜYÜK",
+        "price": 10.0
+      },
+      {
+        "name": "BATON SÜTLÜ BÜYÜK",
+        "price": 26.0
+      },
+      {
+        "name": "KARE BEYA2 ÇİKOLATA",
+        "price": 0.0
+      },
+      {
+        "name": "KARE BİTTER ÇİKOLATA",
+        "price": 19.0
+      },
+      {
+        "name": "CARAMİO BÜYÜK",
+        "price": 0.0
+      },
+      {
+        "name": "ANTEP GOLDEN BÜYÜK",
+        "price": 5.0
+      },
+      {
+        "name": "SARELLE",
+        "price": 37.0
+      }
+    ]
+  },
+  {
+    "categoryId": 15,
+    "categoryName": "24 ADET",
+    "products": [
+      {
+        "name": "Halley",
+        "price": 24.0
+      },
+      {
+        "name": "JELİBON BÜYÜK",
+        "price": 180.0
+      },
+      {
+        "name": "JELİBON KÜÇÜK",
+        "price": 12.0
+      },
+      {
+        "name": "PROBİS",
+        "price": 29.0
+      },
+      {
+        "name": "Eti Puf",
+        "price": 0.0
+      },
+      {
+        "name": "KRİSPİ CİPS",
+        "price": -1.0
+      },
+      {
+        "name": "Kekstra",
+        "price": -47.0
+      },
+      {
+        "name": "Kekstra Uzun",
+        "price": 0.0
+      },
+      {
+        "name": "ETİ CRAX",
+        "price": 3.0
+      },
+      {
+        "name": "Pöti Kek",
+        "price": 4.0
+      },
+      {
+        "name": "Hoşbeş Gofret",
+        "price": 13.0
+      },
+      {
+        "name": "RuloKat",
+        "price": 0.0
+      },
+      {
+        "name": "KatKat",
+        "price": 0.0
+      },
+      {
+        "name": "Alpella kek",
+        "price": -1.0
+      },
+      {
+        "name": "TOFİTA",
+        "price": 0.0
+      },
+      {
+        "name": "Alman pastası",
+        "price": 0.0
+      },
+      {
+        "name": "TODAY BÜYÜK",
+        "price": 1.0
+      },
+      {
+        "name": "TODAY KÜÇÜK",
+        "price": 0.0
+      },
+      {
+        "name": "KROVASAN",
+        "price": 0.0
+      },
+      {
+        "name": "TEKLİ RULOKAT",
+        "price": 0.0
+      },
+      {
+        "name": "Luppo",
+        "price": 3.0
+      },
+      {
+        "name": "OLALA SUFFLE",
+        "price": -1.0
+      },
+      {
+        "name": "DANKEK",
+        "price": -60.0
+      }
+    ]
+  },
+  {
+    "categoryId": 4,
+    "categoryName": "Kahve",
+    "products": [
+      {
+        "name": "Sütlü Sahlep",
+        "price": -611.0
+      },
+      {
+        "name": "SÜT",
+        "price": -986.0
+      },
+      {
+        "name": "nescafe küçük",
+        "price": -960.0
+      },
+      {
+        "name": "sıcak çikolata küçük",
+        "price": -749.0
+      },
+      {
+        "name": "sahlep küçük",
+        "price": -2.0
+      },
+      {
+        "name": "SÜTLÜ SICAK ÇİKOLATA",
+        "price": -822.0
+      }
+    ]
+  },
+  {
+    "categoryId": 10,
+    "categoryName": "Enerji İçeceği",
+    "products": [
+      {
+        "name": "ENERJİ",
+        "price": -303.0
+      },
+      {
+        "name": "REDBULL",
+        "price": -9.0
+      },
+      {
+        "name": "MOJİTO PREDATOR",
+        "price": 1.0
+      },
+      {
+        "name": "NESCAFE SOĞUK",
+        "price": 0.0
+      },
+      {
+        "name": "JBR ENERJİ",
+        "price": 99.0
+      },
+      {
+        "name": "POWER ENERJİ",
+        "price": 7.0
+      }
+    ]
+  },
+  {
+    "categoryId": 12,
+    "categoryName": "Su",
+    "products": [
+      {
+        "name": "bardak su",
+        "price": -3.0
+      },
+      {
+        "name": "PAROL",
+        "price": -30.0
+      }
+    ]
+  },
+  {
+    "categoryId": 7,
+    "categoryName": "Meyve Suyu",
+    "products": [
+      {
+        "name": "SIKMA PORTAKAL",
+        "price": -808.0
+      },
+      {
+        "name": "Fındıklı Portakal",
+        "price": -13.0
+      },
+      {
+        "name": "NAR",
+        "price": -632.0
+      },
+      {
+        "name": "PORTAKAL NAR",
+        "price": -609.0
+      },
+      {
+        "name": "PORTAKAL LİMON",
+        "price": -23.0
+      },
+      {
+        "name": "PORTAKAL NAR LİMON",
+        "price": -26.0
+      },
+      {
+        "name": "CAPPY PORTAKAL KUTU",
+        "price": 0.0
+      }
+    ]
+  },
+  {
+    "categoryId": 22,
+    "categoryName": "0",
+    "products": [
+      {
+        "name": "SÜTLAÇ",
+        "price": 0.0
+      },
+      {
+        "name": "MAGNUM GRUBU",
+        "price": -148.0
+      },
+      {
+        "name": "CORNETTO KÜLAH ÇEŞİTLERİ",
+        "price": 0.0
+      },
+      {
+        "name": "SANDİVİÇ",
+        "price": 0.0
+      },
+      {
+        "name": "BALLI FISTIKLI PASTA",
+        "price": 4.0
+      },
+      {
+        "name": "TABAK DONDURMA",
+        "price": -4.0
+      },
+      {
+        "name": "LİMONLU CHEESCAKE",
+        "price": 10.0
+      },
+      {
+        "name": "FISTIK RÜYASI",
+        "price": -7.0
+      },
+      {
+        "name": "SUFFLE",
+        "price": -26.0
+      },
+      {
+        "name": "BALLI FISTIKLI PASTA",
+        "price": 7.0
+      },
+      {
+        "name": "ORMAN MEY. CHEESCAKE",
+        "price": -2.0
+      },
+      {
+        "name": "FRİGO ALASKA",
+        "price": -142.0
+      },
+      {
+        "name": "DOĞUM GÜNÜ PASTA",
+        "price": -1.0
+      },
+      {
+        "name": "PUDİNG",
+        "price": -102.0
+      }
+    ]
+  },
+  {
+    "categoryId": 9,
+    "categoryName": "Cola-Gazoz",
+    "products": [
+      {
+        "name": "ŞİŞE FANTA",
+        "price": -745.0
+      },
+      {
+        "name": "KUTU FANTA",
+        "price": -45.0
+      },
+      {
+        "name": "BARDAK ICE TEA",
+        "price": 12.0
+      },
+      {
+        "name": "NİĞDE GAZOZ",
+        "price": 24.0
+      },
+      {
+        "name": "BARDAK SHEWEPS",
+        "price": 15.0
+      },
+      {
+        "name": "ICE TEA KÜÇÜK",
+        "price": 7.0
+      },
+      {
+        "name": "OBSESSO",
+        "price": -1435.0
+      },
+      {
+        "name": "BARDAK KOLA BÜYÜK BOY",
+        "price": -12.0
+      }
+    ]
+  },
+  {
+    "categoryId": 1,
+    "categoryName": "Çay Çeşitleri",
+    "products": [
+      {
+        "name": "Limonlu çay",
+        "price": -651.0
+      },
+      {
+        "name": "çay1",
+        "price": -717.0
+      },
+      {
+        "name": "B.ÇAY 1",
+        "price": -168.0
+      },
+      {
+        "name": "SICAK LİMON",
+        "price": -302.0
+      }
+    ]
+  },
+  {
+    "categoryId": 2,
+    "categoryName": "Bitki Çayı",
+    "products": [
+      {
+        "name": "DEMLEME IHLAMUR",
+        "price": -82.0
+      }
+    ]
+  },
+  {
+    "categoryId": 8,
+    "categoryName": "Ayran",
+    "products": [
+      {
+        "name": "küçük s.ayran limon",
+        "price": -37.0
+      },
+      {
+        "name": "BÜYÜK AYRAN",
+        "price": -84.0
+      },
+      {
+        "name": "FIÇI AYRAN",
+        "price": -122.0
+      },
+      {
+        "name": "YAYIK AYRAN",
+        "price": -507.0
+      }
+    ]
+  },
+  {
+    "categoryId": 5,
+    "categoryName": "Türk Kahvesi",
+    "products": [
+      {
+        "name": "TÜRK KAHVESİ",
+        "price": 0.0
+      }
+    ]
+  },
+  {
+    "categoryId": 3,
+    "categoryName": "Oralet",
+    "products": [
+      {
+        "name": "ORALET",
+        "price": 0.0
+      }
+    ]
+  }
+]
