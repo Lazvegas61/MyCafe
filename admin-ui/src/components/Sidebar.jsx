@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import BilardoLogo from "../assets/mc-bilardo-small.png";
+import { useGunDurumu } from "../context/GunDurumuContext";
 
 const RENK = {
   arka: "#4b2e05",
@@ -10,7 +11,7 @@ const RENK = {
 };
 
 const menuItems = [
-  { key: "ana", label: "Ana Sayfa", path: "/ana", icon: "🏠" }, // "/" yerine "/ana"
+  { key: "ana", label: "Ana Sayfa", path: "/ana", icon: "🏠" },
   { key: "masalar", label: "Masalar", path: "/masalar", icon: "🍽️" },
   { key: "bilardo", label: "Bilardo", path: "/bilardo", icon: "🎱" },
   { key: "musteri", label: "Müşteri İşlemleri", path: "/musteri-islemleri", icon: "👥" },
@@ -26,6 +27,7 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
   const navigate = useNavigate();
   const [visible, setVisible] = useState(false);
   const user = JSON.parse(localStorage.getItem("mc_user") || "null");
+  const { gunSonuYap } = useGunDurumu();
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 50);
@@ -39,7 +41,6 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
   };
 
   const isActive = (path) => {
-    // Ana sayfa için özel kontrol
     if (path === "/ana") {
       return location.pathname === "/ana" || location.pathname === "/";
     }
@@ -47,7 +48,7 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
   };
 
   // Gün sonu fonksiyonu
-  const handleGunSonu = () => {
+  const handleGunSonu = async () => {
     if (!canEndDay) {
       alert('❌ Gün sonu yapma yetkiniz yok. Sadece Admin gün sonu yapabilir.');
       return;
@@ -62,21 +63,106 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
     const acikAdisyonlar = JSON.parse(localStorage.getItem('mc_acik_adisyonlar') || '[]');
     
     if (acikAdisyonlar.length > 0) {
-      const confirmMessage = `${acikAdisyonlar.length} açık adisyon bulunuyor. Yine de günü sonlandırmak istiyor musunuz?`;
+      const confirmMessage = `${acikAdisyonlar.length} açık adisyon bulunuyor. Yine de günü sonlandırmak istiyor musunuz?\n\nAçık adisyonlar otomatik kapatılacak ve Kasa Farkı işlemi olarak kaydedilecek.`;
       
       if (!window.confirm(confirmMessage)) {
         return;
       }
+      
+      // Açık adisyonları kapat
+      acikAdisyonlar.forEach(adisyon => {
+        const kasaFarki = {
+          id: `KF_${Date.now()}_${adisyon.id}`,
+          adisyonId: adisyon.id,
+          miktar: adisyon.toplamTutar || 0,
+          tur: 'acik_adisyon_kapatma',
+          aciklama: `Açık Adisyon Kapatma: ${adisyon.id}`,
+          tarih: new Date().toISOString(),
+          kullaniciId: user?.id || 'sistem',
+          masaNo: adisyon.masaNo || 'N/A'
+        };
+        
+        const kasaFarklari = JSON.parse(localStorage.getItem('mc_kasa_farklari') || '[]');
+        kasaFarklari.push(kasaFarki);
+        localStorage.setItem('mc_kasa_farklari', JSON.stringify(kasaFarklari));
+      });
     }
     
-    // Gün sonu raporu oluştur
-    const gunSonuRaporId = `GUN_${new Date().toISOString().split('T')[0].replace(/-/g, '')}_${Date.now()}`;
+    try {
+      // 1. Kasa servisi ile gün sonu kasa işlemini kaydet
+      let kasaIslemId = null;
+      if (window.kasaService && window.kasaService.gunSonuKasaEkle) {
+        const kasaEkleResult = await window.kasaService.gunSonuKasaEkle();
+        if (kasaEkleResult.success) {
+          kasaIslemId = kasaEkleResult.islemId;
+        }
+      }
+      
+      // 2. Rapor motoru ile gün sonu raporu oluştur
+      let gunSonuRaporu = null;
+      if (window.raporMotoruV2 && window.raporMotoruV2.createGunSonuRaporu) {
+        gunSonuRaporu = await window.raporMotoruV2.createGunSonuRaporu();
+      } else {
+        // Fallback: Basit rapor oluştur
+        gunSonuRaporu = createSimpleGunSonuRaporu();
+      }
+      
+      if (!gunSonuRaporu) {
+        alert('❌ Gün sonu raporu oluşturulamadı!');
+        return;
+      }
+      
+      // 3. Raporu localStorage'a kaydet
+      const gunSonuId = `GUNSONU_${new Date().toISOString().split('T')[0].replace(/-/g, '')}_${Date.now()}`;
+      
+      const tamRapor = {
+        id: gunSonuId,
+        ...gunSonuRaporu,
+        kasaIslemId: kasaIslemId,
+        olusturulmaZamani: new Date().toISOString(),
+        olusturanKullanici: user?.id || 'unknown',
+        acikAdisyonKapatilan: acikAdisyonlar.length
+      };
+      
+      // Gün sonu listesine ekle
+      const gunSonuListesi = JSON.parse(localStorage.getItem('mycafe_gun_sonu_listesi') || '[]');
+      gunSonuListesi.unshift(tamRapor);
+      localStorage.setItem('mycafe_gun_sonu_listesi', JSON.stringify(gunSonuListesi.slice(0, 50)));
+      
+      // Ayrıca raporu kendi başına da kaydet
+      localStorage.setItem(`mycafe_gun_sonu_${gunSonuId}`, JSON.stringify(tamRapor));
+      
+      // 4. Gün durumunu kapalı yap
+      gunSonuYap();
+      
+      // 5. Başarı mesajı göster
+      const successMessage = `
+✅ Gün sonu başarıyla tamamlandı!
+
+📊 Rapor Özeti:
+• Toplam Ciro: ${gunSonuRaporu.toplamCiro?.toLocaleString('tr-TR') || 0} ₺
+• Masalar: ${gunSonuRaporu.normalSatis?.toLocaleString('tr-TR') || 0} ₺
+• Bilardo: ${gunSonuRaporu.bilardoCiro?.toLocaleString('tr-TR') || 0} ₺
+• Çalışma Süresi: ${gunSonuRaporu.sureSaat || 0} saat ${gunSonuRaporu.sureDakika || 0} dakika
+      `;
+      
+      alert(successMessage);
+      
+      // 6. Gün sonu raporu sayfasına yönlendir
+      navigate(`/raporlar/gun-sonu/${gunSonuId}`);
+      
+    } catch (error) {
+      console.error('❌ Gün sonu hatası:', error);
+      alert(`❌ Gün sonu sırasında hata oluştu: ${error.message}`);
+    }
+  };
+
+  // Basit gün sonu raporu oluşturma (fallback)
+  const createSimpleGunSonuRaporu = () => {
+    const today = new Date().toISOString().split('T')[0];
     const baslangicZamani = new Date(localStorage.getItem('mycafe_gun_baslangic') || new Date());
     const bitisZamani = new Date();
     
-    const gunVerileri = JSON.parse(localStorage.getItem('mycafe_gun_bilgileri') || '{}');
-    
-    const today = new Date().toISOString().split('T')[0];
     const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
     const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
     
@@ -94,44 +180,17 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
       })
       .reduce((sum, b) => sum + (parseFloat(b.bilardoUcreti || 0) || 0), 0);
     
-    const gunSonuRaporu = {
-      id: gunSonuRaporId,
-      baslangic: baslangicZamani.toISOString(),
-      bitis: bitisZamani.toISOString(),
+    return {
+      tarih: today,
+      baslangicZamani: baslangicZamani.toISOString(),
+      bitisZamani: bitisZamani.toISOString(),
       sureDakika: Math.floor((bitisZamani - baslangicZamani) / 60000),
       sureSaat: Math.floor((bitisZamani - baslangicZamani) / 3600000),
-      baslangicKasa: gunVerileri.baslangicKasa || 0,
       toplamCiro: bugunkuNormalSatis + bugunkuBilardoSatis,
-      nakit: bugunkuNormalSatis * 0.6,
-      krediKarti: bugunkuNormalSatis * 0.4,
+      normalSatis: bugunkuNormalSatis,
       bilardoCiro: bugunkuBilardoSatis,
-      toplamAdisyon: gunVerileri.toplamAdisyon || 0,
-      acikAdisyon: acikAdisyonlar.length,
-      kritikStok: 0,
-      tarih: today,
-      olusturulmaZamani: new Date().toISOString()
+      netKar: (bugunkuNormalSatis + bugunkuBilardoSatis)
     };
-    
-    localStorage.setItem(`mycafe_gun_sonu_${gunSonuRaporId}`, JSON.stringify(gunSonuRaporu));
-    
-    const eskiGunler = JSON.parse(localStorage.getItem('mycafe_gun_sonu_listesi') || '[]');
-    eskiGunler.unshift(gunSonuRaporu);
-    localStorage.setItem('mycafe_gun_sonu_listesi', JSON.stringify(eskiGunler.slice(0, 30)));
-    
-    localStorage.setItem('mycafe_gun_durumu', 'kapali');
-    
-    if (window.dispatchGlobalEvent) {
-      window.dispatchGlobalEvent('gunDurumuDegisti', { aktif: false });
-      window.dispatchGlobalEvent('gunSonlandirildi', { 
-        raporId: gunSonuRaporId,
-        toplamCiro: gunSonuRaporu.toplamCiro
-      });
-    }
-    
-    alert(`✅ Gün sonlandırıldı!\n\n📊 Gün Sonu Raporu oluşturuldu:\n• Toplam Ciro: ${gunSonuRaporu.toplamCiro.toLocaleString('tr-TR')} ₺\n• Süre: ${gunSonuRaporu.sureSaat} saat ${gunSonuRaporu.sureDakika % 60} dakika`);
-    
-    // Gün sonu raporu sayfasına yönlendir
-    navigate(`/gun-sonu-rapor/${gunSonuRaporId}`);
   };
 
   // Gün başlatma fonksiyonu
@@ -141,7 +200,6 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
       return;
     }
     
-    // Açık adisyon kontrolü (önceki günden kalan)
     const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
     
     if (acikAdisyonlar.length > 0) {
@@ -152,11 +210,9 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
       }
     }
     
-    // onGunBaslat fonksiyonunu çağır
     if (onGunBaslat) {
       onGunBaslat();
     } else {
-      // Varsayılan gün başlatma işlemi
       const baslangicZamani = new Date();
       const baslangicKasa = 0;
       
@@ -185,7 +241,6 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
         });
       }
       
-      console.log('✅ Gün başlatıldı:', baslangicZamani);
       alert('✅ Gün başarıyla başlatıldı!');
     }
   };
@@ -323,6 +378,7 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
         </button>
       )}
 
+      {/* Logo */}
       <div
         style={{
           marginBottom: 25,
@@ -345,10 +401,10 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
         />
       </div>
 
+      {/* Menü */}
       <div style={{ flex: 1 }}>
         {menuItems.map((item) => {
           const active = isActive(item.path);
-          // Ana sayfa hariç tüm menüler gün aktif değilse kilitli
           const disabled = !gunAktif && item.path !== "/ana";
 
           return (
@@ -412,6 +468,7 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
         })}
       </div>
 
+      {/* Çıkış Butonu */}
       <button
         onClick={handleLogout}
         style={{

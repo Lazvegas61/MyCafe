@@ -1,3 +1,4 @@
+// File: admin-ui/src/App.jsx (GÜNCELLENMİŞ - ROUTE DÜZELTMELİ)
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   BrowserRouter,
@@ -12,11 +13,9 @@ import Sidebar from "./components/Sidebar";
 import GlobalSureBittiPopup from "./components/GlobalSureBittiPopup";
 import syncService from "./services/syncService";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { GunDurumuProvider, useGunDurumu } from "./context/GunDurumuContext";
 import { RaporFiltreProvider } from "@/context/RaporFiltreContext";
 import "@/services/raporMotoruV2";
-import RaporlarIndex from "@/pages/Raporlar/RaporlarIndex";
-
-
 
 /* ------------------------------------------------------------
    🔧 İlk Kurulum Verileri
@@ -224,7 +223,7 @@ function initializeSyncService() {
   }
 }
 
-// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU - GÜNCELLENMİŞ VERSİYON
+// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
 function syncAcikAdisyonlar() {
   try {
     const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
@@ -431,21 +430,23 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import GarsonMasalar from "./pages/garson/GarsonMasalar.jsx";
 import GarsonAdisyon from "./pages/garson/GarsonAdisyon.jsx";
 
-/* ===== MYCAFE RAPORLAR ===== */
-import GenelOzet from "@/pages/Raporlar/GenelOzet/GenelOzet";
-import KategoriRaporu from "@/pages/Raporlar/KategoriRaporu/KategoriRaporu";
-import UrunRaporu from "@/pages/Raporlar/UrunRaporu/UrunRaporu";
-import MasaRaporu from "@/pages/Raporlar/MasaRaporu/MasaRaporu";
-import KasaRaporu from "@/pages/Raporlar/KasaRaporu/KasaRaporu";
-import GiderRaporlari from "@/pages/Raporlar/GiderRaporlari/GiderRaporlari";
-
-
+/* ===== RAPORLAMA SİSTEMİ ===== */
+// NOT: Raporlar artık tek bir bileşen olacak, nested route yok
+import RaporlarIndex from "@/pages/Raporlar/RaporlarIndex";
+import GunSonuDetay from "@/pages/Raporlar/RaporDetay/GunSonuDetay";
+import KasaDetay from "@/pages/Raporlar/RaporDetay/KasaDetay";
+import UrunDetay from "@/pages/Raporlar/RaporDetay/UrunDetay";
+import KategoriDetay from "@/pages/Raporlar/RaporDetay/KategoriDetay";
+import MasaDetayRapor from "@/pages/Raporlar/RaporDetay/MasaDetay";
+import BilardoDetay from "@/pages/Raporlar/RaporDetay/BilardoDetay";
+import GiderDetay from "@/pages/Raporlar/RaporDetay/GiderDetay";
 
 /* ------------------------------------------------------------
    🔐 PROTECTED ROUTE BİLEŞENİ
 ------------------------------------------------------------ */
 function ProtectedRoute({ children, requiredRole = null, requireAuth = true }) {
   const { user, loading } = useAuth();
+  const { gunAktif } = useGunDurumu();
   const navigate = useNavigate();
   
   if (loading) {
@@ -473,7 +474,7 @@ function ProtectedRoute({ children, requiredRole = null, requireAuth = true }) {
     return <Navigate to="/login" replace />;
   }
   
-  // Rol kontrolü - GÜNCELLENDİ
+  // Rol kontrolü
   if (requiredRole && user?.rol !== requiredRole) {
     // Garson rolündeyse ve garson sayfalarına erişmeye çalışıyorsa izin ver
     if (user?.rol === "GARSON" && window.location.pathname.startsWith("/garson")) {
@@ -543,11 +544,13 @@ function GarsonGuard({ children }) {
 /* ------------------------------------------------------------
    📌 LAYOUT — Sidebar login harici HER YERDE görünsün
 ------------------------------------------------------------ */
-function Layout({ children, gunAktif, onGunBaslat }) {
+function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const path = location.pathname;
   const { user, canStartDay, canEndDay, loading } = useAuth();
+  const { gunAktif, gunBaslat } = useGunDurumu();
+  
   const hideSidebar = path === "/login" || path.startsWith("/garson");
   const initializedRef = useRef(false);
   const eventListenersInitializedRef = useRef(false);
@@ -583,9 +586,6 @@ function Layout({ children, gunAktif, onGunBaslat }) {
     );
   }
 
-  // Login sayfasında opacity ve pointer-events uygulama
-  const isLoginPageComponent = path === "/login";
-  
   return (
     <>
       <div
@@ -603,7 +603,7 @@ function Layout({ children, gunAktif, onGunBaslat }) {
             gunAktif={gunAktif}
             canStartDay={canStartDay}
             canEndDay={canEndDay}
-            onGunBaslat={onGunBaslat}
+            onGunBaslat={gunBaslat}
           />
         )}
 
@@ -628,67 +628,13 @@ function Layout({ children, gunAktif, onGunBaslat }) {
 function MainApp() {
   const syncInitializedRef = useRef(false);
   const [globalSureBittiPopup, setGlobalSureBittiPopup] = useState(null);
-  const [gunAktif, setGunAktif] = useState(() => {
-    return localStorage.getItem('mycafe_gun_durumu') === 'aktif';
-  });
-  const { user } = useAuth();
+  const { gunAktif, gunBaslat } = useGunDurumu();
 
   // İlk yüklemede verileri hazırla
   useEffect(() => {
     loadInitialData();
     autoFixCategoryAndProducts();
     ensureDemoAdmin();
-  }, []);
-
-  // Gün durumu değişikliklerini dinle
-  useEffect(() => {
-    const handleGunDurumuDegisti = (event) => {
-      if (event.detail && typeof event.detail.aktif !== 'undefined') {
-        setGunAktif(event.detail.aktif);
-      }
-    };
-    
-    window.addEventListener('gunDurumuDegisti', handleGunDurumuDegisti);
-    
-    return () => {
-      window.removeEventListener('gunDurumuDegisti', handleGunDurumuDegisti);
-    };
-  }, []);
-
-  // Gün başlatma fonksiyonu
-  const handleGunBaslat = useCallback(() => {
-    const baslangicZamani = new Date();
-    const baslangicKasa = 0;
-    
-    localStorage.setItem('mycafe_gun_durumu', 'aktif');
-    localStorage.setItem('mycafe_gun_baslangic', baslangicZamani.toISOString());
-    localStorage.setItem('mycafe_gun_baslangic_kasa', baslangicKasa.toString());
-    
-    const yeniGunBilgileri = {
-      baslangicKasa: baslangicKasa,
-      nakitGiris: 0,
-      krediKarti: 0,
-      toplamAdisyon: 0,
-      acikAdisyon: 0,
-      gunlukSatis: 0,
-      baslangicTarih: baslangicZamani.toISOString(),
-      sonGuncelleme: new Date().toISOString()
-    };
-    
-    localStorage.setItem('mycafe_gun_bilgileri', JSON.stringify(yeniGunBilgileri));
-    
-    setGunAktif(true);
-    
-    if (window.dispatchGlobalEvent) {
-      window.dispatchGlobalEvent('gunDurumuDegisti', { aktif: true });
-      window.dispatchGlobalEvent('gunBaslatildi', { 
-        zaman: baslangicZamani,
-        kasa: baslangicKasa 
-      });
-    }
-    
-    console.log('✅ Gün başlatıldı:', baslangicZamani);
-    
   }, []);
 
   // Sync service ve interval'leri başlat
@@ -820,11 +766,8 @@ function MainApp() {
               path="/ana" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
-                    <AnaEkran setGunAktif={setGunAktif} />
+                  <Layout>
+                    <AnaEkran />
                   </Layout>
                 </ProtectedRoute>
               } 
@@ -835,10 +778,7 @@ function MainApp() {
               path="/masalar" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Masalar />
                   </Layout>
                 </ProtectedRoute>
@@ -848,10 +788,7 @@ function MainApp() {
               path="/musteri-islemleri" 
               element={
                 <ProtectedRoute requiredRole="ADMIN">
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <MusteriIslemleri />
                   </Layout>
                 </ProtectedRoute>
@@ -861,10 +798,7 @@ function MainApp() {
               path="/urun-stok" 
               element={
                 <ProtectedRoute requiredRole="ADMIN">
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <UrunStokYonetimi />
                   </Layout>
                 </ProtectedRoute>
@@ -874,10 +808,7 @@ function MainApp() {
               path="/giderler" 
               element={
                 <ProtectedRoute requiredRole="ADMIN">
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Giderler />
                   </Layout>
                 </ProtectedRoute>
@@ -887,10 +818,7 @@ function MainApp() {
               path="/personel" 
               element={
                 <ProtectedRoute requiredRole="ADMIN">
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Personel />
                   </Layout>
                 </ProtectedRoute>
@@ -900,10 +828,7 @@ function MainApp() {
               path="/ayarlar" 
               element={
                 <ProtectedRoute requiredRole="ADMIN">
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Ayarlar />
                   </Layout>
                 </ProtectedRoute>
@@ -913,10 +838,7 @@ function MainApp() {
               path="/bilardo" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Bilardo />
                   </Layout>
                 </ProtectedRoute>
@@ -928,10 +850,7 @@ function MainApp() {
               path="/adisyon/:id" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Adisyon />
                   </Layout>
                 </ProtectedRoute>
@@ -941,10 +860,7 @@ function MainApp() {
               path="/adisyondetay/:masaNo" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <Adisyon />
                   </Layout>
                 </ProtectedRoute>
@@ -954,10 +870,7 @@ function MainApp() {
               path="/masa-detay/:id" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <MasaDetay />
                   </Layout>
                 </ProtectedRoute>
@@ -967,30 +880,101 @@ function MainApp() {
               path="/bilardo-adisyon/:id" 
               element={
                 <ProtectedRoute>
-                  <Layout 
-                    gunAktif={gunAktif} 
-                    onGunBaslat={handleGunBaslat}
-                  >
+                  <Layout>
                     <BilardoAdisyon />
                   </Layout>
                 </ProtectedRoute>
               } 
             />
             
-            {/* 5. KONSOLİDE RAPORLAMA SİSTEMİ - SADECE ADMIN */}
-<Route 
-  path="/raporlar/*" 
-  element={
-    <ProtectedRoute requiredRole="ADMIN">
-      <Layout 
-        gunAktif={gunAktif} 
-        onGunBaslat={handleGunBaslat}
-      >
-        <RaporlarIndex />
-      </Layout>
-    </ProtectedRoute>
-  } 
-/>
+            {/* 5. RAPORLAMA SİSTEMİ - DÜZELTİLMİŞ: NESTED ROUTE YOK, DOĞRUDAN ROUTE'LAR */}
+            <Route 
+              path="/raporlar" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <RaporlarIndex />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/gun-sonu" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <GunSonuDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/kasa" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <KasaDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/urun" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <UrunDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/kategori" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <KategoriDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/masa" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <MasaDetayRapor />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/bilardo" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <BilardoDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/raporlar/gider" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <GiderDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
             
             {/* 6. GARSON SAYFALARI */}
             <Route
@@ -1014,10 +998,7 @@ function MainApp() {
             <Route
               path="*"
               element={
-                <Layout 
-                  gunAktif={gunAktif} 
-                  onGunBaslat={handleGunBaslat}
-                >
+                <Layout>
                   <div style={{
                     minHeight: '100vh',
                     display: 'flex',
@@ -1029,7 +1010,7 @@ function MainApp() {
                       <h1 style={{ fontSize: '6rem', fontWeight: 'bold', color: '#4b2e05', marginBottom: '1rem' }}>404</h1>
                       <p style={{ fontSize: '1.5rem', color: '#6b4210', marginBottom: '2rem' }}>Sayfa bulunamadı</p>
                       <button
-                        onClick={() => window.location.href = '/ana'}
+                        onClick={() => navigate('/ana')}
                         style={{
                           padding: '0.75rem 2rem',
                           background: '#4b2e05',
@@ -1070,7 +1051,9 @@ function MainApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <GunDurumuProvider>
+        <MainApp />
+      </GunDurumuProvider>
     </AuthProvider>
   );
 }

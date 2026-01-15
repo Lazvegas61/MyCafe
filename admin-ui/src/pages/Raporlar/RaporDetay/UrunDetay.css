@@ -1,0 +1,299 @@
+/* File: admin-ui/src/pages/Raporlar/RaporDetay/UrunDetay.css */
+.urun-detay {
+  padding: 20px;
+  position: relative;
+  min-height: 100vh;
+  padding-bottom: 100px; /* Butonlar için alan */
+}
+
+/* Header */
+.detay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f1f1f1;
+}
+
+.header-info h1 {
+  color: #2c3e50;
+  margin: 0 0 5px 0;
+  font-size: 24px;
+}
+
+.tarih-araligi {
+  color: #7f8c8d;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Filtre Bölümü */
+.filtre-section {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 30px;
+  border: 1px solid #e9ecef;
+}
+
+.filtre-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.filtre-grup {
+  display: flex;
+  flex-direction: column;
+}
+
+.filtre-grup label {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.filtre-input {
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.filtre-input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.filtre-input:disabled {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+}
+
+.filtre-temizle-btn {
+  padding: 10px 20px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.filtre-temizle-btn:hover {
+  background-color: #5a6268;
+}
+
+/* Aktif Filtreler */
+.aktif-filtreler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px dashed #dee2e6;
+}
+
+.filtre-etiket {
+  display: inline-flex;
+  align-items: center;
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.filtre-etiket button {
+  background: none;
+  border: none;
+  color: #1565c0;
+  margin-left: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.filtre-etiket button:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Ürün Özeti */
+.urun-ozet {
+  margin-bottom: 30px;
+}
+
+.ozet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.ozet-kart {
+  background: white;
+  border-radius: 10px;
+  padding: 25px 20px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.ozet-kart:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.ozet-kart h3 {
+  color: #495057;
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ozet-kart .deger {
+  color: #2c3e50;
+  font-size: 32px;
+  font-weight: bold;
+  margin: 10px 0 15px 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ozet-detay {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f1f1;
+}
+
+/* Section Stilleri */
+.urun-section,
+.grafik-section,
+.kategori-section {
+  background: white;
+  border-radius: 10px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+
+.urun-section h2,
+.grafik-section h2,
+.kategori-section h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 20px;
+  border-bottom: 2px solid #f1f1f1;
+  padding-bottom: 10px;
+}
+
+/* Boş Veri Stili */
+.bos-veri {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6c757d;
+  border: 1px dashed #dee2e6;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+/* Action Butonları - ALT SAĞ KÖŞE */
+.action-buttons-bottom {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  display: flex;
+  gap: 15px;
+  z-index: 100;
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+
+.btn-pdf,
+.btn-print {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-pdf {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-print {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.btn-pdf:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-print:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .urun-detay {
+    padding: 15px;
+    padding-bottom: 120px;
+  }
+  
+  .detay-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .filtre-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .ozet-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons-bottom {
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+    justify-content: center;
+  }
+  
+  .btn-pdf,
+  .btn-print {
+    flex: 1;
+    padding: 12px;
+  }
+}

@@ -1,0 +1,399 @@
+/* File: admin-ui/src/pages/Raporlar/components/GrafikBilesenleri.css */
+.grafik-container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.bos-grafik {
+  text-align: center;
+  padding: 40px 20px;
+  color: #7f8c8d;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.bos-grafik p {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* Donut Chart */
+.donut-chart-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+@media (min-width: 768px) {
+  .donut-chart-wrapper {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+  }
+}
+
+.donut-chart {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  position: relative;
+  background: conic-gradient(
+    #4CAF50 0% calc(var(--nakit-percent, 0) * 1%),
+    #2196F3 0% calc((var(--nakit-percent, 0) + var(--kart-percent, 0)) * 1%),
+    #9C27B0 0% calc((var(--nakit-percent, 0) + var(--kart-percent, 0) + var(--hesap-percent, 0)) * 1%),
+    #f0f0f0 0% 100%
+  );
+}
+
+.donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-total {
+  font-size: 20px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.donut-label {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-top: 4px;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.legend-color.nakit {
+  background: #4CAF50;
+}
+
+.legend-color.kart {
+  background: #2196F3;
+}
+
+.legend-color.hesap {
+  background: #9C27B0;
+}
+
+.legend-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.legend-label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.legend-value {
+  color: #7f8c8d;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+/* Çizgi Grafik */
+.cizgi-grafik {
+  height: 240px;
+  position: relative;
+  padding-bottom: 40px;
+}
+
+.chart-bars {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 200px;
+  padding: 0 10px;
+}
+
+.chart-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  margin: 0 5px;
+}
+
+.chart-bar {
+  width: 30px;
+  background: linear-gradient(to top, #2196F3, #64b5f6);
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  transition: height 0.3s ease;
+  cursor: pointer;
+}
+
+.chart-bar:hover {
+  background: linear-gradient(to top, #1976D2, #42a5f5);
+}
+
+.chart-bar:hover .bar-value {
+  opacity: 1;
+  transform: translateY(-30px);
+}
+
+.bar-value {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.bar-label {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #7f8c8d;
+  text-align: center;
+}
+
+.chart-axis {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+}
+
+.axis-line {
+  height: 2px;
+  background: #e0e0e0;
+}
+
+/* Yatay Bar Grafik */
+.yatay-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.yatay-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.bar-label {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kategori-ad {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kategori-adet {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-top: 2px;
+}
+
+.bar-container {
+  flex: 1;
+  height: 30px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.yatay-bar {
+  height: 100%;
+  background: linear-gradient(to right, #4CAF50, #81c784);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  transition: width 0.3s ease;
+}
+
+.bar-tutar {
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bar-yuzde {
+  width: 50px;
+  text-align: right;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+/* Kar Grafiği */
+.kar-grafik {
+  display: flex;
+  flex-direction: column;
+}
+
+.kar-header {
+  display: flex;
+  padding: 12px 0;
+  border-bottom: 2px solid #e0e0e0;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.kar-row {
+  display: flex;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  align-items: center;
+}
+
+.kar-row:last-child {
+  border-bottom: none;
+}
+
+.kar-col {
+  padding: 0 10px;
+}
+
+.kar-col.urun {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+}
+
+.kar-col.gelir,
+.kar-col.maliyet,
+.kar-col.kar {
+  flex: 1;
+  text-align: right;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.urun-ad {
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.urun-adet {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.kar-deger {
+  font-weight: 600;
+}
+
+.kar-deger.pozitif {
+  color: #2e7d32;
+}
+
+.kar-deger.negatif {
+  color: #c62828;
+}
+
+.kar-yuzde {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* Print stilleri */
+@media print {
+  .grafik-container {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+  
+  .chart-bar:hover .bar-value {
+    opacity: 1;
+    transform: translateY(-25px);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .donut-chart {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .donut-center {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .donut-total {
+    font-size: 16px;
+  }
+  
+  .yatay-bar-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .bar-label {
+    width: 100%;
+  }
+  
+  .bar-container {
+    width: 100%;
+  }
+  
+  .kar-header,
+  .kar-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .kar-col {
+    width: 100%;
+    text-align: left !important;
+    padding: 4px 0;
+  }
+}

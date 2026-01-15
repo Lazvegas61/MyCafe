@@ -1,0 +1,19 @@
+export interface DatepickerViewsDaysTheme {
+    header: {
+        base: string;
+        title: string;
+    };
+    items: {
+        base: string;
+        item: {
+            base: string;
+            selected: string;
+            disabled: string;
+            today: string;
+        };
+    };
+}
+export declare function DatepickerViewsDays(): import("react/jsx-runtime").JSX.Element;
+export declare namespace DatepickerViewsDays {
+    var displayName: string;
+}

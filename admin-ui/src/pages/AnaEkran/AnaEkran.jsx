@@ -1,42 +1,23 @@
+// File: admin-ui/src/pages/AnaEkran/AnaEkran.jsx (GÜNCELLENMİŞ - CONTEXT KULLANIMLI)
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useGunDurumu } from "../../context/GunDurumuContext"; // YENİ: Gün durumu context'i
 import syncService from "../../services/syncService";
 import "./AnaEkran.css";
 
-
-export default function AnaEkran({ setGunAktif }) {
+export default function AnaEkran() {
   const [currentTime, setCurrentTime] = useState("");
   const [dashboardData, setDashboardData] = useState({
     dailySales: { total: 0, normal: 0, bilardo: 0, debt: 0 },
     criticalProducts: [],
     openTables: [],
-    dailyExpenses: 0 // Yeni: Günlük giderler
+    dailyExpenses: 0
   });
   
-  // GÜN DURUMU STATE'LERİ
-  const [gunDurumu, setGunDurumu] = useState(() => {
-    return localStorage.getItem('mycafe_gun_durumu') || 'kapali';
-  });
-
-  const [gunBaslangicZamani, setGunBaslangicZamani] = useState(() => {
-    const saved = localStorage.getItem('mycafe_gun_baslangic');
-    return saved ? new Date(saved) : null;
-  });
-
-  const [gunBilgileri, setGunBilgileri] = useState(() => {
-    const saved = localStorage.getItem('mycafe_gun_bilgileri');
-    return saved ? JSON.parse(saved) : {
-      baslangicKasa: 0,
-      nakitGiris: 0,
-      krediKarti: 0,
-      toplamAdisyon: 0,
-      acikAdisyon: 0,
-      gunlukSatis: 0,
-      baslangicTarih: null
-    };
-  });
-
+  // GÜN DURUMU ARTIK CONTEXT'TEN ALINIYOR
+  const { gunAktif, gunBilgileri, gunBaslat, gunDurumunuKontrolEt } = useGunDurumu();
+  
   // GÜN SÜRESİ HESAPLAMA
   const [gunSuresi, setGunSuresi] = useState({
     saat: 0,
@@ -514,7 +495,7 @@ export default function AnaEkran({ setGunAktif }) {
           const bNum = parseInt(b.no.replace('B', '').replace(/\D/g, ''));
           return aNum - bNum;
         }),
-        dailyExpenses: dailyExpenses // Günlük giderler eklendi
+        dailyExpenses: dailyExpenses
       };
       
       setDashboardData(newDashboardData);
@@ -553,53 +534,28 @@ export default function AnaEkran({ setGunAktif }) {
 
   // Gün süresini güncelle (gün aktifse)
   useEffect(() => {
-    if (gunDurumu === 'aktif' && gunBaslangicZamani) {
-      const updateGunSuresi = () => {
-        const now = new Date();
-        const baslangic = new Date(gunBaslangicZamani);
-        const farkMs = now - baslangic;
-        
-        const saat = Math.floor(farkMs / (1000 * 60 * 60));
-        const dakika = Math.floor((farkMs % (1000 * 60 * 60)) / (1000 * 60));
-        
-        setGunSuresi({ saat, dakika });
-      };
+    if (gunAktif) {
+      const gunBaslangicZamani = localStorage.getItem('mycafe_gun_baslangic');
       
-      updateGunSuresi();
-      const interval = setInterval(updateGunSuresi, 60000); // Her dakika güncelle
-      
-      return () => clearInterval(interval);
-    }
-  }, [gunDurumu, gunBaslangicZamani]);
-
-  // Gün durumu değişikliklerini dinle
-  useEffect(() => {
-    const handleGunDurumuDegisti = (event) => {
-      if (event.detail && typeof event.detail.aktif !== 'undefined') {
-        const aktif = event.detail.aktif;
-        setGunDurumu(aktif ? 'aktif' : 'kapali');
-        if (setGunAktif) {
-          setGunAktif(aktif);
-        }
+      if (gunBaslangicZamani) {
+        const updateGunSuresi = () => {
+          const now = new Date();
+          const baslangic = new Date(gunBaslangicZamani);
+          const farkMs = now - baslangic;
+          
+          const saat = Math.floor(farkMs / (1000 * 60 * 60));
+          const dakika = Math.floor((farkMs % (1000 * 60 * 60)) / (1000 * 60));
+          
+          setGunSuresi({ saat, dakika });
+        };
         
-        if (aktif) {
-          const saved = localStorage.getItem('mycafe_gun_baslangic');
-          setGunBaslangicZamani(saved ? new Date(saved) : null);
-        }
+        updateGunSuresi();
+        const interval = setInterval(updateGunSuresi, 60000);
         
-        // Dashboard'u güncelle
-        setTimeout(() => {
-          updateDashboardData();
-        }, 500);
+        return () => clearInterval(interval);
       }
-    };
-    
-    window.addEventListener('gunDurumuDegisti', handleGunDurumuDegisti);
-    
-    return () => {
-      window.removeEventListener('gunDurumuDegisti', handleGunDurumuDegisti);
-    };
-  }, [setGunAktif, updateDashboardData]);
+    }
+  }, [gunAktif]);
 
   // SyncService event'lerini dinle - PANEL ANLIK GÜNCELLEME
   useEffect(() => {
@@ -699,7 +655,7 @@ export default function AnaEkran({ setGunAktif }) {
 
   // Masa veya bilardo detayına git
   const goToTableDetail = useCallback((masa) => {
-    if (gunDurumu === 'kapali') {
+    if (!gunAktif) {
       alert('❌ Gün başlatılmamış! Önce günü başlatın.');
       return;
     }
@@ -796,15 +752,24 @@ export default function AnaEkran({ setGunAktif }) {
       console.log(`Normal adisyona gidiliyor: /adisyondetay/${masaNumarasi}`);
       navigate(`/adisyondetay/${masaNumarasi}`);
     }
-  }, [navigate, gunDurumu, isAdisyonKapali]);
+  }, [navigate, gunAktif, isAdisyonKapali]);
 
-  const goToReportsDashboard = useCallback(() => {
+  // Raporlar sayfasına git
+  const goToReports = useCallback(() => {
+    navigate('/raporlar');
   }, [navigate]);
 
   // Giderler sayfasına git
   const goToExpenses = useCallback(() => {
     navigate('/giderler');
   }, [navigate]);
+
+  // Gün başlatma butonu handler'ı
+  const handleGunBaslatClick = () => {
+    if (gunBaslat) {
+      gunBaslat();
+    }
+  };
 
   return (
     <div className="ana-wrapper">
@@ -814,7 +779,7 @@ export default function AnaEkran({ setGunAktif }) {
       </div>
 
       {/* GÜN DURUMU BİLGİ KARTI */}
-      {gunDurumu === 'aktif' && gunBaslangicZamani && (
+      {gunAktif && (
         <div className="gun-durumu-kart">
           <div className="gun-durumu-left">
             <div className="gun-durumu-icon">
@@ -825,7 +790,7 @@ export default function AnaEkran({ setGunAktif }) {
                 Gün Süresi: {gunSuresi.saat} saat {gunSuresi.dakika} dakika
               </div>
               <div className="gun-baslangic">
-                Başlangıç: {gunBaslangicZamani.toLocaleDateString('tr-TR')} {gunBaslangicZamani.toLocaleTimeString('tr-TR')}
+                Başlangıç: {new Date(localStorage.getItem('mycafe_gun_baslangic') || new Date()).toLocaleDateString('tr-TR')} {new Date(localStorage.getItem('mycafe_gun_baslangic') || new Date()).toLocaleTimeString('tr-TR')}
               </div>
             </div>
           </div>
@@ -855,239 +820,266 @@ export default function AnaEkran({ setGunAktif }) {
         </div>
       )}
 
-      {/* SATIŞ İSTATİSTİKLERİ */}
-      <div className="summary-cards">
-        <div className="sum-card">
-          <div className="sum-icon">💰</div>
-          <div className="sum-title">GÜNLÜK TOPLAM SATIŞ</div>
-          <div className="sum-value">
-            {formatPara(dashboardData.dailySales.total)} ₺
-          </div>
-          <div className="sum-detaylar">
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">🍽 Normal</div>
-              <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.normal)} ₺</div>
+      {/* GÜN BAŞLAT BUTONU (gün aktif değilse) */}
+      {!gunAktif && (
+        <div className="gun-baslat-container">
+          <div className="gun-baslat-kart">
+            <div className="gun-baslat-icon">🚀</div>
+            <div className="gun-baslat-bilgi">
+              <h3>Gün Başlatılmamış</h3>
+              <p>Günlük işlemleri başlatmak için günü başlatın.</p>
             </div>
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">🎱 Bilardo</div>
-              <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.bilardo)} ₺</div>
-            </div>
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">📝 Hesaba Yaz</div>
-              <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.debt)} ₺</div>
-            </div>
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">📊 Net</div>
-              <div className="sum-detay-deger">
-                {formatPara(dashboardData.dailySales.total - dashboardData.dailySales.debt)} ₺
-              </div>
-            </div>
+            <button 
+              className="gun-baslat-button"
+              onClick={handleGunBaslatClick}
+            >
+              Günü Başlat
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="sum-card">
-          <div className="sum-icon">🪑</div>
-          <div className="sum-title">AÇIK ADİSYONLAR</div>
-          <div className="sum-value">
-            {dashboardData.openTables.length} Masa
+      {/* SATIŞ İSTATİSTİKLERİ */}
+      {gunAktif && (
+        <>
+          <div className="summary-cards">
+            <div className="sum-card">
+              <div className="sum-icon">💰</div>
+              <div className="sum-title">GÜNLÜK TOPLAM SATIŞ</div>
+              <div className="sum-value">
+                {formatPara(dashboardData.dailySales.total)} ₺
+              </div>
+              <div className="sum-detaylar">
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">🍽 Normal</div>
+                  <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.normal)} ₺</div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">🎱 Bilardo</div>
+                  <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.bilardo)} ₺</div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">📝 Hesaba Yaz</div>
+                  <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.debt)} ₺</div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">📊 Net</div>
+                  <div className="sum-detay-deger">
+                    {formatPara(dashboardData.dailySales.total - dashboardData.dailySales.debt)} ₺
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sum-card">
+              <div className="sum-icon">🪑</div>
+              <div className="sum-title">AÇIK ADİSYONLAR</div>
+              <div className="sum-value">
+                {dashboardData.openTables.length} Masa
+              </div>
+              <div className="sum-detaylar">
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">🍽 Normal</div>
+                  <div className="sum-detay-deger">
+                    {dashboardData.openTables.filter(t => t.tur === "NORMAL").length}
+                  </div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">🎱 Bilardo</div>
+                  <div className="sum-detay-deger">
+                    {dashboardData.openTables.filter(t => t.tur === "BİLARDO").length}
+                  </div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">💵 Toplam Tutar</div>
+                  <div className="sum-detay-deger">
+                    {formatPara(dashboardData.openTables.reduce((sum, t) => {
+                      const tutar = parseFloat(t.toplamTutar) || 0;
+                      return sum + tutar;
+                    }, 0))} ₺
+                  </div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">📦 Toplam Ürün</div>
+                  <div className="sum-detay-deger">
+                    {dashboardData.openTables.reduce((sum, t) => sum + (t.urunSayisi || 0), 0)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sum-card">
+              <div className="sum-icon">🏦</div>
+              <div className="sum-title">KRİTİK STOK</div>
+              <div className="sum-value">
+                {dashboardData.criticalProducts.length} Ürün
+              </div>
+              <div className="critical-products-list">
+                {dashboardData.criticalProducts.slice(0, 3).map((urun, idx) => (
+                  <div key={idx} className="critical-product-item">
+                    <span className="critical-product-name">
+                      {urun.name ? (urun.name.length > 15 ? urun.name.substring(0, 12) + "..." : urun.name) : "İsimsiz"}
+                    </span>
+                    <span className="critical-product-stock">
+                      {urun.stock || 0}/{urun.critical || 10}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* RAPORLAR BUTONU */}
+            <div className="sum-card">
+              <div className="sum-icon">📊</div>
+              <div className="sum-title">RAPORLAR</div>
+              <div className="sum-value">
+                Detaylı Analiz
+              </div>
+              <div className="raporlar-button-container">
+                <div 
+                  className="raporlar-button"
+                  onClick={goToReports}
+                >
+                  📈 Raporlara Git
+                </div>
+              </div>
+              <div className="sum-detaylar">
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">Günlük Özet</div>
+                  <div className="sum-detay-deger">📋</div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">Kategori Raporu</div>
+                  <div className="sum-detay-deger">📊</div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">Kasa Raporu</div>
+                  <div className="sum-detay-deger">💰</div>
+                </div>
+                <div className="sum-detay-item">
+                  <div className="sum-detay-label">Detaylı Analiz</div>
+                  <div className="sum-detay-deger">🔍</div>
+                </div>
+              </div>
+            </div>
+
+            {/* GİDERLER PANELİ */}
+            <div className="sum-card">
+              <div className="sum-icon">💸</div>
+              <div className="sum-title">GÜNLÜK GİDERLER</div>
+              <div className="sum-value">
+                {formatPara(dashboardData.dailyExpenses)} ₺
+              </div>
+              <div className="expenses-summary">
+                <div className="expenses-net-profit">
+                  <div className="expenses-net-label">Net Kâr:</div>
+                  <div 
+                    className="expenses-net-value"
+                    style={{
+                      color: (dashboardData.dailySales.total - dashboardData.dailySales.debt - dashboardData.dailyExpenses) > 0 ? '#10b981' : '#ef4444'
+                    }}
+                  >
+                    {formatPara(dashboardData.dailySales.total - dashboardData.dailySales.debt - dashboardData.dailyExpenses)} ₺
+                  </div>
+                </div>
+                <div className="expenses-button-container">
+                  <div 
+                    className="expenses-button"
+                    onClick={goToExpenses}
+                  >
+                    📋 Gider Detayları
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="sum-detaylar">
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">🍽 Normal</div>
-              <div className="sum-detay-deger">
-                {dashboardData.openTables.filter(t => t.tur === "NORMAL").length}
-              </div>
-            </div>
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">🎱 Bilardo</div>
-              <div className="sum-detay-deger">
-                {dashboardData.openTables.filter(t => t.tur === "BİLARDO").length}
-              </div>
-            </div>
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">💵 Toplam Tutar</div>
-              <div className="sum-detay-deger">
-                {formatPara(dashboardData.openTables.reduce((sum, t) => {
+
+          {/* AÇIK ADİSYONLAR PANELİ */}
+          <div className="panel-box-wide">
+            <div className="panel-header-wide">
+              <span>📋 AÇIK ADİSYONLAR</span>
+              <span className="panel-small-wide">
+                {dashboardData.openTables.length} Masa • 
+                Toplam: {formatPara(dashboardData.openTables.reduce((sum, t) => {
                   const tutar = parseFloat(t.toplamTutar) || 0;
                   return sum + tutar;
                 }, 0))} ₺
-              </div>
-            </div>
-            <div className="sum-detay-item">
-              <div className="sum-detay-label">📦 Toplam Ürün</div>
-              <div className="sum-detay-deger">
-                {dashboardData.openTables.reduce((sum, t) => sum + (t.urunSayisi || 0), 0)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="sum-card">
-          <div className="sum-icon">🏦</div>
-          <div className="sum-title">KRİTİK STOK</div>
-          <div className="sum-value">
-            {dashboardData.criticalProducts.length} Ürün
-          </div>
-          <div className="critical-products-list">
-            {dashboardData.criticalProducts.slice(0, 3).map((urun, idx) => (
-              <div key={idx} className="critical-product-item">
-                <span className="critical-product-name">
-                  {urun.name ? (urun.name.length > 15 ? urun.name.substring(0, 12) + "..." : urun.name) : "İsimsiz"}
-                </span>
-                <span className="critical-product-stock">
-                  {urun.stock || 0}/{urun.critical || 10}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="sum-card">
-          <div className="sum-icon">📊</div>
-          <div className="report-single-button">
-            <div 
-              className="report-button-main"
-              onClick={goToReportsDashboard}
-            >
-            </div>
-          </div>
-        </div>
-
-        {/* YENİ: GİDERLER PANELİ */}
-        <div className="sum-card">
-          <div className="sum-icon">💸</div>
-          <div className="sum-title">GÜNLÜK GİDERLER</div>
-          <div className="sum-value">
-            {formatPara(dashboardData.dailyExpenses)} ₺
-          </div>
-          <div className="expenses-summary">
-            <div className="expenses-net-profit">
-              <div className="expenses-net-label">Net Kâr:</div>
-              <div 
-                className="expenses-net-value"
-                style={{
-                  color: (dashboardData.dailySales.total - dashboardData.dailySales.debt - dashboardData.dailyExpenses) > 0 ? '#10b981' : '#ef4444'
-                }}
-              >
-                {formatPara(dashboardData.dailySales.total - dashboardData.dailySales.debt - dashboardData.dailyExpenses)} ₺
-              </div>
-            </div>
-            <div className="expenses-button-container">
-              <div 
-                className="expenses-button"
-                onClick={goToExpenses}
-              >
-                📋 Gider Detayları
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* AÇIK ADİSYONLAR PANELİ */}
-      <div className="panel-box-wide">
-        <div className="panel-header-wide">
-          <span>📋 AÇIK ADİSYONLAR</span>
-          <span className="panel-small-wide">
-            {dashboardData.openTables.length} Masa • 
-            Toplam: {formatPara(dashboardData.openTables.reduce((sum, t) => {
-              const tutar = parseFloat(t.toplamTutar) || 0;
-              return sum + tutar;
-            }, 0))} ₺
-            {gunDurumu === 'kapali' && (
-              <span className="gun-kapali-uyari">
-                ⚠️ Gün başlatılmamış
+                <span className="live-update-badge"></span>
               </span>
-            )}
-            <span className="live-update-badge">
-             
-            </span>
-          </span>
-        </div>
-        
-        <div className="panel-list-wide">
-          {dashboardData.openTables.length > 0 ? (
-            <div className="table-container-wide">
-              <table className="open-tables-table">
-                <thead>
-                  <tr>
-                    <th>MASALAR</th>
-                    <th>MASA TÜRÜ</th>
-                    <th>MASA NO</th>
-                    <th>TOPLAM TUTAR</th>
-                    <th>İŞLEMLER</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboardData.openTables.map((masa) => {
-                    const isBilardo = masa.tur === "BİLARDO";
-                    
-                    return (
-                      <tr 
-                        key={masa.id}
-                        className={`table-row ${isBilardo ? 'bilardo-row' : 'normal-row'}`}
-                        style={{
-                          opacity: gunDurumu === 'kapali' ? 0.6 : 1,
-                          transition: 'all 0.3s ease'
-                        }}
-                      >
-                        <td>
-                          <div className="table-icon-cell">
-                            <div className="table-icon">
-                              {isBilardo ? '🎱' : '🍽'}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="table-type-cell">
-                          <div className="table-type-badge">
-                            {isBilardo ? 'BİLARDO' : 'YEMEK/İÇECEK'}
-                          </div>
-                        </td>
-                        <td className="table-number">
-                          <strong>{masa.masaNo}</strong>
-                        </td>
-                        <td className="table-amount">
-                          <div className="amount-main">
-                            {formatPara(masa.toplamTutar)} ₺
-                          </div>
-                          <div className="amount-details">
-                            {masa.urunSayisi || 0} ürün
-                          </div>
-                        </td>
-                        <td className="table-actions">
-                          <button 
-                            className="action-button"
-                            onClick={() => goToTableDetail(masa)}
-                            style={{
-                              opacity: gunDurumu === 'kapali' ? 0.5 : 1,
-                              cursor: gunDurumu === 'kapali' ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.3s ease'
-                            }}
-                            disabled={gunDurumu === 'kapali'}
-                          >
-                            📋 Detay
-                            {gunDurumu === 'kapali' && ' (Kilitli)'}
-                          </button>
-                        </td>
+            </div>
+            
+            <div className="panel-list-wide">
+              {dashboardData.openTables.length > 0 ? (
+                <div className="table-container-wide">
+                  <table className="open-tables-table">
+                    <thead>
+                      <tr>
+                        <th>MASALAR</th>
+                        <th>MASA TÜRÜ</th>
+                        <th>MASA NO</th>
+                        <th>TOPLAM TUTAR</th>
+                        <th>İŞLEMLER</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {dashboardData.openTables.map((masa) => {
+                        const isBilardo = masa.tur === "BİLARDO";
+                        
+                        return (
+                          <tr 
+                            key={masa.id}
+                            className={`table-row ${isBilardo ? 'bilardo-row' : 'normal-row'}`}
+                          >
+                            <td>
+                              <div className="table-icon-cell">
+                                <div className="table-icon">
+                                  {isBilardo ? '🎱' : '🍽'}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="table-type-cell">
+                              <div className="table-type-badge">
+                                {isBilardo ? 'BİLARDO' : 'YEMEK/İÇECEK'}
+                              </div>
+                            </td>
+                            <td className="table-number">
+                              <strong>{masa.masaNo}</strong>
+                            </td>
+                            <td className="table-amount">
+                              <div className="amount-main">
+                                {formatPara(masa.toplamTutar)} ₺
+                              </div>
+                              <div className="amount-details">
+                                {masa.urunSayisi || 0} ürün
+                              </div>
+                            </td>
+                            <td className="table-actions">
+                              <button 
+                                className="action-button"
+                                onClick={() => goToTableDetail(masa)}
+                              >
+                                📋 Detay
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state-wide">
+                  <div className="empty-icon-wide">✅</div>
+                  <div className="empty-text-wide">Açık Adisyon Bulunmuyor</div>
+                  <div className="empty-subtext-wide">
+                    Yeni adisyon açmak için "+ Adisyon" butonuna tıklayın
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="empty-state-wide">
-              <div className="empty-icon-wide">✅</div>
-              <div className="empty-text-wide">Açık Adisyon Bulunmuyor</div>
-              <div className="empty-subtext-wide">
-                {gunDurumu === 'kapali' 
-                  ? 'Yeni adisyon açmak için önce günü başlatın'
-                  : 'Yeni adisyon açmak için "+ Adisyon" butonuna tıklayın'}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
