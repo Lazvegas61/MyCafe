@@ -199,7 +199,7 @@
   color: #000000;
 }
 
-/* KRİTİK STOK LİSTESİ */
+/* KRITIK STOK LİSTESİ */
 .critical-products-list {
   margin-top: 15px;
 }
@@ -266,7 +266,7 @@
   box-shadow: 0 4px 8px rgba(139, 69, 19, 0.1);
 }
 
-/* AÇIK ADİSYONLAR PANELİ */
+/* AÇIK ADISYONLAR PANELİ */
 .panel-box-wide {
   background: white;
   border-radius: 16px;
@@ -330,7 +330,7 @@
   padding: 20px;
 }
 
-/* AÇIK ADİSYONLAR TABLOSU */
+/* AÇIK ADISYONLAR TABLOSU */
 .table-container-wide {
   width: 100%;
   overflow-x: auto;

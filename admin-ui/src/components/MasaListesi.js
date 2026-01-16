@@ -9,6 +9,17 @@ const MasaListesi = () => {
   // CRİTİK: Event listener'ları kur
   useEffect(() => {
     console.log('🔄 MasaListesi: SyncService event listenerları kuruluyor...');
+
+    // SYNC SERVICE EVENT İSİMLERİ İLE AYNI OLSUN
+  syncService.on('MASA_GUNCELLENDI', (data) => {  // ✅ Doğru isim
+    console.log('🔄 MASA_GUNCELLENDI:', data);
+    refreshMasalar();
+  });
+  
+  syncService.on('ADISYON_GUNCELLENDİ', (data) => {  // ✅ Doğru isim (İ harfi Türkçe)
+    console.log('🔄 ADISYON_GUNCELLENDİ:', data);
+    refreshMasalar();
+  });
     
     // 1. ANLIK GÜNCELLEMELERİ DİNLE
     syncService.on('ANLIK_GUNCELLEME', (data) => {

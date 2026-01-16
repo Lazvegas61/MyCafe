@@ -78,7 +78,7 @@ export default function MusteriIslemleri() {
   // Müşterileri yükleme fonksiyonu
   const yukleMusteriler = (musteriListesi) => {
     const musterilerBorclu = musteriListesi.map(musteri => {
-      // ADİSYON_KEY'den borçları hesapla
+      // ADISYON_KEY'den borçları hesapla
       const adisyonlar = okuJSON(ADISYON_KEY, []).filter(a => a.musteriId === musteri.id);
       
       // BORC_KEY'den borçları hesapla
@@ -216,7 +216,7 @@ export default function MusteriIslemleri() {
     const tahsilatlar = okuJSON(TAHBILAT_KEY, [])
       .filter(t => t.musteriId === customer.id)
       .map(t => ({
-        tip: "TAHSİLAT",
+        tip: "TAHSILAT",
         tutar: t.tutar,
         tarih: t.tarih,
         odemeTipi: t.tip,
@@ -240,7 +240,7 @@ export default function MusteriIslemleri() {
         borc.hareketler.forEach(hareket => {
           if (hareket.tip === "ÖDEME ALINDI") {
             tumHareketler.push({
-              tip: "TAHSİLAT YAPILDI",
+              tip: "TAHSILAT YAPILDI",
               tutar: hareket.tutar,
               tarih: hareket.tarih,
               odemeTipi: hareket.odemeTipi,
@@ -263,7 +263,7 @@ export default function MusteriIslemleri() {
     // Eski tahsilatları ekle
     tahsilatlar.forEach(t => {
       tumHareketler.push({
-        tip: "TAHSİLAT YAPILDI",
+        tip: "TAHSILAT YAPILDI",
         tutar: t.tutar,
         tarih: t.tarih,
         odemeTipi: t.odemeTipi,
@@ -323,7 +323,7 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // ADİSYON ÜRÜNLERİNİ HAZIRLA
+  // ADISYON ÜRÜNLERİNİ HAZIRLA
   // --------------------------------------------------
   const prepareAdisyonProducts = (record) => {
     if (!record || !record.urunler || record.urunler.length === 0) {
@@ -346,7 +346,7 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // ADİSYON TOPLAMLARINI HESAPLA (KDV ÇIKARILDI)
+  // ADISYON TOPLAMLARINI HESAPLA (KDV ÇIKARILDI)
   // --------------------------------------------------
   const calculateAdisyonTotals = (products) => {
     const toplamTutar = products.reduce((sum, product) => sum + product.toplam, 0);
@@ -358,7 +358,7 @@ export default function MusteriIslemleri() {
   };
 
   // --------------------------------------------------
-  // TAHSİLAT AL
+  // TAHSILAT AL
   // --------------------------------------------------
   const handleCollectPayment = () => {
     if (!selectedCustomer) {
@@ -377,7 +377,7 @@ export default function MusteriIslemleri() {
       return;
     }
     
-    // 1. TAHSİLAT_KEY'e kaydet
+    // 1. TAHSILAT_KEY'e kaydet
     const yeniTahsilat = {
       id: `tah_${Date.now()}`,
       musteriId: selectedCustomer.id,
@@ -819,16 +819,16 @@ export default function MusteriIslemleri() {
         {/* SAĞ KOLON - DİKEY 2 BÖLMELİ */}
         <div className="details-column">
           
-          {/* SOL BÖLÜM - ADİSYON DETAYLARI */}
+          {/* SOL BÖLÜM - ADISYON DETAYLARI */}
           <div className="adisyon-details-section">
             <div className="column-header">
-              <h2>ADİSYON DETAYLARI</h2>
+              <h2>ADISYON DETAYLARI</h2>
             </div>
             
             <div className="adisyon-content">
               {adisyonDetails ? (
                 <>
-                  {/* ADİSYON ÖZETİ */}
+                  {/* ADISYON ÖZETİ */}
                   <div className="adisyon-summary">
                     <div className="adisyon-summary-header">
                       <div className="adisyon-table-info">
@@ -935,9 +935,9 @@ export default function MusteriIslemleri() {
             </div>
             
             <div className="islem-content">
-              {/* TAHSİLAT ALANI */}
+              {/* TAHSILAT ALANI */}
               <div className="payment-section">
-                <h3>TAHSİLAT</h3>
+                <h3>TAHSILAT</h3>
                 <div className="payment-form">
                   <div className="form-group">
                     <label>Tutar (₺)</label>
@@ -1059,15 +1059,15 @@ export default function MusteriIslemleri() {
                       <div key={index} className="transaction-item">
                         <div className={`transaction-type ${
                           transaction.tip.includes('İNDİRİM') ? 'type-discount' :
-                          transaction.tip.includes('TAHSİLAT') ? 'type-payment' :
+                          transaction.tip.includes('TAHSILAT') ? 'type-payment' :
                           transaction.tip.includes('BORÇ') ? 'type-debt' : ''
                         }`}>
                           {transaction.tip}
                         </div>
                         <div className={`transaction-amount ${
-                          transaction.tip.includes('İNDİRİM') || transaction.tip.includes('TAHSİLAT') ? 'amount-negative' : 'amount-positive'
+                          transaction.tip.includes('İNDİRİM') || transaction.tip.includes('TAHSILAT') ? 'amount-negative' : 'amount-positive'
                         }`}>
-                          {transaction.tip.includes('İNDİRİM') || transaction.tip.includes('TAHSİLAT') ? '-' : '+'}
+                          {transaction.tip.includes('İNDİRİM') || transaction.tip.includes('TAHSILAT') ? '-' : '+'}
                           {transaction.tutar.toFixed(2)} ₺
                         </div>
                         <div className="transaction-date">

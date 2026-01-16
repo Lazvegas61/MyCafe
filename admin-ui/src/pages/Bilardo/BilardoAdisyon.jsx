@@ -1,10 +1,10 @@
-// admin-ui/src/pages/Bilardo/BilardoAdisyon.jsx - GÜNCELLENDİ
+// admin-ui/src/pages/Bilardo/BilardoAdisyon.jsx - GUNCELLENDI
 /* ------------------------------------------------------------
    📌 BilardoAdisyon.jsx — BİLARDO ÜCRETİ GÖSTERİMİ DÜZELTİLDİ
    - Bilardo ücreti otomatik gösteriliyor
    - Özet panelinde bilardo ücreti ve ek ürünler gözüküyor
    - Tüm tutarlar doğru hesaplanıyor
-   - GÜNCELLENDİ: Bilardo ücreti ve ek ürünler normal adisyonda gösteriliyor
+   - GUNCELLENDI: Bilardo ücreti ve ek ürünler normal adisyonda gösteriliyor
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
@@ -77,7 +77,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 2. DATA LOADING - GÜNCELLENDİ
+     📌 2. DATA LOADING - GUNCELLENDI
   ============================================================ */
   
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function BilardoAdisyon() {
         
         const dakika = dakikaHesapla();
         
-        // 6. Ücret hesapla - GÜNCELLENDİ: Adisyondan bilardoUcret varsa onu kullan
+        // 6. Ücret hesapla - GUNCELLENDI: Adisyondan bilardoUcret varsa onu kullan
         let ucret = 0;
         if (bulunanAdisyon.bilardoUcret !== undefined) {
           // Adisyonda kayıtlı bilardo ücreti varsa onu kullan
@@ -164,7 +164,7 @@ export default function BilardoAdisyon() {
   }, [adisyonId, navigate]);
 
   /* ============================================================
-     📌 3. KALAN TUTAR HESAPLAMA - GÜNCELLENDİ
+     📌 3. KALAN TUTAR HESAPLAMA - GUNCELLENDI
   ============================================================ */
   
   const updateKalanTutar = (ucret, ekUrunlerData, odemelerData) => {
@@ -204,7 +204,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 4. MYCAFE ÜRÜN EKLEME - GÜNCELLENDİ
+     📌 4. MYCAFE ÜRÜN EKLEME - GUNCELLENDI
   ============================================================ */
   
   const myCafeUrunEkle = (urun) => {
@@ -317,7 +317,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 6. ÖDEME YÖNETİMİ - GÜNCELLENDİ
+     📌 6. ÖDEME YÖNETİMİ - GUNCELLENDI
   ============================================================ */
   
   const odemeModalAc = (tip) => {
@@ -409,7 +409,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 7. ADİSYON KAPATMA
+     📌 7. ADISYON KAPATMA
   ============================================================ */
   
   const adisyonuKapat = () => {
@@ -788,7 +788,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 10. ANA RENDER - GÜNCELLENDİ (BİLARDO ÜCRETİ GÖSTERİMİ)
+     📌 10. ANA RENDER - GUNCELLENDI (BİLARDO ÜCRETİ GÖSTERİMİ)
   ============================================================ */
   
   if (!adisyon) {
@@ -875,7 +875,7 @@ export default function BilardoAdisyon() {
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text'
             }}>
-              BİLARDO ADİSYONU
+              BİLARDO ADISYONU
             </h1>
             <p style={{ margin: '5px 0 0', color: '#8B7355', fontSize: '16px' }}>
               {adisyon.bilardoMasaNo} • {adisyon.sureTipi === "30dk" ? "30 Dakika" : 
@@ -1245,7 +1245,7 @@ export default function BilardoAdisyon() {
           </div>
         </div>
         
-        {/* SÜTUN 4: ÖZET ve AKSİYONLAR - GÜNCELLENDİ (BİLARDO ÜCRETİ GÖSTERİMİ) */}
+        {/* SÜTUN 4: ÖZET ve AKSİYONLAR - GUNCELLENDI (BİLARDO ÜCRETİ GÖSTERİMİ) */}
         <div style={{
           background: 'white',
           borderRadius: '18px',
@@ -1351,7 +1351,7 @@ export default function BilardoAdisyon() {
                 }
               }}
             >
-              ✅ ADİSYONU KAPAT
+              ✅ ADISYONU KAPAT
             </button>
             
             <button

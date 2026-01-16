@@ -15,7 +15,7 @@ import syncService from "./services/syncService";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { GunDurumuProvider, useGunDurumu } from "./context/GunDurumuContext";
 import { RaporFiltreProvider } from "@/context/RaporFiltreContext";
-import "@/services/raporMotoruV2";
+import raporMotoruV2 from "./services/raporMotoruV2"; // ✅ Doğru import
 
 /* ------------------------------------------------------------
    🔧 İlk Kurulum Verileri
@@ -27,7 +27,7 @@ import productsData from "./data/initial_products.json";
 const SYNC_EVENTS = {
   MASA_GUNCELLENDI: 'MASA_GUNCELLENDI',
   ADISYON_GUNCELLENDI: 'ADISYON_GUNCELLENDI',
-  FİYAT_GUNCELLENDİ: 'FİYAT_GUNCELLENDİ',
+  FIYAT_GUNCELLENDİ: 'FIYAT_GUNCELLENDİ',
   SENKRONIZE_ET: 'SENKRONIZE_ET',
   KALEM_EKLENDI: 'KALEM_EKLENDI'
 };
@@ -172,7 +172,7 @@ function autoFixCategoryAndProducts() {
 }
 
 /* ------------------------------------------------------------
-   🔧 SYNC SERVICE ENTEGRASYONU
+   🔧 SYNC SERVICE ENTEGRASYONU - GUNCELLENDI
 ------------------------------------------------------------ */
 let syncServiceInitialized = false;
 
@@ -190,19 +190,20 @@ function initializeSyncService() {
   }
   
   if (window.syncService.on) {
+    // SyncService event'lerini dinle
     window.syncService.on(SYNC_EVENTS.MASA_GUNCELLENDI, (data) => {
       console.log('📢 SyncService: Masa güncellendi', data?.masaNo || data?.masaNum || data);
     });
     
-    window.syncService.on(SYNC_EVENTS.ADISYON_GUNCELLENDI, (data) => {
+    window.syncService.on(SYNC_EVENTS.ADISYON_GUNCELLENDİ, (data) => {
       console.log('📢 SyncService: Adisyon güncellendi', data?.adisyonId || data);
     });
     
-    window.syncService.on(SYNC_EVENTS.FİYAT_GUNCELLENDİ, (data) => {
+    window.syncService.on(SYNC_EVENTS.FIYAT_GUNCELLENDİ, (data) => {
       console.log('💰 SyncService: Fiyat güncellendi', data?.toplamTutar || data);
     });
     
-    window.syncService.on(SYNC_EVENTS.KALEM_EKLENDI, (data) => {
+    window.syncService.on(SYNC_EVENTS.KALEM_EKLENDİ, (data) => {
       console.log('➕ SyncService: Kalem eklendi', data?.adisyonId || data);
     });
     
@@ -210,25 +211,37 @@ function initializeSyncService() {
       console.log('🔄 SyncService: Tüm veriler senkronize edildi');
     });
     
+    window.syncService.on(SYNC_EVENTS.KASA_HAREKETI_EKLENDI, (data) => {
+      console.log('💰 SyncService: Kasa hareketi eklendi', data?.id);
+    });
+    
+    window.syncService.on(SYNC_EVENTS.ODEME_ALINDI, (data) => {
+      console.log('💰 SyncService: Ödeme alındı', data?.adisyonId);
+    });
+    
     syncServiceInitialized = true;
     console.log('✅ SyncService başlatıldı ve event listener\'lar kuruldu');
     
+    // İlk senkronizasyonu yap
     setTimeout(() => {
       if (window.syncService.senkronizeMasalar) {
         window.syncService.senkronizeMasalar();
       }
-    }, 1500);
+      if (window.syncService.dashboardGuncelle) {
+        window.syncService.dashboardGuncelle();
+      }
+    }, 2000);
   } else {
     console.warn('⚠️ SyncService.on() methodu bulunamadı, event listener\'lar kurulamadı');
   }
 }
 
-// AÇIK ADİSYONLARI SENKRONİZE ETME FONKSİYONU
+// AÇIK ADISYONLARI SENKRONİZE ETME FONKSİYONU
 function syncAcikAdisyonlar() {
   try {
     const normalAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
     
-    // SADECE AÇIK OLAN NORMAL ADİSYONLARI AL
+    // SADECE AÇIK OLAN NORMAL ADISYONLARI AL
     const acikNormalAdisyonlar = normalAdisyonlar.filter(a => {
       const durum = a.durum?.toUpperCase();
       const isKapali = a.kapali || durum === "KAPALI" || durum === "KAPATILDI";
@@ -238,7 +251,7 @@ function syncAcikAdisyonlar() {
     
     const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
     
-    // SADECE AÇIK OLAN BİLARDO ADİSYONLARI AL
+    // SADECE AÇIK OLAN BİLARDO ADISYONLARI AL
     const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(a => {
       const durum = a.durum?.toUpperCase();
       const isKapali = a.kapali || durum === "KAPALI" || durum === "KAPATILDI";
@@ -274,7 +287,7 @@ function syncAcikAdisyonlar() {
   }
 }
 
-// KRİTİK STOK KONTROL FONKSİYONU
+// KRITIK STOK KONTROL FONKSİYONU
 function checkCriticalStock() {
   try {
     const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
@@ -333,30 +346,69 @@ function ensureDemoAdmin() {
 }
 
 /* ------------------------------------------------------------
-   📌 GLOBAL EVENT LISTENER FONKSİYONU
+   📌 GLOBAL EVENT LISTENER FONKSİYONU - GUNCELLENDI
 ------------------------------------------------------------ */
 function initializeGlobalEventListeners() {
   console.log('🔔 Global event listeners başlatılıyor...');
   
+  // ✅ DEBUG: Event listener kurulumunu logla
+  if (window.syncDebug) {
+    console.log('🔍 syncDebug mevcut, sistem kontrolü yapılabilir');
+  }
+
+  // SYNC SERVICE EVENT'LERİ İLE SENKRONİZE ET
   const globalEvents = {
-    MASA_GUNCELLENDI: 'masaGuncellendi',
-    ADISYON_GUNCELLENDI: 'adisyonGuncellendi',
-    BİLARDO_ADİSYON_GUNCELLENDI: 'bilardoAdisyonGuncellendi',
-    BİLARDO_MASA_GUNCELLENDI: 'bilardoMasaGuncellendi',
-    STOK_GUNCELLENDI: 'stokGuncellendi',
-    KRITIK_STOK: 'kritikStok',
-    SENKRONIZE_ET: 'senkronizeEt'
+    // SyncService event'leri ile aynı isimler
+    MASA_GUNCELLENDI: 'MASA_GUNCELLENDI',
+    ADISYON_GUNCELLENDI: 'ADISYON_GUNCELLENDİ',  // ✅ syncService'de ADISYON_GUNCELLENDİ (İ harfi Türkçe)
+    BİLARDO_ADISYON_GUNCELLENDI: 'BİLARDO_ADISYON_GUNCELLENDI',
+    BİLARDO_MASA_GUNCELLENDI: 'BİLARDO_MASA_GUNCELLENDI',
+    STOK_GUNCELLENDI: 'STOK_GUNCELLENDI',
+    KRITIK_STOK: 'KRITIK_STOK',
+    SENKRONIZE_ET: 'SENKRONIZE_ET',
+    
+    // Kasa event'leri
+    ODEME_ALINDI: 'ODEME_ALINDI',
+    KASA_HAREKETI_EKLENDI: 'KASA_HAREKETI_EKLENDI',
+    GUN_BASI_KASA_GIRILDI: 'GUN_BASI_KASA_GIRILDI',
+    GUN_SONU_KASA_GIRILDI: 'GUN_SONU_KASA_GIRILDI'
   };
   
   window.dispatchGlobalEvent = (eventName, data = {}) => {
-    const event = new CustomEvent(eventName, { detail: data });
-    window.dispatchEvent(event);
+    // 1. ÖNCE: SyncService event'i tetikle (eğer syncService hazırsa)
+    if (window.syncService && window.syncService.emitEvent) {
+      // Event isimlerini syncService formatına çevir
+      let syncEventName = eventName;
+      
+      // Özel dönüşümler
+      if (eventName === 'ADISYON_GUNCELLENDI') {
+        syncEventName = 'ADISYON_GUNCELLENDİ'; // İ harfi Türkçe
+      } else if (eventName === 'BİLARDO_ADISYON_GUNCELLENDI') {
+        syncEventName = 'BİLARDO_ADISYON_GUNCELLENDİ'; // İ harfi Türkçe
+      }
+      
+      try {
+        window.syncService.emitEvent(syncEventName, data);
+      } catch (syncError) {
+        console.error('❌ SyncService event gönderme hatası:', syncError);
+      }
+    }
+    
+    // 2. SONRA: Custom event tetikle (mevcut kodla uyumlu)
+    try {
+      const event = new CustomEvent(eventName, { detail: data });
+      window.dispatchEvent(event);
+    } catch (customError) {
+      console.error('❌ Custom event gönderme hatası:', customError);
+    }
+    
     console.log(`📢 Global Event Gönderildi: ${eventName}`, data);
   };
   
   const handleStorageChange = (event) => {
     const key = event.key;
     
+    // SyncService key'lerini tespit et ve uygun event gönder
     if (key === 'mc_masalar') {
       window.dispatchGlobalEvent(globalEvents.MASA_GUNCELLENDI, { 
         type: 'storage_update', 
@@ -370,7 +422,7 @@ function initializeGlobalEventListeners() {
       });
     }
     else if (key === 'bilardo_adisyonlar') {
-      window.dispatchGlobalEvent(globalEvents.BİLARDO_ADİSYON_GUNCELLENDI, { 
+      window.dispatchGlobalEvent(globalEvents.BİLARDO_ADISYON_GUNCELLENDI, { 
         type: 'storage_update', 
         key: key 
       });
@@ -387,6 +439,12 @@ function initializeGlobalEventListeners() {
         key: key 
       });
     }
+    else if (key === 'mc_kasa_hareketleri') {
+      window.dispatchGlobalEvent(globalEvents.KASA_HAREKETI_EKLENDI, { 
+        type: 'storage_update', 
+        key: key 
+      });
+    }
     else if (key.startsWith('mc_')) {
       window.dispatchGlobalEvent(globalEvents.SENKRONIZE_ET, { 
         type: 'storage_update', 
@@ -397,10 +455,28 @@ function initializeGlobalEventListeners() {
   
   window.addEventListener('storage', handleStorageChange);
   
+  // SyncService event'lerini dinle
+  if (window.syncService && window.syncService.on) {
+    // Dashboard güncellendiğinde logla
+    window.syncService.on('DASHBOARD_GUNCELLENDİ', (data) => {
+      console.log('📊 Dashboard güncellendi:', data?.dashboardData?.lastUpdated);
+    });
+    
+    // Kasa hareketi eklendiğinde logla
+    window.syncService.on('KASA_HAREKETI_EKLENDI', (hareket) => {
+      console.log('💰 Kasa hareketi eklendi:', hareket.id);
+    });
+  }
+  
   const storageCheckInterval = setInterval(() => {
     syncAcikAdisyonlar();
     checkCriticalStock();
-  }, 10000);
+    
+    // SyncService senkronizasyonu
+    if (window.syncService && window.syncService.senkronizeMasalar) {
+      window.syncService.senkronizeMasalar();
+    }
+  }, 30000); // 30 saniyede bir
   
   console.log('✅ Global event listeners kuruldu');
   
@@ -635,6 +711,18 @@ function MainApp() {
     loadInitialData();
     autoFixCategoryAndProducts();
     ensureDemoAdmin();
+    
+    // ✅ DEBUG: İlk yüklemede sistem kontrolü (geliştirme modunda)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Geliştirme modu: syncDebug aktif');
+      
+      // 5 saniye sonra otomatik kontrol
+      setTimeout(() => {
+        if (window.syncDebug && window.syncDebug.checkAllServices) {
+          window.syncDebug.checkAllServices();
+        }
+      }, 5000);
+    }
   }, []);
 
   // Sync service ve interval'leri başlat
@@ -773,7 +861,7 @@ function MainApp() {
               } 
             />
 
-            {/* 3. DİĞER SAYFALAR - GARSON YETKİLERİ GÜNCELLENDİ */}
+            {/* 3. DİĞER SAYFALAR - GARSON YETKİLERİ GUNCELLENDI */}
             <Route 
               path="/masalar" 
               element={
@@ -900,14 +988,37 @@ function MainApp() {
             />
             
             <Route 
-              path="/raporlar/gun-sonu" 
-              element={
-                <ProtectedRoute requiredRole="ADMIN">
-                  <Layout>
-                    <GunSonuDetay />
-                  </Layout>
-                </ProtectedRoute>
-              } 
+  path="/raporlar/gun-sonu/today" 
+  element={
+    <ProtectedRoute requiredRole="ADMIN">
+      <Layout>
+        <GunSonuDetay />
+      </Layout>
+    </ProtectedRoute>
+  } 
+/>
+
+<Route 
+  path="/raporlar/gun-sonu/:raporId" 
+  element={
+    <ProtectedRoute requiredRole="ADMIN">
+      <Layout>
+        <GunSonuDetay />
+      </Layout>
+    </ProtectedRoute>
+  } 
+/>
+
+<Route 
+  path="/raporlar/gun-sonu" 
+  element={
+    <ProtectedRoute requiredRole="ADMIN">
+      <Layout>
+        <GunSonuDetay />
+      </Layout>
+    </ProtectedRoute>
+  } 
+
             />
             
             <Route 

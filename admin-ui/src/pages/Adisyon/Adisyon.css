@@ -308,7 +308,7 @@
 }
 
 /* =========================================================
-   2 — ADİSYON PANELİ (ORTA)
+   2 — ADISYON PANELİ (ORTA)
 ========================================================= */
 .panel-adisyon {
   background: #fff7e6;
@@ -330,7 +330,7 @@
   color: #4b2e05;
 }
 
-/* ESKİ ADİSYON CONTAINER */
+/* ESKİ ADISYON CONTAINER */
 .eski-adisyon-container {
   margin-bottom: 15px;
   padding: 12px;
@@ -354,7 +354,7 @@
   font-style: italic;
 }
 
-/* YENİ ADİSYON CONTAINER */
+/* YENİ ADISYON CONTAINER */
 .yeni-adisyon-container {
   flex: 1;
   display: flex;

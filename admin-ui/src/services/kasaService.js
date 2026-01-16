@@ -1,12 +1,11 @@
+// File: admin-ui/src/services/kasaService.js
 /* ------------------------------------------------------------
    💰 kasaService.js — MyCafe Kasa Raporu Servisi
-   📌 SADECE KASA HAREKETLERİ ve ÖDEME TAKİBİ
-   📌 SyncService event'lerini dinler, kasa verilerini yönetir
+   📌 KASA VERİLERİNİ OKUMA ve RAPORLAMA (SADECE OKUMA)
+   📌 YAZMA İŞLEMLERİ syncService ÜZERİNDEN YAPILIR
 ------------------------------------------------------------ */
 
-import syncService from './syncService';
-
-// LocalStorage Key'leri
+// LocalStorage Key'leri - syncService ile SENKRONİZE
 const KASA_HAREKETLERI_KEY = "mc_kasa_hareketleri";
 const GUN_BASI_KASA_KEY = "mc_gun_basi_kasa";
 const GUN_SONU_KASA_KEY = "mc_gun_sonu_kasa";
@@ -17,7 +16,8 @@ const KASA_TIPLERI = {
   GUN_SONU: "GUN_SONU",
   TAHISILAT: "TAHSILAT",
   MANUEL_GIRIS: "MANUEL_GIRIS",
-  MANUEL_CIKIS: "MANUEL_CIKIS"
+  MANUEL_CIKIS: "MANUEL_CIKIS",
+  BORC_TAHSILATI: "BORC_TAHSILATI"
 };
 
 // Ödeme Tipleri
@@ -25,182 +25,37 @@ const ODEME_TIPLERI = {
   NAKIT: "NAKIT",
   KART: "KART",
   HAVALE: "HAVALE",
-  HESABA_YAZ: "HESABA_YAZ"
+  HESABA_YAZ: "HESABA_YAZ",
+  DIGER: "DIGER"
 };
 
 const kasaService = {
   // --------------------------------------------------
-  // TEMEL LOCALSTORAGE FONKSİYONLARI
+  // TEMEL OKUMA FONKSİYONLARI (SADECE OKUMA)
   // --------------------------------------------------
   oku: (key, defaultValue = []) => {
     try {
+      // ÖNCE localStorageService'den dene
+      if (typeof window !== 'undefined' && window.localStorageService) {
+        return window.localStorageService.getByKey(key) || defaultValue;
+      }
+      
+      // Fallback: direkt localStorage
       const raw = localStorage.getItem(key);
-      if (!raw) return defaultValue;
-      return JSON.parse(raw);
+      return raw ? JSON.parse(raw) : defaultValue;
     } catch (error) {
       console.error(`❌ KASA: JSON parse hatası (${key}):`, error);
       return defaultValue;
     }
   },
 
-  yaz: (key, value) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      console.error(`❌ KASA: LocalStorage yazma hatası (${key}):`, error);
-      return false;
-    }
-  },
-
   // --------------------------------------------------
-  // KASA HAREKETİ KAYIT FONKSİYONLARI
-  // --------------------------------------------------
-  
-  /**
-   * Yeni kasa hareketi ekle
-   */
-  hareketEkle: (hareketData) => {
-    console.log('💰 KASA: Yeni hareket ekleniyor', hareketData);
-    
-    const hareketler = kasaService.oku(KASA_HAREKETLERI_KEY, []);
-    
-    const yeniHareket = {
-      id: `kasa_${Date.now().toString()}`,
-      tarih: new Date().toISOString(),
-      ...hareketData,
-      createdAt: new Date().toISOString(),
-      userId: JSON.parse(localStorage.getItem("mc_user"))?.id || "unknown"
-    };
-    
-    hareketler.push(yeniHareket);
-    kasaService.yaz(KASA_HAREKETLERI_KEY, hareketler);
-    
-    // Event yayınla
-    syncService.emitEvent('KASA_HAREKETI_EKLENDI', yeniHareket);
-    
-    console.log('✅ KASA: Hareket eklendi', yeniHareket.id);
-    return yeniHareket;
-  },
-
-  /**
-   * Ödeme kaydı oluştur (Adisyon kapatıldığında)
-   */
-  odemeKaydet: (odemeData) => {
-    console.log('💰 KASA: Ödeme kaydediliyor', odemeData);
-    
-    const hareket = {
-      tip: KASA_TIPLERI.TAHISILAT,
-      altTip: odemeData.odemeTipi,
-      tutar: odemeData.tutar,
-      aciklama: `Adisyon #${odemeData.adisyonId} ödemesi`,
-      adisyonId: odemeData.adisyonId,
-      masaNo: odemeData.masaNo,
-      musteriAdi: odemeData.musteriAdi,
-      // KRİTİK: Ödeme tarihini kullan
-      odemeTarihi: odemeData.odemeTarihi || new Date().toISOString()
-    };
-    
-    // Hesaba yaz ise farklı kaydet
-    if (odemeData.odemeTipi === ODEME_TIPLERI.HESABA_YAZ) {
-      hareket.aciklama = `Hesaba yaz - Adisyon #${odemeData.adisyonId}`;
-      hareket.kasaGirisi = false; // Kasaya giriş değil
-    } else {
-      hareket.kasaGirisi = true; // Kasaya giriş var
-    }
-    
-    return kasaService.hareketEkle(hareket);
-  },
-
-  /**
-   * Gün başı kasa girişi (Admin tarafından)
-   */
-  gunBasiKasaEkle: (tutar, tarih = new Date().toISOString().split('T')[0]) => {
-    console.log('💰 KASA: Gün başı kasa ekleniyor', { tutar, tarih });
-    
-    const gunBasiKayitlari = kasaService.oku(GUN_BASI_KASA_KEY, []);
-    
-    // Aynı tarihte kayıt var mı kontrol et
-    const tarihKaydi = gunBasiKayitlari.find(k => k.tarih === tarih);
-    if (tarihKaydi) {
-      console.warn('⚠️ KASA: Bu tarihte zaten gün başı kasa kaydı var');
-      return null;
-    }
-    
-    const kayit = {
-      id: `gunbasi_${Date.now().toString()}`,
-      tarih: tarih,
-      tutar: tutar,
-      tip: KASA_TIPLERI.GUN_BASI,
-      createdAt: new Date().toISOString(),
-      userId: JSON.parse(localStorage.getItem("mc_user"))?.id || "unknown"
-    };
-    
-    gunBasiKayitlari.push(kayit);
-    kasaService.yaz(GUN_BASI_KASA_KEY, gunBasiKayitlari);
-    
-    // Kasa hareketi olarak da kaydet
-    kasaService.hareketEkle({
-      tip: KASA_TIPLERI.GUN_BASI,
-      tutar: tutar,
-      aciklama: `Gün başı kasa - ${tarih}`,
-      tarih: tarih + "T09:00:00" // Sabah 09:00
-    });
-    
-    syncService.emitEvent('GUN_BASI_KASA_GIRILDI', kayit);
-    
-    console.log('✅ KASA: Gün başı kasa eklendi', kayit.id);
-    return kayit;
-  },
-
-  /**
-   * Gün sonu kasa girişi (Admin tarafından)
-   */
-  gunSonuKasaEkle: (tutar, tarih = new Date().toISOString().split('T')[0]) => {
-    console.log('💰 KASA: Gün sonu kasa ekleniyor', { tutar, tarih });
-    
-    const gunSonuKayitlari = kasaService.oku(GUN_SONU_KASA_KEY, []);
-    
-    // Aynı tarihte kayıt var mı kontrol et
-    const tarihKaydi = gunSonuKayitlari.find(k => k.tarih === tarih);
-    if (tarihKaydi) {
-      console.warn('⚠️ KASA: Bu tarihte zaten gün sonu kasa kaydı var');
-      return null;
-    }
-    
-    const kayit = {
-      id: `gunsonu_${Date.now().toString()}`,
-      tarih: tarih,
-      tutar: tutar,
-      tip: KASA_TIPLERI.GUN_SONU,
-      createdAt: new Date().toISOString(),
-      userId: JSON.parse(localStorage.getItem("mc_user"))?.id || "unknown"
-    };
-    
-    gunSonuKayitlari.push(kayit);
-    kasaService.yaz(GUN_SONU_KASA_KEY, gunSonuKayitlari);
-    
-    // Kasa hareketi olarak da kaydet
-    kasaService.hareketEkle({
-      tip: KASA_TIPLERI.GUN_SONU,
-      tutar: tutar,
-      aciklama: `Gün sonu kasa - ${tarih}`,
-      tarih: tarih + "T23:00:00" // Akşam 23:00
-    });
-    
-    syncService.emitEvent('GUN_SONU_KASA_GIRILDI', kayit);
-    
-    console.log('✅ KASA: Gün sonu kasa eklendi', kayit.id);
-    return kayit;
-  },
-
-  // --------------------------------------------------
-  // RAPOR ALMA FONKSİYONLARI
+  // RAPOR ALMA FONKSİYONLARI (SADECE OKUMA)
   // --------------------------------------------------
   
   /**
    * Tarih aralığına göre kasa raporu getir
-   * KRİTİK: ÖDEME TARİHİNE göre filtreler
+   * KRITIK: syncService tarafından oluşturulan verileri okur
    */
   kasaRaporuGetir: (baslangicTarihi, bitisTarihi) => {
     console.log('💰 KASA: Rapor oluşturuluyor', { baslangicTarihi, bitisTarihi });
@@ -210,7 +65,7 @@ const kasaService = {
       return null;
     }
     
-    // Tüm hareketleri getir
+    // Tüm hareketleri getir (syncService'den)
     const tumHareketler = kasaService.oku(KASA_HAREKETLERI_KEY, []);
     
     // ÖDEME TARİHİNE göre filtrele
@@ -247,7 +102,8 @@ const kasaService = {
       nakit: 0,
       kart: 0,
       havale: 0,
-      hesabaYaz: 0
+      hesabaYaz: 0,
+      diger: 0
     };
     
     filtrelenmisHareketler
@@ -266,20 +122,25 @@ const kasaService = {
           case ODEME_TIPLERI.HESABA_YAZ:
             odemeDagilimi.hesabaYaz += parseFloat(h.tutar) || 0;
             break;
+          default:
+            odemeDagilimi.diger += parseFloat(h.tutar) || 0;
+            break;
         }
       });
     
     // Tahsilat türleri
     const tahsilatTurleri = {
       adisyonTahsilat: filtrelenmisHareketler
-        .filter(h => h.tip === KASA_TIPLERI.TAHISILAT && h.kasaGirisi === true)
+        .filter(h => h.tip === KASA_TIPLERI.TAHISILAT && h.kasaGirisi === true && !h.sonradanTahsilat)
         .reduce((sum, h) => sum + (parseFloat(h.tutar) || 0), 0),
       
       hesabaYazTahsilat: filtrelenmisHareketler
         .filter(h => h.altTip === ODEME_TIPLERI.HESABA_YAZ)
         .reduce((sum, h) => sum + (parseFloat(h.tutar) || 0), 0),
       
-      sonradanTahsilat: 0 // İleride eklenecek
+      sonradanTahsilat: filtrelenmisHareketler
+        .filter(h => h.sonradanTahsilat === true)
+        .reduce((sum, h) => sum + (parseFloat(h.tutar) || 0), 0)
     };
     
     // Kasa özeti
@@ -287,18 +148,41 @@ const kasaService = {
     const gunSonuKasa = filtrelenmisGunSonu.reduce((sum, k) => sum + (parseFloat(k.tutar) || 0), 0);
     const kasaFarki = (gunBasiKasa + toplamTahsilat) - gunSonuKasa;
     
+    // Hareket detayları
+    const hareketDetaylari = filtrelenmisHareketler.map(h => ({
+      id: h.id,
+      tarih: h.odemeTarihi || h.tarih,
+      tip: h.tip,
+      altTip: h.altTip,
+      tutar: parseFloat(h.tutar) || 0,
+      aciklama: h.aciklama,
+      masaNo: h.masaNo,
+      adisyonId: h.adisyonId,
+      musteriAdi: h.musteriAdi,
+      kasaGirisi: h.kasaGirisi,
+      sonradanTahsilat: h.sonradanTahsilat || false
+    }));
+    
     const rapor = {
-      hareketler: filtrelenmisHareketler,
+      hareketler: hareketDetaylari,
       kasaOzet: {
         gunBasiKasa,
         gunSonuKasa,
         toplamTahsilat,
-        kasaFarki
+        kasaFarki,
+        netKasa: gunBasiKasa + toplamTahsilat - gunSonuKasa
       },
       odemeDagilimi,
       tahsilatTurleri,
       gunBasiKayitlari: filtrelenmisGunBasi,
       gunSonuKayitlari: filtrelenmisGunSonu,
+      istatistikler: {
+        toplamHareket: filtrelenmisHareketler.length,
+        tahsilatHareket: filtrelenmisHareketler.filter(h => h.tip === KASA_TIPLERI.TAHISILAT).length,
+        gunBasiKayit: filtrelenmisGunBasi.length,
+        gunSonuKayit: filtrelenmisGunSonu.length,
+        ortalamaTahsilat: toplamTahsilat / (filtrelenmisHareketler.filter(h => h.tip === KASA_TIPLERI.TAHISILAT).length || 1)
+      },
       sorgu: {
         baslangicTarihi,
         bitisTarihi,
@@ -307,74 +191,212 @@ const kasaService = {
       }
     };
     
-    console.log('✅ KASA: Rapor oluşturuldu', rapor.sorgu);
+    console.log('✅ KASA: Rapor oluşturuldu', {
+      hareketSayisi: rapor.sorgu.hareketSayisi,
+      toplamTahsilat: rapor.kasaOzet.toplamTahsilat,
+      kasaFarki: rapor.kasaOzet.kasaFarki
+    });
+    
     return rapor;
   },
 
   // --------------------------------------------------
-  // EVENT DİNLEYİCİ KURULUMU
+  // ÖZEL RAPORLAR
   // --------------------------------------------------
   
   /**
-   * SyncService event'lerini dinlemeye başla
+   * Günlük kasa raporu
    */
-  initEventListeners: () => {
-    console.log('💰 KASA: Event listener\'lar kuruluyor...');
+  gunlukKasaRaporu: (tarih = null) => {
+    const targetDate = tarih || new Date().toISOString().split('T')[0];
+    return kasaService.kasaRaporuGetir(targetDate, targetDate);
+  },
+
+  /**
+   * Haftalık kasa raporu
+   */
+  haftalikKasaRaporu: (baslangicTarihi = null) => {
+    const today = new Date();
+    const startDate = baslangicTarihi ? new Date(baslangicTarihi) : new Date(today.setDate(today.getDate() - 7));
+    const endDate = new Date();
     
-    // Adisyon kapatıldığında ödemeyi kaydet
-    syncService.on('ADİSYON_GUNCELLENDİ', (data) => {
-      if (data.adisyon?.kapali === true && data.adisyon?.odemeler?.length > 0) {
-        console.log('💰 KASA: Adisyon kapatıldı, ödemeler kaydediliyor', data.adisyonId);
-        
-        data.adisyon.odemeler.forEach(odeme => {
-          kasaService.odemeKaydet({
-            adisyonId: data.adisyonId,
-            odemeTipi: odeme.tip,
-            tutar: odeme.tutar,
-            masaNo: data.adisyon?.masaNum || data.adisyon?.masaNo,
-            musteriAdi: data.adisyon?.musteriAdi,
-            // KRİTİK: Ödeme tarihi olarak şimdiki zamanı kullan
-            odemeTarihi: new Date().toISOString()
-          });
-        });
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+    
+    return kasaService.kasaRaporuGetir(startStr, endStr);
+  },
+
+  /**
+   * Aylık kasa raporu
+   */
+  aylikKasaRaporu: (yil = null, ay = null) => {
+    const today = new Date();
+    const targetYear = yil || today.getFullYear();
+    const targetMonth = ay !== null ? ay : today.getMonth() + 1;
+    
+    const startDate = new Date(targetYear, targetMonth - 1, 1);
+    const endDate = new Date(targetYear, targetMonth, 0);
+    
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+    
+    return kasaService.kasaRaporuGetir(startStr, endStr);
+  },
+
+  /**
+   * Ödeme tipine göre rapor
+   */
+  odemeTipiRaporu: (odemeTipi, baslangicTarihi, bitisTarihi) => {
+    const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
+    if (!rapor) return null;
+    
+    const filtrelenmisHareketler = rapor.hareketler.filter(h => 
+      h.altTip === odemeTipi
+    );
+    
+    const toplamTutar = filtrelenmisHareketler.reduce((sum, h) => sum + h.tutar, 0);
+    
+    return {
+      odemeTipi,
+      baslangicTarihi,
+      bitisTarihi,
+      hareketler: filtrelenmisHareketler,
+      toplamTutar,
+      ortalamaTutar: toplamTutar / (filtrelenmisHareketler.length || 1),
+      hareketSayisi: filtrelenmisHareketler.length,
+      yuzde: rapor.kasaOzet.toplamTahsilat > 0 ? 
+        (toplamTutar / rapor.kasaOzet.toplamTahsilat) * 100 : 0
+    };
+  },
+
+  // --------------------------------------------------
+  // İSTATİSTİK FONKSİYONLARI
+  // --------------------------------------------------
+  
+  /**
+   * En çok satış yapılan masalar
+   */
+  enCokSatisYapanMasalar: (baslangicTarihi, bitisTarihi, limit = 10) => {
+    const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
+    if (!rapor) return [];
+    
+    const masaSatislari = {};
+    
+    rapor.hareketler.forEach(h => {
+      if (h.masaNo && h.kasaGirisi === true) {
+        if (!masaSatislari[h.masaNo]) {
+          masaSatislari[h.masaNo] = {
+            masaNo: h.masaNo,
+            toplamTutar: 0,
+            hareketSayisi: 0
+          };
+        }
+        masaSatislari[h.masaNo].toplamTutar += h.tutar;
+        masaSatislari[h.masaNo].hareketSayisi++;
       }
     });
     
-    // Manuel ödeme alındığında (borç tahsilatı)
-    syncService.on('ODEME_ALINDI', (data) => {
-      console.log('💰 KASA: Manuel ödeme alındı', data);
-      
-      kasaService.odemeKaydet({
-        adisyonId: data.adisyonId || 'manuel',
-        odemeTipi: data.odemeTipi,
-        tutar: data.tutar,
-        masaNo: data.masaNo,
-        musteriAdi: data.musteriAdi,
-        odemeTarihi: data.odemeTarihi || new Date().toISOString()
-      });
+    return Object.values(masaSatislari)
+      .sort((a, b) => b.toplamTutar - a.toplamTutar)
+      .slice(0, limit);
+  },
+
+  /**
+   * En çok harcama yapan müşteriler
+   */
+  enCokHarcamaYapanMusteriler: (baslangicTarihi, bitisTarihi, limit = 10) => {
+    const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
+    if (!rapor) return [];
+    
+    const musteriHarcamalari = {};
+    
+    rapor.hareketler.forEach(h => {
+      if (h.musteriAdi && h.kasaGirisi === true) {
+        const musteriAdi = h.musteriAdi.trim();
+        if (!musteriHarcamalari[musteriAdi]) {
+          musteriHarcamalari[musteriAdi] = {
+            musteriAdi: musteriAdi,
+            toplamTutar: 0,
+            hareketSayisi: 0
+          };
+        }
+        musteriHarcamalari[musteriAdi].toplamTutar += h.tutar;
+        musteriHarcamalari[musteriAdi].hareketSayisi++;
+      }
     });
     
-    console.log('✅ KASA: Event listener\'lar kuruldu');
+    return Object.values(musteriHarcamalari)
+      .sort((a, b) => b.toplamTutar - a.toplamTutar)
+      .slice(0, limit);
+  },
+
+  /**
+   * Saatlik satış analizi
+   */
+  saatlikSatisAnalizi: (baslangicTarihi, bitisTarihi) => {
+    const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
+    if (!rapor) return [];
+    
+    const saatlikAnaliz = Array.from({ length: 24 }, (_, i) => ({
+      saat: i,
+      toplamTutar: 0,
+      hareketSayisi: 0
+    }));
+    
+    rapor.hareketler.forEach(h => {
+      if (h.kasaGirisi === true && h.tarih) {
+        const saat = new Date(h.tarih).getHours();
+        if (saat >= 0 && saat < 24) {
+          saatlikAnaliz[saat].toplamTutar += h.tutar;
+          saatlikAnaliz[saat].hareketSayisi++;
+        }
+      }
+    });
+    
+    return saatlikAnaliz.filter(s => s.hareketSayisi > 0);
+  },
+
+  // --------------------------------------------------
+  // EVENT DİNLEYİCİ KURULUMU (SADECE LOGLAMA)
+  // --------------------------------------------------
+  
+  /**
+   * SyncService event'lerini dinlemeye başla (SADECE LOGLAMA)
+   */
+  initEventListeners: () => {
+    console.log('💰 KASA: Event listener\'lar kuruluyor (sadece loglama)...');
+    
+    // SyncService'in gönderdiği kasa event'lerini dinle (SADECE LOGLAMA)
+    if (typeof window !== 'undefined' && window.syncService) {
+      // Kasa hareketi eklendiğinde logla
+      window.syncService.on('KASA_HAREKETI_EKLENDI', (hareket) => {
+        console.log('💰 KASA: SyncService kasa hareketi ekledi', {
+          id: hareket.id,
+          tip: hareket.tip,
+          tutar: hareket.tutar,
+          tarih: hareket.odemeTarihi || hareket.tarih
+        });
+      });
+      
+      // Ödeme alındığında logla
+      window.syncService.on('ODEME_ALINDI', (odeme) => {
+        console.log('💰 KASA: SyncService ödeme kaydetti', {
+          id: odeme.id,
+          adisyonId: odeme.adisyonId,
+          tutar: odeme.tutar,
+          tip: odeme.altTip
+        });
+      });
+      
+      console.log('✅ KASA: Event listener\'lar kuruldu (sadece loglama)');
+    } else {
+      console.warn('⚠️ KASA: SyncService bulunamadı, event listener\'lar kurulamadı');
+    }
   },
 
   // --------------------------------------------------
   // YARDIMCI FONKSİYONLAR
   // --------------------------------------------------
-  
-  /**
-   * Kasa hareketlerini temizle (sadece admin)
-   */
-  hareketleriTemizle: () => {
-    const user = JSON.parse(localStorage.getItem("mc_user"));
-    if (!user || !["ADMIN", "SUPER_ADMIN"].includes(user.role)) {
-      console.error('❌ KASA: Yetkisiz işlem');
-      return false;
-    }
-    
-    kasaService.yaz(KASA_HAREKETLERI_KEY, []);
-    console.log('✅ KASA: Tüm hareketler temizlendi');
-    return true;
-  },
   
   /**
    * Bugünün kasa durumunu getir
@@ -384,29 +406,110 @@ const kasaService = {
     return kasaService.kasaRaporuGetir(bugun, bugun);
   },
 
+  /**
+   * Kasa bakiyesini hesapla
+   */
+  kasaBakiyesiHesapla: (tarih = null) => {
+    const targetDate = tarih || new Date().toISOString().split('T')[0];
+    
+    const gunBasiKayitlari = kasaService.oku(GUN_BASI_KASA_KEY, []);
+    const gunSonuKayitlari = kasaService.oku(GUN_SONU_KASA_KEY, []);
+    const kasaHareketleri = kasaService.oku(KASA_HAREKETLERI_KEY, []);
+    
+    // Bugünkü gün başı kasa
+    const bugununGunBasi = gunBasiKayitlari.find(k => k.tarih === targetDate);
+    const gunBasiTutar = bugununGunBasi ? parseFloat(bugununGunBasi.tutar) : 0;
+    
+    // Bugünkü tahsilatlar
+    const bugununTahsilatlari = kasaHareketleri
+      .filter(h => {
+        const hareketTarihi = (h.odemeTarihi || h.tarih).split('T')[0];
+        return hareketTarihi === targetDate && h.kasaGirisi === true;
+      })
+      .reduce((sum, h) => sum + (parseFloat(h.tutar) || 0), 0);
+    
+    // Bugünkü gün sonu kasa
+    const bugununGunSonu = gunSonuKayitlari.find(k => k.tarih === targetDate);
+    const gunSonuTutar = bugununGunSonu ? parseFloat(bugununGunSonu.tutar) : 0;
+    
+    return {
+      tarih: targetDate,
+      gunBasi: gunBasiTutar,
+      tahsilat: bugununTahsilatlari,
+      gunSonu: gunSonuTutar,
+      beklenenKasa: gunBasiTutar + bugununTahsilatlari,
+      fark: (gunBasiTutar + bugununTahsilatlari) - gunSonuTutar,
+      tamamlandi: bugununGunSonu !== undefined
+    };
+  },
+
+  /**
+   * Eksik gün sonu kontrolleri
+   */
+  eksikGunSonuKontrolu: (baslangicTarihi = null, bitisTarihi = null) => {
+    const start = baslangicTarihi || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+    const end = bitisTarihi || new Date().toISOString().split('T')[0];
+    
+    const gunBasiKayitlari = kasaService.oku(GUN_BASI_KASA_KEY, []);
+    const gunSonuKayitlari = kasaService.oku(GUN_SONU_KASA_KEY, []);
+    
+    // Tarih aralığındaki tüm tarihler
+    const tumTarihler = [];
+    const currentDate = new Date(start);
+    const endDate = new Date(end);
+    
+    while (currentDate <= endDate) {
+      tumTarihler.push(currentDate.toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Eksik gün sonu bul
+    const eksikGunSonu = tumTarihler.filter(tarih => {
+      const gunBasiVar = gunBasiKayitlari.some(k => k.tarih === tarih);
+      const gunSonuVar = gunSonuKayitlari.some(k => k.tarih === tarih);
+      return gunBasiVar && !gunSonuVar;
+    });
+    
+    return {
+      baslangicTarihi: start,
+      bitisTarihi: end,
+      toplamGun: tumTarihler.length,
+      eksikGunSonu: eksikGunSonu,
+      eksikSayisi: eksikGunSonu.length,
+      tamamGunSonu: tumTarihler.length - eksikGunSonu.length
+    };
+  },
+
   // --------------------------------------------------
   // SERVİS BAŞLATMA
   // --------------------------------------------------
   init: () => {
     console.log('🚀 KASA: KasaService başlatılıyor...');
     
-    // LocalStorage key'lerini kontrol et, yoksa oluştur
-    if (!localStorage.getItem(KASA_HAREKETLERI_KEY)) {
-      kasaService.yaz(KASA_HAREKETLERI_KEY, []);
-    }
+    // LocalStorage key'lerini kontrol et (syncService ile senkron)
+    const requiredKeys = [
+      KASA_HAREKETLERI_KEY,
+      GUN_BASI_KASA_KEY,
+      GUN_SONU_KASA_KEY
+    ];
     
-    if (!localStorage.getItem(GUN_BASI_KASA_KEY)) {
-      kasaService.yaz(GUN_BASI_KASA_KEY, []);
-    }
+    requiredKeys.forEach(key => {
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, JSON.stringify([]));
+        console.log(`📦 KASA: ${key} key oluşturuldu`);
+      }
+    });
     
-    if (!localStorage.getItem(GUN_SONU_KASA_KEY)) {
-      kasaService.yaz(GUN_SONU_KASA_KEY, []);
-    }
-    
-    // Event listener'ları kur
+    // Event listener'ları kur (sadece loglama için)
     kasaService.initEventListeners();
     
-    console.log('✅ KASA: KasaService başlatıldı');
+    // Global yap
+    if (typeof window !== 'undefined') {
+      window.kasaService = kasaService;
+      console.log('✅ KASA: KasaService global olarak yüklendi');
+    }
+    
+    console.log('✅ KASA: KasaService başlatıldı (SADECE OKUMA MODU)');
     return true;
   }
 };
@@ -415,7 +518,8 @@ const kasaService = {
 if (typeof window !== 'undefined') {
   setTimeout(() => {
     kasaService.init();
-  }, 1000);
+  }, 1500);
 }
 
 export default kasaService;
+export { KASA_TIPLERI, ODEME_TIPLERI };

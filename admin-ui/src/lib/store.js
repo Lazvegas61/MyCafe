@@ -93,7 +93,7 @@ export function saveMusteriler(list) {
 }
 
 // -------------------------
-// ADİSYONLAR
+// ADISYONLAR
 // -------------------------
 export function getAdisyonlar() {
   return readJSON(KEY_ADISYONLAR, []);

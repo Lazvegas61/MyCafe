@@ -12,7 +12,7 @@ import {
 
 /**
  * Tarihe göre hareketleri filtrele
- * KRİTİK: Ödeme tarihine göre filtreler
+ * KRITIK: Ödeme tarihine göre filtreler
  */
 export const tariheGoreFiltrele = (hareketler, baslangicTarihi, bitisTarihi) => {
   if (!baslangicTarihi || !bitisTarihi) return [];
@@ -140,7 +140,7 @@ export const kasaFarkiDurumuBelirle = (kasaFarki) => {
   } else {
     return {
       durum: KASA_FARK_DURUMLARI.KRITIK,
-      mesaj: `KRİTİK: ${fark.toFixed(2)} TL fark`,
+      mesaj: `KRITIK: ${fark.toFixed(2)} TL fark`,
       renk: "#EF4444", // Kırmızı
       ikon: "🚨"
     };

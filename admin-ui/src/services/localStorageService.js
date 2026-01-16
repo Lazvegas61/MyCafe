@@ -1,8 +1,16 @@
+// File: admin-ui/src/services/localStorageService.js
+/* ------------------------------------------------------------
+   📦 localStorageService.js — MyCafe LocalStorage Yönetimi
+   📌 TÜM localStorage key'lerini merkezi yönetir
+   📌 STANDART KEY_MAP ile tutarlılık sağlar
+------------------------------------------------------------ */
+
 /**
- * MyCafe LocalStorage Rapor Servisi - GÜNCELLENDİ
+ * MyCafe LocalStorage Rapor Servisi - GUNCELLENDI
  */
 class LocalStorageService {
   constructor() {
+    // STANDART KEY_MAP - Tüm uygulama burada tanımlı key'leri kullanmalı
     this.KEY_MAP = {
       // Temel veriler
       masalar: 'mc_masalar',
@@ -14,18 +22,34 @@ class LocalStorageService {
       musteriler: 'mc_musteriler',
       giderler: 'mc_giderler',
       
-      // Kasa ve rapor verileri
+      // Kasa ve rapor verileri - STANDARTLAŞTIRILDI
       kasa_hareketleri: 'mc_kasa_hareketleri',
-      kasa_hareketleri_key: 'mc_kasa_hareketleri', // syncService uyumu için
+      gun_basi_kasa: 'mc_gun_basi_kasa',
+      gun_sonu_kasa: 'mc_gun_sonu_kasa',
       gun_sonu_listesi: 'mc_gun_sonu_listesi',
       gunsonu_raporlar: 'mc_gunsonu_raporlar',
-      bilardo_adisyonlar: 'mc_bilardo_adisyonlar',
+      
+      // Bilardo verileri - STANDARTLAŞTIRILDI
+      bilardo_adisyonlar: 'bilardo_adisyonlar',
+      bilardo: 'bilardo',
+      bilardo_ucretleri: 'bilardo_ucretleri',
+      
+      // Borçlar
       borclar: 'mc_borclar',
       
-      // Gün başı/sonu kasaları
-      gun_basi_kasa: 'mc_gun_basi_kasa',
-      gun_sonu_kasa: 'mc_gun_sonu_kasa'
+      // Stok
+      stok: 'mc_stok',
+      
+      // Diğer
+      kasa: 'mc_kasalar',
+      acik_bilardo_adisyonlar: 'acik_bilardo_adisyonlar'
     };
+
+    // Global erişim için kendini window'a ekle
+    if (typeof window !== 'undefined') {
+      window.localStorageService = this;
+      console.log('✅ localStorageService global olarak yüklendi');
+    }
   }
 
   // Ham veriyi getir
@@ -38,6 +62,23 @@ class LocalStorageService {
       console.error(`❌ localStorageService.get hatası (${key}):`, error);
       return [];
     }
+  }
+
+  // Veriyi kaydet
+  set(key, value) {
+    const storageKey = this.KEY_MAP[key] || key;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.error(`❌ localStorageService.set hatası (${key}):`, error);
+      return false;
+    }
+  }
+
+  // Key'e göre direkt get (alternatif kullanım)
+  getByKey(storageKey) {
+    return this.get(storageKey);
   }
 
   // Tüm verileri getir
@@ -98,6 +139,107 @@ class LocalStorageService {
     });
     console.groupEnd();
   }
+
+  // Key kontrolü
+  hasKey(key) {
+    return localStorage.getItem(key) !== null;
+  }
+
+  // Key silme
+  remove(key) {
+    const storageKey = this.KEY_MAP[key] || key;
+    try {
+      localStorage.removeItem(storageKey);
+      return true;
+    } catch (error) {
+      console.error(`❌ localStorageService.remove hatası (${key}):`, error);
+      return false;
+    }
+  }
+
+  // Tüm key'leri temizle (sadece mc_ ile başlayanlar)
+  clearAllMcKeys() {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('mc_') || key.startsWith('bilardo')) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('🧹 Tüm mc_ ve bilardo key\'leri temizlendi');
+    return true;
+  }
+
+  // Key'den kategoriyi bul (ters arama)
+  findCategoryByKey(storageKey) {
+    for (const [category, key] of Object.entries(this.KEY_MAP)) {
+      if (key === storageKey) {
+        return category;
+      }
+    }
+    return null;
+  }
+
+  // Veri boyutunu hesapla
+  getDataSize(key) {
+    const storageKey = this.KEY_MAP[key] || key;
+    const data = localStorage.getItem(storageKey);
+    if (!data) return 0;
+    
+    // Byte cinsinden boyut
+    return new Blob([data]).size;
+  }
+
+  // Tüm verilerin toplam boyutu
+  getTotalSize() {
+    let total = 0;
+    Object.keys(localStorage).forEach(key => {
+      const data = localStorage.getItem(key);
+      if (data) {
+        total += new Blob([data]).size;
+      }
+    });
+    return total;
+  }
+
+  // Backup al
+  backup() {
+    const backup = {};
+    Object.keys(this.KEY_MAP).forEach(key => {
+      backup[key] = this.get(key);
+    });
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupKey = `mc_backup_${timestamp}`;
+    
+    localStorage.setItem(backupKey, JSON.stringify(backup));
+    console.log(`💾 Backup alındı: ${backupKey}`);
+    return backupKey;
+  }
+
+  // Backup'dan geri yükle
+  restore(backupKey) {
+    try {
+      const backupData = JSON.parse(localStorage.getItem(backupKey));
+      if (!backupData) {
+        console.error('❌ Backup bulunamadı:', backupKey);
+        return false;
+      }
+      
+      Object.keys(backupData).forEach(key => {
+        if (this.KEY_MAP[key]) {
+          this.set(key, backupData[key]);
+        }
+      });
+      
+      console.log(`🔙 Backup geri yüklendi: ${backupKey}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Backup geri yükleme hatası:', error);
+      return false;
+    }
+  }
 }
 
-export default new LocalStorageService();
+// Singleton instance oluştur
+const localStorageService = new LocalStorageService();
+
+export default localStorageService;

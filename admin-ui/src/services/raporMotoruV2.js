@@ -1,8 +1,112 @@
-// File: admin-ui/src/services/raporMotoruV2.js
+/* ------------------------------------------------------------
+   📊 raporMotoruV2.js — MyCafe Raporlama Motoru
+   📌 GUNCELLENDI: Tarih standardizasyonu, Bilardo net ayrımı
+   📌 localStorageService entegrasyonu eklendi
+------------------------------------------------------------ */
+
 import localStorageService from './localStorageService';
 
 const raporMotoruV2 = {
   
+  // YARDIMCI FONKSİYON: Tarih alanı standardizasyonu
+  getItemDate: (item) => {
+    if (!item) return new Date();
+    
+    // ÖNCELİK SIRASI (KRITIK):
+    // 1. odemeTarihi (kasa hareketleri için - EN GÜVENİLİR)
+    // 2. kapanisZamani (adisyonda ödeme tarihi)
+    // 3. tarih (genel tarih alanı)
+    // 4. acilisZamani (son çare)
+    // 5. createdAt (en son çare)
+    
+    if (item.odemeTarihi) {
+      const date = new Date(item.odemeTarihi);
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    if (item.kapanisZamani) {
+      const date = new Date(item.kapanisZamani);
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    if (item.tarih) {
+      const date = new Date(item.tarih);
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    if (item.acilisZamani) {
+      const date = new Date(item.acilisZamani);
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    if (item.createdAt) {
+      const date = new Date(item.createdAt);
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    // Hiçbiri geçerli değilse bugün
+    return new Date();
+  },
+
+  // YARDIMCI FONKSİYON: Bilardo adisyonu kontrolü
+  isBilardoAdisyon: (adisyon) => {
+    if (!adisyon) return false;
+    
+    // 1. Özel tur alanı (EN GÜVENİLİR)
+    if (adisyon.tur === 'BİLARDO' || adisyon.tur === 'bilardo') return true;
+    
+    // 2. Masa numarası B ile başlıyorsa
+    const masaNo = adisyon.masaNo || adisyon.masaNum || '';
+    const masaStr = masaNo.toString().toUpperCase();
+    if (masaStr.startsWith('B')) return true;
+    
+    // 3. Masa tipi alanı
+    if (adisyon.masaTipi === 'BİLARDO' || adisyon.masaTipi === 'bilardo') return true;
+    
+    // 4. isBilardo flag'i
+    if (adisyon.isBilardo === true) return true;
+    
+    // 5. Bilardo ücreti varsa
+    if (adisyon.bilardoUcret || adisyon.bilardoUcreti) return true;
+    
+    // 6. SyncService'de bilardo olarak işaretlenmişse
+    if (typeof window !== 'undefined' && window.syncService) {
+      const masa = window.syncService.masaBul(masaNo);
+      if (masa && masa.isBilardo === true) return true;
+    }
+    
+    return false;
+  },
+
+  // Tarihe göre filtreleme (GUNCELLENDI)
+  filterByDate: (data, startDate, endDate) => {
+    if (!data || !Array.isArray(data)) return [];
+    
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    
+    // Tarihleri normalize et
+    if (start) start.setHours(0, 0, 0, 0);
+    if (end) end.setHours(23, 59, 59, 999);
+    
+    return data.filter(item => {
+      if (!item) return false;
+      
+      // STANDART TARİH FONKSİYONUNU KULLAN
+      const itemDate = raporMotoruV2.getItemDate(item);
+      if (isNaN(itemDate.getTime())) return false;
+      
+      // Tarih karşılaştırması
+      const itemDateOnly = new Date(itemDate);
+      itemDateOnly.setHours(0, 0, 0, 0);
+      
+      if (start && itemDateOnly < start) return false;
+      if (end && itemDateOnly > end) return false;
+      
+      return true;
+    });
+  },
+
   // GÜN SONU RAPORU HESAPLAMA
   gunSonuRaporuHesapla(gunSonuRaporlari) {
     try {
@@ -34,15 +138,18 @@ const raporMotoruV2 = {
 
         // Masa detayları
         if (rapor.masaNo || rapor.masaNum) {
+          const isBilardo = this.isBilardoAdisyon(rapor);
+          
           masaDetaylari.push({
             masaNo: rapor.masaNo || rapor.masaNum,
-            masaTipi: rapor.masaTipi || (rapor.masaNo?.startsWith('B') ? 'BİLARDO' : 'NORMAL'),
+            masaTipi: isBilardo ? 'BİLARDO' : 'NORMAL',
             acilisZamani: rapor.acilisZamani || rapor.acilisSaati,
-            kapanisZamani: rapor.odemeTarihi || rapor.kapanisZamani,
+            kapanisZamani: this.getItemDate(rapor).toISOString(), // STANDART TARİH
             toplamTutar: raporToplam,
             odemeTipi: rapor.odemeTipi || this.odemeTipiBelirle(rapor),
             durum: rapor.durum || 'KAPALI',
-            urunSayisi: rapor.urunler?.length || 0
+            urunSayisi: rapor.urunler?.length || 0,
+            isBilardo: isBilardo // BİLARDO FLAG EKLENDİ
           });
         }
 
@@ -88,6 +195,10 @@ const raporMotoruV2 = {
         hesap: toplamHesap
       };
 
+      // Bilardo/Normal ayrımı
+      const bilardoMasalar = masaDetaylari.filter(m => m.isBilardo);
+      const normalMasalar = masaDetaylari.filter(m => !m.isBilardo);
+
       return {
         toplamCiro,
         netCiro: toplamCiro - toplamIndirim,
@@ -98,7 +209,12 @@ const raporMotoruV2 = {
         toplamMasaSayisi: masaDetaylari.length,
         aktifMasaSayisi: masaDetaylari.filter(m => m.durum === 'DOLU' || m.durum === 'ACIK').length,
         ortalamaMasaTutari: masaDetaylari.length > 0 ? toplamCiro / masaDetaylari.length : 0,
-        toplamUrunAdedi: Object.values(urunSatislari).reduce((sum, u) => sum + u.satisAdedi, 0)
+        toplamUrunAdedi: Object.values(urunSatislari).reduce((sum, u) => sum + u.satisAdedi, 0),
+        // BİLARDO/NORMAL AYRIMI EKLENDİ
+        bilardoMasaSayisi: bilardoMasalar.length,
+        normalMasaSayisi: normalMasalar.length,
+        bilardoCiro: bilardoMasalar.reduce((sum, m) => sum + m.toplamTutar, 0),
+        normalCiro: normalMasalar.reduce((sum, m) => sum + m.toplamTutar, 0)
       };
     } catch (error) {
       console.error('Gün sonu raporu hesaplama hatası:', error);
@@ -106,7 +222,7 @@ const raporMotoruV2 = {
     }
   },
 
-  // KASA RAPORU HESAPLAMA
+  // KASA RAPORU HESAPLAMA (GUNCELLENDI - STANDART TARİH KULLANIMI)
   kasaRaporuHesapla(gunSonuRaporlari) {
     try {
       if (!gunSonuRaporlari || gunSonuRaporlari.length === 0) {
@@ -122,7 +238,8 @@ const raporMotoruV2 = {
 
       // Gün sonu raporlarından gelirleri hesapla
       gunSonuRaporlari.forEach(rapor => {
-        const tarih = new Date(rapor.odemeTarihi || rapor.kapanisZamani);
+        // STANDART TARİH FONKSİYONUNU KULLAN
+        const tarih = this.getItemDate(rapor);
         const gunKey = tarih.toISOString().split('T')[0]; // YYYY-MM-DD formatı
         
         const nakit = parseFloat(rapor.nakitOdeme || rapor.nakit || 0);
@@ -153,19 +270,12 @@ const raporMotoruV2 = {
         }
       });
 
-      // Giderleri hesapla
+      // Giderleri hesapla - localStorageService KULLAN
       const giderler = localStorageService.get('mc_giderler') || [];
-      const filtrelenmisGiderler = giderler.filter(gider => {
-        const giderTarihi = new Date(gider.tarih);
-        const enEskiRapor = new Date(Math.min(...gunSonuRaporlari.map(r => 
-          new Date(r.odemeTarihi || r.kapanisZamani).getTime()
-        )));
-        const enYeniRapor = new Date(Math.max(...gunSonuRaporlari.map(r => 
-          new Date(r.odemeTarihi || r.kapanisZamani).getTime()
-        )));
-        
-        return giderTarihi >= enEskiRapor && giderTarihi <= enYeniRapor;
-      });
+      
+      // Tarih aralığı filtrelemesi
+      const tarihAraligi = this.getTarihAraligi(gunSonuRaporlari);
+      const filtrelenmisGiderler = this.filterByDate(giderler, tarihAraligi.start, tarihAraligi.end);
 
       const toplamGider = filtrelenmisGiderler.reduce((sum, gider) => 
         sum + parseFloat(gider.tutar || 0), 0
@@ -218,6 +328,7 @@ const raporMotoruV2 = {
         return this.bosRaporOlustur('urun');
       }
 
+      // localStorageService KULLAN
       const urunler = localStorageService.get('mc_urunler') || [];
       const kategoriler = localStorageService.get('mc_kategoriler') || [];
       
@@ -363,6 +474,7 @@ const raporMotoruV2 = {
         return this.bosRaporOlustur('kategori');
       }
 
+      // localStorageService KULLAN
       const kategoriler = localStorageService.get('mc_kategoriler') || [];
       const urunler = localStorageService.get('mc_urunler') || [];
       
@@ -517,13 +629,14 @@ const raporMotoruV2 = {
     }
   },
 
-  // MASA RAPORU HESAPLAMA
+  // MASA RAPORU HESAPLAMA (GUNCELLENDI - BİLARDO NET AYRIMI)
   masaRaporuHesapla(gunSonuRaporlari) {
     try {
       if (!gunSonuRaporlari || gunSonuRaporlari.length === 0) {
         return this.bosRaporOlustur('masa');
       }
 
+      // localStorageService KULLAN
       const masalar = localStorageService.get('mc_masalar') || [];
       let masaPerformanslari = {};
       let toplamCiro = 0;
@@ -533,15 +646,16 @@ const raporMotoruV2 = {
       // Masa performanslarını hesapla
       gunSonuRaporlari.forEach(rapor => {
         const masaNo = rapor.masaNo || rapor.masaNum;
-        const masaTipi = rapor.masaTipi || (masaNo?.startsWith('B') ? 'BİLARDO' : 'NORMAL');
+        const isBilardo = this.isBilardoAdisyon(rapor); // BİLARDO KONTROLÜ
+        const masaTipi = isBilardo ? 'BİLARDO' : 'NORMAL';
         const toplamTutar = parseFloat(rapor.toplamTutar || rapor.toplam || 0);
         const acilisZamani = new Date(rapor.acilisZamani || rapor.acilisSaati);
-        const kapanisZamani = new Date(rapor.odemeTarihi || rapor.kapanisZamani);
+        const kapanisZamani = this.getItemDate(rapor); // STANDART TARİH
         const sureDakika = (kapanisZamani - acilisZamani) / (1000 * 60);
 
         toplamCiro += toplamTutar;
 
-        if (masaTipi === 'BİLARDO') {
+        if (isBilardo) {
           bilardoMasaToplamCiro += toplamTutar;
         } else {
           normalMasaToplamCiro += toplamTutar;
@@ -557,7 +671,8 @@ const raporMotoruV2 = {
               toplamSure: 0,
               ortalamaTutar: 0,
               ortalamaSure: 0,
-              sonKullanim: null
+              sonKullanim: null,
+              isBilardo: isBilardo // FLAG EKLENDİ
             };
           }
 
@@ -595,9 +710,9 @@ const raporMotoruV2 = {
         .sort((a, b) => b.toplamTutar - a.toplamTutar)
         .slice(0, 10);
 
-      // Masa doluluk analizi
-      const normalMasalar = masalar.filter(m => !m.no?.startsWith('B'));
-      const bilardoMasalar = masalar.filter(m => m.no?.startsWith('B'));
+      // Masa doluluk analizi - BİLARDO/NORMAL AYRIMI
+      const normalMasalar = masalar.filter(m => !this.isBilardoAdisyon(m));
+      const bilardoMasalar = masalar.filter(m => this.isBilardoAdisyon(m));
       
       const normalMasaDolu = normalMasalar.filter(m => m.durum === 'DOLU').length;
       const bilardoMasaDolu = bilardoMasalar.filter(m => m.durum === 'DOLU').length;
@@ -610,10 +725,10 @@ const raporMotoruV2 = {
 
       // Masa kullanım oranları
       const normalMasaKullanimOrani = normalMasalar.length > 0 ? 
-        (Object.values(masaPerformanslari).filter(m => m.masaTipi === 'NORMAL').length / normalMasalar.length) * 100 : 0;
+        (Object.values(masaPerformanslari).filter(m => !m.isBilardo).length / normalMasalar.length) * 100 : 0;
       
       const bilardoMasaKullanimOrani = bilardoMasalar.length > 0 ? 
-        (Object.values(masaPerformanslari).filter(m => m.masaTipi === 'BİLARDO').length / bilardoMasalar.length) * 100 : 0;
+        (Object.values(masaPerformanslari).filter(m => m.isBilardo).length / bilardoMasalar.length) * 100 : 0;
 
       return {
         toplamMasa: masalar.length,
@@ -623,29 +738,29 @@ const raporMotoruV2 = {
         normalMasaToplamCiro,
         bilardoMasaToplamCiro,
         normalMasaOrtalamaCiro: Object.values(masaPerformanslari)
-          .filter(m => m.masaTipi === 'NORMAL').length > 0 ?
+          .filter(m => !m.isBilardo).length > 0 ?
           Object.values(masaPerformanslari)
-            .filter(m => m.masaTipi === 'NORMAL')
+            .filter(m => !m.isBilardo)
             .reduce((sum, masa) => sum + masa.toplamTutar, 0) / 
-          Object.values(masaPerformanslari).filter(m => m.masaTipi === 'NORMAL').length : 0,
+          Object.values(masaPerformanslari).filter(m => !m.isBilardo).length : 0,
         bilardoMasaOrtalamaCiro: Object.values(masaPerformanslari)
-          .filter(m => m.masaTipi === 'BİLARDO').length > 0 ?
+          .filter(m => m.isBilardo).length > 0 ?
           Object.values(masaPerformanslari)
-            .filter(m => m.masaTipi === 'BİLARDO')
+            .filter(m => m.isBilardo)
             .reduce((sum, masa) => sum + masa.toplamTutar, 0) / 
-          Object.values(masaPerformanslari).filter(m => m.masaTipi === 'BİLARDO').length : 0,
+          Object.values(masaPerformanslari).filter(m => m.isBilardo).length : 0,
         normalMasaOrtalamaSure: Object.values(masaPerformanslari)
-          .filter(m => m.masaTipi === 'NORMAL').length > 0 ?
+          .filter(m => !m.isBilardo).length > 0 ?
           Object.values(masaPerformanslari)
-            .filter(m => m.masaTipi === 'NORMAL')
+            .filter(m => !m.isBilardo)
             .reduce((sum, masa) => sum + masa.toplamSure, 0) / 
-          Object.values(masaPerformanslari).filter(m => m.masaTipi === 'NORMAL').length : 0,
+          Object.values(masaPerformanslari).filter(m => !m.isBilardo).length : 0,
         bilardoMasaOrtalamaSure: Object.values(masaPerformanslari)
-          .filter(m => m.masaTipi === 'BİLARDO').length > 0 ?
+          .filter(m => m.isBilardo).length > 0 ?
           Object.values(masaPerformanslari)
-            .filter(m => m.masaTipi === 'BİLARDO')
+            .filter(m => m.isBilardo)
             .reduce((sum, masa) => sum + masa.toplamSure, 0) / 
-          Object.values(masaPerformanslari).filter(m => m.masaTipi === 'BİLARDO').length : 0,
+          Object.values(masaPerformanslari).filter(m => m.isBilardo).length : 0,
         masaDetaylari,
         enCokKullanilanMasalar,
         enCokCiroYapanMasalar,
@@ -667,19 +782,19 @@ const raporMotoruV2 = {
     }
   },
 
-  // BİLARDO RAPORU HESAPLAMA
+  // BİLARDO RAPORU HESAPLAMA (GUNCELLENDI - NET AYRIM)
   bilardoRaporuHesapla(gunSonuRaporlari, bilardoAdisyonlar) {
     try {
-      // Bilardo masalarını filtrele
+      // Bilardo masalarını filtrele - YENİ FONKSİYONU KULLAN
       const bilardoRaporlari = gunSonuRaporlari.filter(rapor => 
-        rapor.masaTipi === 'bilardo' || rapor.tur === 'BİLARDO' || rapor.masaNo?.startsWith('B')
+        this.isBilardoAdisyon(rapor) // NET AYRIM
       );
 
       if (bilardoRaporlari.length === 0 && (!bilardoAdisyonlar || bilardoAdisyonlar.length === 0)) {
         return this.bosRaporOlustur('bilardo');
       }
 
-      // Bilardo masaları
+      // localStorageService KULLAN
       const bilardoMasalar = localStorageService.get('bilardo') || [];
       const ucretAyarlari = localStorageService.get('bilardo_ucretleri') || {
         bilardo30dk: 80,
@@ -708,7 +823,7 @@ const raporMotoruV2 = {
         const toplamTutar = parseFloat(rapor.toplamTutar || rapor.toplam || 0);
         const masaNo = rapor.masaNo || rapor.masaNum;
         const sureTipi = rapor.sureTipi || 'dakika';
-        const tarih = new Date(rapor.odemeTarihi || rapor.kapanisZamani);
+        const tarih = this.getItemDate(rapor); // STANDART TARİH
         const saat = tarih.getHours();
 
         toplamGelir += toplamTutar;
@@ -735,7 +850,8 @@ const raporMotoruV2 = {
               toplamSaat: 0,
               ortalamaGelir: 0,
               ortalamaSaat: 0,
-              sonKullanim: null
+              sonKullanim: null,
+              isBilardo: true // FLAG EKLENDİ
             };
           }
 
@@ -746,7 +862,7 @@ const raporMotoruV2 = {
           
           // Süre hesapla
           const acilisZamani = new Date(rapor.acilisZamani || rapor.acilisSaati);
-          const kapanisZamani = new Date(rapor.odemeTarihi || rapor.kapanisZamani);
+          const kapanisZamani = this.getItemDate(rapor);
           const sureSaat = (kapanisZamani - acilisZamani) / (1000 * 60 * 60);
           masaPerformanslari[masaNo].toplamSaat += sureSaat;
           masaPerformanslari[masaNo].ortalamaSaat = 
@@ -835,7 +951,8 @@ const raporMotoruV2 = {
           tahminiUcret,
           sonKullanim: performans.sonKullanim,
           kullanimSayisi: performans.kullanimSayisi,
-          toplamGelir: performans.toplamGelir
+          toplamGelir: performans.toplamGelir,
+          isBilardo: true // FLAG EKLENDİ
         };
       });
 
@@ -919,7 +1036,7 @@ const raporMotoruV2 = {
       giderler.forEach(gider => {
         const tutar = parseFloat(gider.tutar || 0);
         const tip = gider.tip || 'GENEL';
-        const tarih = new Date(gider.tarih);
+        const tarih = this.getItemDate(gider); // STANDART TARİH
         const gunKey = tarih.toISOString().split('T')[0];
         const ayKey = `${tarih.getFullYear()}-${String(tarih.getMonth() + 1).padStart(2, '0')}`;
         const ayAdi = tarih.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
@@ -1053,15 +1170,6 @@ const raporMotoruV2 = {
     }
   },
 
-  // GENEL TOPLAM CIRO HESAPLAMA
-  toplamCiroHesapla(raporlar) {
-    if (!raporlar || !Array.isArray(raporlar)) return 0;
-    
-    return raporlar.reduce((total, rapor) => {
-      return total + parseFloat(rapor.toplamTutar || rapor.toplam || 0);
-    }, 0);
-  },
-
   // YARDIMCI FONKSİYONLAR
   odemeTipiBelirle(rapor) {
     const nakit = parseFloat(rapor.nakitOdeme || rapor.nakit || 0);
@@ -1077,6 +1185,26 @@ const raporMotoruV2 = {
     return 'Karma';
   },
 
+  getTarihAraligi(raporlar) {
+    if (!raporlar || raporlar.length === 0) {
+      return { start: null, end: null };
+    }
+    
+    let minDate = new Date(raporlar[0].acilisZamani || raporlar[0].tarih || new Date());
+    let maxDate = new Date(raporlar[0].acilisZamani || raporlar[0].tarih || new Date());
+    
+    raporlar.forEach(rapor => {
+      const raporTarihi = this.getItemDate(rapor);
+      if (raporTarihi < minDate) minDate = raporTarihi;
+      if (raporTarihi > maxDate) maxDate = raporTarihi;
+    });
+    
+    return {
+      start: minDate.toISOString().split('T')[0],
+      end: maxDate.toISOString().split('T')[0]
+    };
+  },
+
   bosRaporOlustur(tip) {
     const bosRaporlar = {
       gunSonu: {
@@ -1089,7 +1217,11 @@ const raporMotoruV2 = {
         toplamMasaSayisi: 0,
         aktifMasaSayisi: 0,
         ortalamaMasaTutari: 0,
-        toplamUrunAdedi: 0
+        toplamUrunAdedi: 0,
+        bilardoMasaSayisi: 0,
+        normalMasaSayisi: 0,
+        bilardoCiro: 0,
+        normalCiro: 0
       },
       kasa: {
         toplamGelir: 0,
@@ -1222,6 +1354,12 @@ const raporMotoruV2 = {
     return bosRaporlar[tip] || {};
   }
 };
+
+// Global erişim için
+if (typeof window !== 'undefined') {
+  window.raporMotoruV2 = raporMotoruV2;
+  console.log('✅ raporMotoruV2 global olarak yüklendi');
+}
 
 export { raporMotoruV2 };
 export default raporMotoruV2;

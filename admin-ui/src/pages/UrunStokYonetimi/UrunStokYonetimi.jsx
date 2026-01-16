@@ -558,7 +558,7 @@ export default function UrunStokYonetimi() {
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
       }}
     >
-      {/* KRİTİK STOK ALARM BUTTON */}
+      {/* KRITIK STOK ALARM BUTTON */}
       {kritikAlarm && (
         <div
           onClick={kritikUrunGoster}
@@ -581,7 +581,7 @@ export default function UrunStokYonetimi() {
           }}
         >
           <span style={{ fontSize: "1.2rem" }}>⚠️</span>
-          KRİTİK STOK ({kritikStokSayisi})
+          KRITIK STOK ({kritikStokSayisi})
         </div>
       )}
 
@@ -900,7 +900,7 @@ export default function UrunStokYonetimi() {
                           <span style={stil.badgeDanger}>TAKİP YOK</span>
                         )}
                         {u.stokTakibi && u.stock <= u.critical && (
-                          <span style={stil.badgeDanger}>KRİTİK</span>
+                          <span style={stil.badgeDanger}>KRITIK</span>
                         )}
                       </div>
                       <div style={{ display: "flex", gap: "15px", fontSize: "0.9rem", color: TEMA.textLight }}>

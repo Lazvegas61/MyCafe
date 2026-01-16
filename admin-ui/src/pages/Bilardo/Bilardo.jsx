@@ -1,4 +1,4 @@
-// admin-ui/src/pages/Bilardo/Bilardo.jsx - SÜRE UZATMA MANTIĞI GÜNCELLENDİ + MINI DASHBOARD
+// admin-ui/src/pages/Bilardo/Bilardo.jsx - SÜRE UZATMA MANTIĞI GUNCELLENDI + MINI DASHBOARD
 /* ------------------------------------------------------------
    📌 Bilardo.jsx — YENİ SÜRE UZATMA MANTIĞI + MINI DASHBOARD
    - İlk açılış: Normal bilardo ücreti (80₺ veya 120₺)
@@ -376,7 +376,7 @@ export default function Bilardo() {
           
           const toplamTutar = anlikUcret + ekUrunToplam;
           
-          // BİLARDO ÜCRETİNİ ADİSYONA KAYDET
+          // BİLARDO ÜCRETİNİ ADISYONA KAYDET
           const adisyonIndex = adisyonlar.findIndex(a => a.id === masa.aktifAdisyonId);
           if (adisyonIndex !== -1) {
             adisyonlar[adisyonIndex].bilardoUcret = anlikUcret;
@@ -385,7 +385,7 @@ export default function Bilardo() {
             localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
           }
           
-          // AÇIK ADİSYONLARA EKLE (Ana Sayfa için)
+          // AÇIK ADISYONLARA EKLE (Ana Sayfa için)
           updateAcikAdisyonlar(masaAdisyonu, anlikUcret, ekUrunToplam, gecenDakika, masa.no);
           
           return {
@@ -427,7 +427,7 @@ export default function Bilardo() {
     return () => clearInterval(interval);
   }, []);
   
-  // AÇIK ADİSYONLARI GÜNCELLE (Ana Sayfa için)
+  // AÇIK ADISYONLARI GÜNCELLE (Ana Sayfa için)
   const updateAcikAdisyonlar = (adisyon, bilardoUcret, ekUrunToplam, gecenDakika, masaNo) => {
     try {
       const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
@@ -611,7 +611,7 @@ export default function Bilardo() {
     // Açık adisyonlara ekle
     updateAcikAdisyonlar(yeniAdisyon, baslangicUcreti, 0, 0, `B${index + 1}`);
     
-    // DİREKT ADİSYONA YÖNLENDİR
+    // DİREKT ADISYONA YÖNLENDİR
     setTimeout(() => {
       navigate(`/bilardo-adisyon/${yeniAdisyon.id}`);
     }, 100);

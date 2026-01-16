@@ -131,7 +131,7 @@ export function AuthProvider({ children }) {
 
   // Gün sonlandırma fonksiyonu
   const gunSonlandir = () => {
-    // ÖNCE AÇIK ADİSYON KONTROLÜ
+    // ÖNCE AÇIK ADISYON KONTROLÜ
     const acikAdisyonlar = JSON.parse(localStorage.getItem('mc_acik_adisyonlar') || '[]');
     
     if (acikAdisyonlar.length > 0) {
@@ -300,13 +300,13 @@ export function AuthProvider({ children }) {
     return user?.rol === 'ADMIN' || hasPermission('kasa_goruntule');
   };
 
-  // Gün başlatma yetkisi kontrolü - GÜNCELLENDİ
+  // Gün başlatma yetkisi kontrolü - GUNCELLENDI
   const canStartDay = () => {
     // ADMIN veya GARSON gün başlatabilir
     return user?.rol === 'ADMIN' || user?.rol === 'GARSON';
   };
 
-  // Gün sonlandırma yetkisi kontrolü - GÜNCELLENDİ
+  // Gün sonlandırma yetkisi kontrolü - GUNCELLENDI
   const canEndDay = () => {
     // ADMIN veya GARSON gün sonlandırabilir
     return user?.rol === 'ADMIN' || user?.rol === 'GARSON';

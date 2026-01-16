@@ -1,9 +1,8 @@
-// File: admin-ui/src/pages/AnaEkran/AnaEkran.jsx (GÜNCELLENMİŞ - CONTEXT KULLANIMLI)
+// File: admin-ui/src/pages/AnaEkran/AnaEkran.jsx (GÜNCELLENMİŞ - GÜN BAŞLANGIÇ KONTROLLÜ)
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useGunDurumu } from "../../context/GunDurumuContext"; // YENİ: Gün durumu context'i
-import syncService from "../../services/syncService";
+import { useGunDurumu } from "../../context/GunDurumuContext"; // DÜZELTİLDİ
 import "./AnaEkran.css";
 
 export default function AnaEkran() {
@@ -15,10 +14,7 @@ export default function AnaEkran() {
     dailyExpenses: 0
   });
   
-  // GÜN DURUMU ARTIK CONTEXT'TEN ALINIYOR
   const { gunAktif, gunBilgileri, gunBaslat, gunDurumunuKontrolEt } = useGunDurumu();
-  
-  // GÜN SÜRESİ HESAPLAMA
   const [gunSuresi, setGunSuresi] = useState({
     saat: 0,
     dakika: 0
@@ -52,13 +48,12 @@ export default function AnaEkran() {
       }
     }
     
-    // 4. Ödemeler dizisi kontrolü (bilardo için özellikle önemli)
+    // 4. Ödemeler dizisi kontrolü
     if (adisyon.odemeler && Array.isArray(adisyon.odemeler) && adisyon.odemeler.length > 0) {
       const toplamOdenen = adisyon.odemeler.reduce((sum, odeme) => {
         return sum + (parseFloat(odeme.miktar) || 0);
       }, 0);
       
-      // Bilardo için toplam tutar hesaplama
       let toplamTutar = 0;
       if (isBilardo) {
         const bilardoUcret = parseFloat(adisyon.bilardoUcret || 0);
@@ -68,13 +63,12 @@ export default function AnaEkran() {
         toplamTutar = parseFloat(adisyon.toplamTutar || 0);
       }
       
-      // Eğer toplam ödenen, toplam tutara eşit veya fazlaysa, adisyon kapalıdır
       if (toplamOdenen >= toplamTutar) {
         return true;
       }
     }
     
-    // 5. Bilardo özel kontrolü - süre bitmiş mi?
+    // 5. Bilardo özel kontrolü
     if (isBilardo && adisyon.sureBitti !== undefined) {
       if (adisyon.sureBitti === true || adisyon.sureBitti === "true") {
         return true;
@@ -89,21 +83,22 @@ export default function AnaEkran() {
     return false;
   }, []);
 
-  // GÜNLÜK GİDERLERİ HESAPLA FONKSİYONU
+  // GÜNLÜK GİDERLERİ HESAPLA FONKSİYONU - GÜN BAŞLANGICI KONTROLLÜ
   const calculateDailyExpenses = useCallback(() => {
     try {
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      // Gün başlangıcını kontrol et
+      const gunBaslangic = localStorage.getItem('mycafe_gun_baslangic');
+      if (!gunBaslangic) return 0;
       
-      // Giderleri localStorage'dan al
+      const gunBaslangicTarih = new Date(gunBaslangic);
+      
       const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
       
-      // Bugünkü giderleri filtrele ve topla
       const dailyExpenses = giderler
         .filter(gider => {
           if (!gider.tarih) return false;
-          const giderTarih = new Date(gider.tarih).toISOString().split('T')[0];
-          return giderTarih === todayStr;
+          const giderTarihi = new Date(gider.tarih);
+          return giderTarihi >= gunBaslangicTarih;
         })
         .reduce((sum, gider) => {
           return sum + (parseFloat(gider.tutar) || 0);
@@ -116,7 +111,7 @@ export default function AnaEkran() {
     }
   }, []);
 
-  // GELİŞMİŞ BOŞ ADİSYON TEMİZLEME FONKSİYONU
+  // GELİŞMİŞ BOŞ ADISYON TEMİZLEME FONKSİYONU
   const cleanupEmptyAdisyonlar = useCallback(() => {
     try {
       const allAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
@@ -129,13 +124,10 @@ export default function AnaEkran() {
       
       // 1. mc_adisyonlar'dan kapalı ve boş olanları temizle
       const filteredAdisyonlar = allAdisyonlar.filter(ad => {
-        // Gelişmiş kapalı kontrolü
         if (isAdisyonKapali(ad)) {
-          // Kapalı adisyonları tut (tarihsel veri için)
           return true;
         }
         
-        // Açık ama içi dolu adisyonları tut
         let hasItems = false;
         
         if (ad.tur === "BİLARDO") {
@@ -158,21 +150,15 @@ export default function AnaEkran() {
       
       // 2. mc_acik_adisyonlar'dan kapalı ve boş olanları temizle
       let filteredAcikAdisyonlar = acikAdisyonlar.filter(ad => {
-        // Gelişmiş kapalı kontrolü
         if (isAdisyonKapali(ad)) {
           console.log('🧹 Kapalı adisyon açık adisyonlar listesinden çıkarıldı:', {
             id: ad.id,
             tur: ad.tur,
-            masaNo: ad.masaNo || ad.masaNum,
-            kapali: ad.kapali,
-            durum: ad.durum,
-            kapanisZamani: ad.kapanisZamani,
-            odemeler: ad.odemeler?.length || 0
+            masaNo: ad.masaNo || ad.masaNum
           });
           return false;
         }
         
-        // İçeriği kontrol et
         if (ad.tur === "BİLARDO") {
           const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
           const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
@@ -198,8 +184,7 @@ export default function AnaEkran() {
         }
       });
       
-      // 3. KAPALI BİLARDO ADİSYONLARINI TEMİZLEME
-      // Bilardo adisyonları için özel temizlik
+      // 3. KAPALI BİLARDO ADISYONLARINI TEMİZLEME
       const kapaliBilardoAdisyonlar = allAdisyonlar.filter(ad => 
         ad.tur === "BİLARDO" && isAdisyonKapali(ad)
       );
@@ -207,12 +192,10 @@ export default function AnaEkran() {
       if (kapaliBilardoAdisyonlar.length > 0) {
         console.log('🎱 Kapalı bilardo adisyonları temizleniyor:', kapaliBilardoAdisyonlar.length);
         
-        // Kapalı bilardo adisyonlarını mc_acik_adisyonlar'dan da temizle
         const filteredAcikWithoutClosedBilardo = filteredAcikAdisyonlar.filter(ad => 
           !(ad.tur === "BİLARDO" && isAdisyonKapali(ad))
         );
         
-        // Farkı göster
         const removedCount = filteredAcikAdisyonlar.length - filteredAcikWithoutClosedBilardo.length;
         if (removedCount > 0) {
           console.log(`🎱 ${removedCount} kapalı bilardo adisyonu açık adisyonlar listesinden temizlendi.`);
@@ -220,15 +203,12 @@ export default function AnaEkran() {
         }
       }
       
-      // 4. TUTARSIZLIK KONTROLÜ: Aynı adisyon hem mc_adisyonlar'da hem de mc_acik_adisyonlar'da olmamalı
+      // 4. TUTARSIZLIK KONTROLÜ
       const acikAdisyonIds = new Set(filteredAcikAdisyonlar.map(ad => ad.id));
       const finalFilteredAdisyonlar = filteredAdisyonlar.map(ad => {
-        // Eğer bu adisyon açık adisyonlar listesinde de varsa
         if (acikAdisyonIds.has(ad.id)) {
-          // Açık adisyonlar listesindeki versiyonunu bul
           const acikVersiyon = filteredAcikAdisyonlar.find(a => a.id === ad.id);
           
-          // Durum tutarlılığını kontrol et
           const isKapali1 = isAdisyonKapali(ad);
           const isKapali2 = isAdisyonKapali(acikVersiyon);
           
@@ -240,7 +220,6 @@ export default function AnaEkran() {
               masaNo: ad.masaNo || ad.masaNum
             });
             
-            // Kapalı durumuna göre güncelle
             if (isKapali2) {
               return { 
                 ...ad, 
@@ -280,36 +259,81 @@ export default function AnaEkran() {
     }
   }, [isAdisyonKapali]);
 
-  // Dashboard verilerini güncelle fonksiyonu
+  // Dashboard verilerini güncelle fonksiyonu - GUNCELLENDI
   const updateDashboardData = useCallback(() => {
     console.log('📊 ANA EKRAN: Dashboard verileri güncelleniyor...');
     
     try {
+      // Gün başlangıcını kontrol et
+      const gunBaslangic = localStorage.getItem('mycafe_gun_baslangic');
+      
+      if (!gunBaslangic) {
+        // Gün başlatılmamışsa boş veri göster
+        setDashboardData({
+          dailySales: { total: 0, normal: 0, bilardo: 0, debt: 0 },
+          criticalProducts: [],
+          openTables: [],
+          dailyExpenses: 0
+        });
+        return;
+      }
+      
+      const gunBaslangicTarih = new Date(gunBaslangic);
+      
+      // Bugünün tarihi
       const today = new Date();
       const todayStr = today.toISOString().split('T')[0];
       
       const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
       const borclar = JSON.parse(localStorage.getItem("mc_borclar") || "[]");
       const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
+      const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
       
-      // GÜNLÜK SATIŞ HESAPLAMA
+      // GÜNLÜK SATIŞ HESAPLAMA - GÜN BAŞLANGICINDAN SONRAKİLER
       const todayNormalSales = adisyonlar
         .filter(a => {
           if (!a.acilisZamani) return false;
-          const tarih = new Date(a.acilisZamani).toISOString().split('T')[0];
-          return tarih === todayStr && isAdisyonKapali(a);
+          const adisyonTarihi = new Date(a.acilisZamani);
+          const tarihStr = adisyonTarihi.toISOString().split('T')[0];
+          
+          // Sadece bugün VE gün başlangıcından sonraki adisyonlar
+          return tarihStr === todayStr && 
+                 adisyonTarihi >= gunBaslangicTarih && 
+                 isAdisyonKapali(a);
         })
         .reduce((sum, a) => sum + (parseFloat(a.toplamTutar || 0) || 0), 0);
       
+      // Bugünkü borçlar
       const todayDebts = borclar
         .filter(b => {
-          if (!b.acilisZamani) return false;
-          const tarih = new Date(b.acilisZamani).toISOString().split('T')[0];
-          return tarih === todayStr;
+          if (!b.tarih && !b.acilisZamani) return false;
+          const borcTarihi = b.tarih 
+            ? new Date(b.tarih)
+            : new Date(b.acilisZamani);
+          const tarihStr = borcTarihi.toISOString().split('T')[0];
+          
+          return tarihStr === todayStr && borcTarihi >= gunBaslangicTarih;
         })
-        .reduce((sum, b) => sum + (parseFloat(b.tutar || 0) || 0), 0);
+        .reduce((sum, b) => sum + (parseFloat(b.tutar || b.toplamTutar || 0) || 0), 0);
       
-      // KRİTİK STOK KONTROLÜ
+      // Bugünkü bilardo satışları
+      const todayBilardoSales = bilardoAdisyonlar
+        .filter(b => {
+          if (!b.acilisZamani) return false;
+          const adisyonTarihi = new Date(b.acilisZamani);
+          const tarihStr = adisyonTarihi.toISOString().split('T')[0];
+          
+          return tarihStr === todayStr && 
+                 adisyonTarihi >= gunBaslangicTarih &&
+                 b.durum === "KAPANDI" && !b.iptal && !b.transferEdildi;
+        })
+        .reduce((sum, b) => {
+          const bilardoUcret = parseFloat(b.bilardoUcret || b.bilardoUcreti || 0) || 0;
+          const ekUrunToplam = parseFloat(b.ekUrunToplam || 0) || 0;
+          return sum + bilardoUcret + ekUrunToplam;
+        }, 0);
+      
+      // KRITIK STOK KONTROLÜ
       const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
       const criticalProducts = urunler
         .filter(u => {
@@ -320,88 +344,27 @@ export default function AnaEkran() {
         })
         .slice(0, 5);
       
-      // GÜNLÜK GİDERLERİ HESAPLA
-      const dailyExpenses = calculateDailyExpenses();
+      // GÜNLÜK GİDERLERİ HESAPLA (gün başlangıcından sonraki)
+      const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
+      const dailyExpenses = giderler
+        .filter(gider => {
+          if (!gider.tarih) return false;
+          const giderTarihi = new Date(gider.tarih);
+          return giderTarihi >= gunBaslangicTarih;
+        })
+        .reduce((sum, gider) => sum + (parseFloat(gider.tutar) || 0), 0);
       
-      // AÇIK ADİSYONLARI AL - GELİŞMİŞ KAPALI KONTROLÜ İLE
+      // AÇIK ADISYONLARI AL (Gün başlangıcından sonra açılmış olanlar)
       const openTables = [];
-      let todayBilardoSales = 0;
       
-      // TÜM AÇIK ADİSYONLARI TEKİLLEŞTİR
-      const allAcikAdisyonlar = [];
-      
-      // 1. mc_adisyonlar'dan AÇIK olanları al
-      adisyonlar.forEach(ad => {
-        if (!isAdisyonKapali(ad)) {
-          allAcikAdisyonlar.push({ ...ad, source: 'mc_adisyonlar' });
-        }
-      });
-      
-      // 2. mc_acik_adisyonlar'dan AÇIK olanları al
-      acikAdisyonlar.forEach(ad => {
-        allAcikAdisyonlar.push({ ...ad, source: 'mc_acik_adisyonlar' });
-      });
-      
-      // 3. TEKİLLEŞTİRME VE KAPALI KONTROLÜ
-      const uniqueAdisyonMap = new Map();
-      
-      allAcikAdisyonlar.forEach(ad => {
-        // ID oluştur
-        const adId = ad.id || (ad.tur === "BİLARDO" ? `bilardo_${ad.masaNo}` : `normal_${ad.masaNo || ad.masaNum}`);
-        
-        // Gelişmiş kapalı kontrolü
-        if (isAdisyonKapali(ad)) {
-          console.log('📊 Kapalı adisyon dashboard listesine alınmadı:', {
-            id: adId,
-            tur: ad.tur,
-            kapali: ad.kapali,
-            durum: ad.durum,
-            odemeler: ad.odemeler?.length || 0
-          });
-          return; // Kapalı adisyonları atla
-        }
-        
-        if (!uniqueAdisyonMap.has(adId)) {
-          uniqueAdisyonMap.set(adId, ad);
-        } else {
-          // Daha güncel olanı al
-          const existing = uniqueAdisyonMap.get(adId);
-          const existingTime = new Date(existing.guncellemeZamani || existing.acilisZamani || 0);
-          const currentTime = new Date(ad.guncellemeZamani || ad.acilisZamani || 0);
+      // Normal masalar
+      adisyonlar
+        .filter(a => !isAdisyonKapali(a))
+        .forEach(ad => {
+          const adisyonTarihi = new Date(ad.acilisZamani);
+          if (adisyonTarihi < gunBaslangicTarih) return;
           
-          if (currentTime > existingTime) {
-            uniqueAdisyonMap.set(adId, ad);
-          }
-        }
-      });
-      
-      const uniqueAcikAdisyonlar = Array.from(uniqueAdisyonMap.values());
-      
-      // 4. DASHBOARD VERİLERİNİ HAZIRLA
-      uniqueAcikAdisyonlar.forEach(ad => {
-        const isBilardo = ad.tur === "BİLARDO";
-        const isAcil = ad.isAcil;
-        
-        // ACİL ADİSYONLARI ATLA
-        if (isAcil) {
-          return;
-        }
-        
-        // Bugünkü bilardo satışlarını hesapla (kapalı olsa bile)
-        if (isBilardo) {
-          const adisyonTarih = ad.acilisZamani ? new Date(ad.acilisZamani).toISOString().split('T')[0] : todayStr;
-          if (adisyonTarih === todayStr) {
-            const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
-            const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-            todayBilardoSales += (isNaN(bilardoUcret) ? 0 : bilardoUcret) + 
-                                (isNaN(ekUrunToplam) ? 0 : ekUrunToplam);
-          }
-        }
-        
-        // NORMAL MASA ADİSYONLARI
-        if (!isBilardo) {
           const masaNo = ad.masaNo || `MASA ${ad.masaNum}`;
-          
           let toplamTutar = 0;
           
           if (ad.kalemler && ad.kalemler.length > 0) {
@@ -416,7 +379,6 @@ export default function AnaEkran() {
             toplamTutar = parseFloat(ad.toplamTutar);
           }
           
-          // SADECE TUTARI 0'DAN BÜYÜK OLANLARI EKLE
           if (toplamTutar > 0) {
             openTables.push({
               id: ad.id || `normal_${ad.masaNo || ad.masaNum}`,
@@ -428,15 +390,19 @@ export default function AnaEkran() {
               adisyonData: ad
             });
           }
-        } 
-        // BİLARDO ADİSYONLARI
-        else {
+        });
+      
+      // Bilardo masaları
+      bilardoAdisyonlar
+        .filter(b => b.durum === "ACIK")
+        .forEach(ad => {
+          const adisyonTarihi = new Date(ad.acilisZamani);
+          if (adisyonTarihi < gunBaslangicTarih) return;
+          
           const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
           const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-          const toplamTutar = (isNaN(bilardoUcret) ? 0 : bilardoUcret) + 
-                             (isNaN(ekUrunToplam) ? 0 : ekUrunToplam);
+          const toplamTutar = bilardoUcret + ekUrunToplam;
           
-          // SADECE TUTARI 0'DAN BÜYÜK OLANLARI EKLE
           if (toplamTutar > 0) {
             openTables.push({
               id: ad.id || `bilardo_${ad.masaNo}`,
@@ -450,11 +416,10 @@ export default function AnaEkran() {
               adisyonData: ad
             });
           }
-        }
-      });
+        });
       
-      // 5. TEKİLLEŞTİRME: Aynı masa numarasına sahip adisyonları kontrol et
-      const finalTables = [];
+      // Açık adisyonları benzersiz yap
+      const uniqueOpenTables = [];
       const masaNoMap = new Map();
       
       openTables.forEach(table => {
@@ -462,22 +427,19 @@ export default function AnaEkran() {
         
         if (!masaNoMap.has(masaKey)) {
           masaNoMap.set(masaKey, table);
-          finalTables.push(table);
+          uniqueOpenTables.push(table);
         } else {
-          // Eğer aynı masa numarasına sahip birden fazla adisyon varsa,
-          // daha yüksek tutarlı olanı al
           const existing = masaNoMap.get(masaKey);
           if (table.toplamTutar > existing.toplamTutar) {
-            const index = finalTables.findIndex(t => t.id === existing.id);
+            const index = uniqueOpenTables.findIndex(t => t.id === existing.id);
             if (index !== -1) {
-              finalTables[index] = table;
+              uniqueOpenTables[index] = table;
             }
             masaNoMap.set(masaKey, table);
           }
         }
       });
       
-      // 6. DASHBOARD VERİLERİNİ GÜNCELLE
       const newDashboardData = {
         dailySales: {
           total: todayNormalSales + todayDebts + todayBilardoSales,
@@ -486,11 +448,10 @@ export default function AnaEkran() {
           debt: todayDebts
         },
         criticalProducts: criticalProducts,
-        openTables: finalTables.sort((a, b) => {
+        openTables: uniqueOpenTables.sort((a, b) => {
           if (a.tur === "NORMAL" && b.tur === "BİLARDO") return -1;
           if (a.tur === "BİLARDO" && b.tur === "NORMAL") return 1;
           
-          // Masa numaralarını karşılaştır
           const aNum = parseInt(a.no.replace('B', '').replace(/\D/g, ''));
           const bNum = parseInt(b.no.replace('B', '').replace(/\D/g, ''));
           return aNum - bNum;
@@ -515,7 +476,7 @@ export default function AnaEkran() {
         dailyExpenses: 0
       });
     }
-  }, [isAdisyonKapali, calculateDailyExpenses]);
+  }, [isAdisyonKapali]);
 
   // Canlı saat güncellemesi
   useEffect(() => {
@@ -557,28 +518,21 @@ export default function AnaEkran() {
     }
   }, [gunAktif]);
 
-  // SyncService event'lerini dinle - PANEL ANLIK GÜNCELLEME
+  // SyncService event'lerini dinle
   useEffect(() => {
     console.log('🔔 ANA EKRAN: SyncService event listenerları kuruluyor...');
     
-    // Component mount olduğunda boş adisyonları temizle
     cleanupEmptyAdisyonlar();
-    
-    // İlk yüklemede dashboard'u güncelle
     updateDashboardData();
     
-    // SyncService event'lerini dinle
     const handleSyncEvent = (event) => {
       console.log('📢 ANA EKRAN: Sync event alındı:', event.type, event.detail);
       
-      // Hemen dashboard'u güncelle
       updateDashboardData();
       
-      // Ekstra güvence için kısa bir süre sonra tekrar güncelle
       setTimeout(updateDashboardData, 300);
     };
     
-    // SyncService'den gelen custom event'leri dinle
     const syncEvents = [
       'sync:masa_güncellendi',
       'sync:adisyongüncellendi',
@@ -589,14 +543,15 @@ export default function AnaEkran() {
       'sync:panel_güncellendi',
       'sync:dashboard_güncellendi',
       'sync:gider_eklendi',
-      'sync:gider_silindi'
+      'sync:gider_silindi',
+      'gunSonuYapildi',
+      'gunBaslatildi'
     ];
     
     syncEvents.forEach(eventName => {
       window.addEventListener(eventName, handleSyncEvent);
     });
     
-    // Diğer global event'leri dinle
     const otherEvents = [
       'storage',
       'adisyonGuncellendi',
@@ -615,14 +570,10 @@ export default function AnaEkran() {
       window.addEventListener(eventName, handleSyncEvent);
     });
     
-    // Periyodik güncelleme (her 30 saniyede bir - sadece backup olarak)
     const periodicInterval = setInterval(updateDashboardData, 30000);
-    
-    // Periyodik temizlik (her 5 dakikada bir)
     const cleanupInterval = setInterval(cleanupEmptyAdisyonlar, 300000);
     
     return () => {
-      // Cleanup: Event listener'ları kaldır
       syncEvents.forEach(eventName => {
         window.removeEventListener(eventName, handleSyncEvent);
       });
@@ -656,13 +607,12 @@ export default function AnaEkran() {
   // Masa veya bilardo detayına git
   const goToTableDetail = useCallback((masa) => {
     if (!gunAktif) {
-      alert('❌ Gün başlatılmamış! Önce günü başlatın.');
+      alert('❌ Gün başlatılmamış! Günlük işlemler için sol taraftaki menüden "Gün Başlat" butonuna tıklayın.');
       return;
     }
     
     console.log('Adisyon detayına gidiliyor:', masa);
     
-    // Önce adisyonun gerçekten var olup olmadığını kontrol et
     const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
     const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
     
@@ -670,7 +620,6 @@ export default function AnaEkran() {
     let adisyonBulundu = false;
     
     if (adisyonId) {
-      // Adisyonu ara
       const adisyon = adisyonlar.find(a => a.id === adisyonId) || 
                       acikAdisyonlar.find(a => a.id === adisyonId);
       
@@ -680,10 +629,8 @@ export default function AnaEkran() {
       } else {
         console.warn('⚠️ Adisyon bulunamadı:', adisyonId);
         
-        // Eğer adisyon bulunamazsa, masa numarasına göre ara
         const masaNo = masa.no.toString().replace('BİLARDO ', '').replace('B', '').replace(/\D/g, '');
         
-        // Bilardo için ara
         if (masa.tur === "BİLARDO") {
           const bilardoAdisyon = acikAdisyonlar.find(a => 
             a.tur === "BİLARDO" && 
@@ -700,7 +647,6 @@ export default function AnaEkran() {
             return;
           }
         } else {
-          // Normal masa için ara
           const normalAdisyon = acikAdisyonlar.find(a => 
             a.tur !== "BİLARDO" && 
             (a.masaNum === masaNo || a.masaNo === `MASA ${masaNo}`)
@@ -711,7 +657,7 @@ export default function AnaEkran() {
           );
           
           if (normalAdisyon) {
-            console.log('✅ Normal adisyon masa numarasıyla bulundu:', masaNo);
+            console.log('✅ Normal adisyon masa numarasıyla bulndu:', masaNo);
             navigate(`/adisyondetay/${masaNo}`);
             return;
           }
@@ -722,7 +668,6 @@ export default function AnaEkran() {
     if (masa.tur === "BİLARDO") {
       const masaNumarasi = masa.no.toString().replace('BİLARDO ', '').replace('B', '').replace(/\D/g, '');
       
-      // Bilardo adisyonunun var olduğundan emin ol
       const bilardoAdisyonlar = acikAdisyonlar.filter(a => 
         a.tur === "BİLARDO" && a.masaNo === masaNumarasi && !isAdisyonKapali(a)
       );
@@ -737,7 +682,6 @@ export default function AnaEkran() {
     } else {
       const masaNumarasi = masa.no.toString().replace('MASA ', '').replace(/\D/g, '');
       
-      // Normal adisyonun var olduğundan emin ol
       const normalAdisyonlar = acikAdisyonlar.filter(a => 
         a.tur !== "BİLARDO" && 
         (a.masaNum === masaNumarasi || a.masaNo === `MASA ${masaNumarasi}`) &&
@@ -763,13 +707,6 @@ export default function AnaEkran() {
   const goToExpenses = useCallback(() => {
     navigate('/giderler');
   }, [navigate]);
-
-  // Gün başlatma butonu handler'ı
-  const handleGunBaslatClick = () => {
-    if (gunBaslat) {
-      gunBaslat();
-    }
-  };
 
   return (
     <div className="ana-wrapper">
@@ -820,26 +757,36 @@ export default function AnaEkran() {
         </div>
       )}
 
-      {/* GÜN BAŞLAT BUTONU (gün aktif değilse) */}
+      {/* GÜN BAŞLATILMAMIŞ UYARI KARTI (BUTONSUZ) */}
       {!gunAktif && (
         <div className="gun-baslat-container">
-          <div className="gun-baslat-kart">
-            <div className="gun-baslat-icon">🚀</div>
+          <div className="gun-baslat-kart" style={{
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: 'white',
+            boxShadow: '0 10px 25px rgba(245, 158, 11, 0.3)'
+          }}>
+            <div className="gun-baslat-icon" style={{ fontSize: '48px' }}>⏸️</div>
             <div className="gun-baslat-bilgi">
-              <h3>Gün Başlatılmamış</h3>
-              <p>Günlük işlemleri başlatmak için günü başlatın.</p>
+              <h3 style={{ color: 'white', marginBottom: '10px' }}>Gün Başlatılmamış</h3>
+              <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '16px', lineHeight: '1.5' }}>
+                Günlük işlemleri başlatmak için <strong>sol taraftaki menüden</strong> "Gün Başlat" butonuna tıklayın.
+              </p>
+              <div style={{
+                marginTop: '15px',
+                padding: '10px 15px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                borderLeft: '4px solid white',
+                fontSize: '14px'
+              }}>
+                📍 <strong>Yönlendirme:</strong> Sol tarafta bulunan sidebar menüsündeki <strong>"🚀 Gün Başlat"</strong> butonunu kullanın.
+              </div>
             </div>
-            <button 
-              className="gun-baslat-button"
-              onClick={handleGunBaslatClick}
-            >
-              Günü Başlat
-            </button>
           </div>
         </div>
       )}
 
-      {/* SATIŞ İSTATİSTİKLERİ */}
+      {/* SATIŞ İSTATİSTİKLERİ (GÜN AKTİFSE) */}
       {gunAktif && (
         <>
           <div className="summary-cards">
@@ -873,7 +820,7 @@ export default function AnaEkran() {
 
             <div className="sum-card">
               <div className="sum-icon">🪑</div>
-              <div className="sum-title">AÇIK ADİSYONLAR</div>
+              <div className="sum-title">AÇIK ADISYONLAR</div>
               <div className="sum-value">
                 {dashboardData.openTables.length} Masa
               </div>
@@ -910,7 +857,7 @@ export default function AnaEkran() {
 
             <div className="sum-card">
               <div className="sum-icon">🏦</div>
-              <div className="sum-title">KRİTİK STOK</div>
+              <div className="sum-title">KRITIK STOK</div>
               <div className="sum-value">
                 {dashboardData.criticalProducts.length} Ürün
               </div>
@@ -994,10 +941,10 @@ export default function AnaEkran() {
             </div>
           </div>
 
-          {/* AÇIK ADİSYONLAR PANELİ */}
+          {/* AÇIK ADISYONLAR PANELİ */}
           <div className="panel-box-wide">
             <div className="panel-header-wide">
-              <span>📋 AÇIK ADİSYONLAR</span>
+              <span>📋 AÇIK ADISYONLAR</span>
               <span className="panel-small-wide">
                 {dashboardData.openTables.length} Masa • 
                 Toplam: {formatPara(dashboardData.openTables.reduce((sum, t) => {
@@ -1072,7 +1019,7 @@ export default function AnaEkran() {
                   <div className="empty-icon-wide">✅</div>
                   <div className="empty-text-wide">Açık Adisyon Bulunmuyor</div>
                   <div className="empty-subtext-wide">
-                    Yeni adisyon açmak için "+ Adisyon" butonuna tıklayın
+                    Yeni adisyon açmak için Masalar sayfasına gidin
                   </div>
                 </div>
               )}

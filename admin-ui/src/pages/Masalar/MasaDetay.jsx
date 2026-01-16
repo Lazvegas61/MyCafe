@@ -2,7 +2,7 @@
    📌 BİRLEŞTİRİLMİŞ MasaDetay.jsx - FINAL
    - Masa kartı ve masa detayı birleştirildi
    - Tasarım DEĞİŞTİRİLMEDİ (Premium Altın-Kahve teması korundu)
-   - Bilardo kodları TAMAMEN TEMİZLENDİ
+   - Bilardo kodları TAMAMEN TEMIZLENDI
    - Mantıksal hatalar düzeltildi
    - Masalar.jsx ile tam uyumlu
 ------------------------------------------------------------- */
@@ -112,7 +112,7 @@ export default function MasaDetay() {
   const [kapanisMesaji, setKapanisMesaji] = useState("");
 
   // ------------------------------
-  // MASA + ADİSYON YÜKLEME - DÜZELTİLDİ
+  // MASA + ADISYON YÜKLEME - DÜZELTİLDİ
   // ------------------------------
   const loadData = useCallback(() => {
     console.log('🔄 Masa detay yükleniyor:', masaNo);
@@ -154,7 +154,7 @@ export default function MasaDetay() {
       return;
     }
     
-    // AÇIK ADİSYON BUL
+    // AÇIK ADISYON BUL
     const acikAdisyon = ads.find(a => 
       a.id === mevcutMasa.adisyonId &&
       !["CLOSED", "KAPALI", "KAPALI"].includes((a.status || a.durum || "").toUpperCase())
@@ -218,7 +218,7 @@ export default function MasaDetay() {
     
     console.log('🔴 MASA KAPATMA BAŞLIYOR:', { masaNo, adisyonId: adisyon.id });
     
-    // 1. ADİSYONLARI GÜNCELLE
+    // 1. ADISYONLARI GÜNCELLE
     const ads = readJSON("mc_adisyonlar", []);
     const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
     
@@ -244,7 +244,7 @@ export default function MasaDetay() {
     writeJSON("mc_adisyonlar", ads);
     console.log('✅ Adisyon kapatıldı:', guncelAdisyon.id);
     
-    // 2. MASALARI GÜNCELLE - EN KRİTİK KISIM!
+    // 2. MASALARI GÜNCELLE - EN KRITIK KISIM!
     const masalar = readJSON("mc_masalar", []);
     const masaIndex = masalar.findIndex(m => String(m.no) === String(masaNo));
     
@@ -763,7 +763,7 @@ export default function MasaDetay() {
           </div>
         </div>
 
-        {/* SAĞ KOLON: ADİSYON DETAY */}
+        {/* SAĞ KOLON: ADISYON DETAY */}
         <div>
           <div style={{
             background: "#fff7e6",

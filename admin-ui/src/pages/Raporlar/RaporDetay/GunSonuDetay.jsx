@@ -19,142 +19,218 @@ const GunSonuDetay = () => {
   const [baslangicZamani, setBaslangicZamani] = useState(null);
   const [bitisZamani, setBitisZamani] = useState(null);
 
-  // CANLI SÜRE HESAPLAMA - useCallback ile optimize edildi
-  const calculateLiveDuration = useCallback((raporData) => {
-    if (!raporData) return;
-    
-    const baslangic = raporData.baslangicZamani ? new Date(raporData.baslangicZamani) : new Date();
-    const bitis = raporData.bitisZamani ? new Date(raporData.bitisZamani) : new Date();
-    
-    // Başlangıç ve bitiş zamanlarını state'e kaydet
-    setBaslangicZamani(baslangic);
-    setBitisZamani(bitis);
-    
-    const farkMs = bitis - baslangic;
-    const saat = Math.floor(farkMs / 3600000);
-    const dakika = Math.floor((farkMs % 3600000) / 60000);
-    
-    setCanliSure({ saat, dakika });
-  }, []);
+  // TARİH FORMATI DÖNÜŞTÜRME FONKSİYONLARI
+  const formatDateToYYYYMMDD = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error('Tarih formatlama hatası:', error, dateString);
+      return '';
+    }
+  };
 
-  // CANLI SÜRE GÜNCELLEME - Her 30 saniyede bir
-  useEffect(() => {
-    if (!rapor) return;
-    
-    const interval = setInterval(() => {
-      calculateLiveDuration(rapor);
-    }, 30000); // 30 saniyede bir güncelle
-    
-    return () => clearInterval(interval);
-  }, [rapor, calculateLiveDuration]);
+  const getTodayDate = () => {
+    const today = new Date();
+    return formatDateToYYYYMMDD(today);
+  };
 
-  // VERİ ANALİZİ - useCallback ile optimize edildi
-  const analyzeData = useCallback((today) => {
+  // TARİHİ GÖRÜNTÜ FORMATINA ÇEVİR
+  const formatDisplayDate = (dateString) => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}.${month}.${year}`;
+  };
+
+  // VERİ ANALİZİ - DÜZELTİLMİŞ VERSİYON
+  const analyzeData = useCallback((searchDate) => {
+    console.log('🔍 Veri analizi başlıyor, tarih:', searchDate);
+    
     const masaOdemeDetaylari = [];
     const bilardoOdemeDetaylari = [];
     const indirimDetaylari = [];
     const giderDetaylari = [];
     
     try {
-      // 1. Masa adisyonlarını analiz et
+      // 1. Masa adisyonlarını analiz et - KAPALI OLANLARI AL
       const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-      const bugunkuAdisyonlar = adisyonlar.filter(a => {
+      console.log('📋 Toplam adisyon sayısı:', adisyonlar.length);
+      
+      // Tarihe göre filtrele ve KAPALI olanları al
+      const tariheGoreAdisyonlar = adisyonlar.filter(a => {
         try {
-          const tarih = new Date(a.tarih || a.acilisZamani || Date.now()).toISOString().split('T')[0];
-          return tarih === today;
-        } catch {
+          // Tarih kontrolü
+          const acilisTarihi = a.acilisZamani || a.tarih || Date.now();
+          const adisyonTarihi = formatDateToYYYYMMDD(acilisTarihi);
+          const tarihEslesti = adisyonTarihi === searchDate;
+          
+          // Durum kontrolü - SADECE KAPALI OLANLARI AL
+          const isKapali = a.kapali === true || 
+                          a.durum?.toUpperCase() === "KAPALI" || 
+                          a.durum?.toUpperCase() === "KAPATILDI" ||
+                          a.durum?.toUpperCase() === "ÖDENDİ";
+          
+          // Tutar kontrolü - 0'dan büyük olmalı
+          const tutar = parseFloat(a.toplamTutar || a.toplam || 0);
+          const hasTutar = tutar > 0;
+          
+          return tarihEslesti && isKapali && hasTutar;
+        } catch (error) {
+          console.error('Adisyon filtreleme hatası:', error, a);
           return false;
         }
       });
       
-      bugunkuAdisyonlar.forEach(adisyon => {
+      console.log('✅ Tarihe ve duruma göre filtrelenmiş adisyonlar:', tariheGoreAdisyonlar.length);
+      
+      tariheGoreAdisyonlar.forEach(adisyon => {
+        const tutar = parseFloat(adisyon.toplamTutar || adisyon.toplam || 0);
+        const indirim = parseFloat(adisyon.indirimTutari || adisyon.indirim || 0);
+        
         const odemeDetayi = {
-          id: adisyon.id || Date.now().toString(),
+          id: adisyon.id || `adisyon_${Date.now()}_${Math.random()}`,
           masaNo: adisyon.masaNo || adisyon.masaId || 'Bilinmeyen',
-          tutar: parseFloat(adisyon.toplamTutar || adisyon.toplam || 0),
-          indirim: parseFloat(adisyon.indirimTutari || adisyon.indirim || 0),
+          masaNum: adisyon.masaNum || '0',
+          tutar: tutar,
+          indirim: indirim,
           odemeTuru: adisyon.odemeTuru || 'nakit',
           odemeTipi: adisyon.odemeTipi || 'normal',
           hesabaYaz: adisyon.hesabaYaz || false,
           kapanisZamani: adisyon.kapanisZamani || adisyon.tarih || new Date().toISOString(),
           not: adisyon.not || '',
-          durum: adisyon.durum || 'kapandi'
+          durum: adisyon.durum || 'kapandi',
+          acilisZamani: adisyon.acilisZamani
         };
         
+        // Hesaba yazılanlar ayrı kategori, diğerleri normal ödeme
         if (odemeDetayi.hesabaYaz) {
           masaOdemeDetaylari.push({
             ...odemeDetayi,
             kategori: 'hesaba_yaz'
           });
-        } else if (odemeDetayi.durum === 'kapandi') {
+        } else {
           masaOdemeDetaylari.push(odemeDetayi);
         }
         
         // İndirimleri topla
-        if (odemeDetayi.indirim > 0) {
+        if (indirim > 0) {
           indirimDetaylari.push({
             id: `indirim_${adisyon.id}`,
             masaNo: odemeDetayi.masaNo,
-            tutar: odemeDetayi.indirim,
+            tutar: indirim,
             aciklama: `Masa ${odemeDetayi.masaNo} indirimi`,
             tarih: odemeDetayi.kapanisZamani
           });
         }
       });
       
-      // 2. Bilardo adisyonlarını analiz et
+      console.log('💰 Masa ödeme detayları:', masaOdemeDetaylari.length);
+      console.log('🎁 İndirimler:', indirimDetaylari.length);
+      
+      // 2. Bilardo adisyonlarını analiz et - KAPALI OLANLARI AL
       const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-      const bugunkuBilardoAdisyonlar = bilardoAdisyonlar.filter(b => {
+      console.log('🎱 Toplam bilardo adisyonu:', bilardoAdisyonlar.length);
+      
+      const tariheGoreBilardoAdisyonlar = bilardoAdisyonlar.filter(b => {
         try {
-          const tarih = new Date(b.acilisZamani || b.tarih || Date.now()).toISOString().split('T')[0];
-          return tarih === today;
-        } catch {
+          const acilisTarihi = b.acilisZamani || b.tarih || Date.now();
+          const bilardoTarihi = formatDateToYYYYMMDD(acilisTarihi);
+          const tarihEslesti = bilardoTarihi === searchDate;
+          
+          // SADECE KAPALI BİLARDO ADISYONLARI
+          const isKapali = b.kapali === true || 
+                          b.durum?.toUpperCase() === "KAPALI" || 
+                          b.durum?.toUpperCase() === "KAPATILDI";
+          
+          // Tutar kontrolü
+          const tutar = parseFloat(b.bilardoUcreti || b.ucret || b.toplam || 0);
+          const hasTutar = tutar > 0;
+          
+          return tarihEslesti && isKapali && hasTutar;
+        } catch (error) {
+          console.error('Bilardo filtreleme hatası:', error, b);
           return false;
         }
       });
       
-      bugunkuBilardoAdisyonlar.forEach(bilardo => {
-        if (bilardo.durum === 'kapandi') {
-          const odemeDetayi = {
-            id: bilardo.id || `bilardo_${Date.now()}`,
-            masaNo: bilardo.masaNo || bilardo.masaId || 'Bilardo',
-            tutar: parseFloat(bilardo.bilardoUcreti || bilardo.ucret || bilardo.toplam || 0),
-            odemeTuru: bilardo.odemeTuru || 'nakit',
-            odemeTipi: 'bilardo',
-            sure: bilardo.sureDakika || bilardo.sure || 0,
-            kapanisZamani: bilardo.kapanisZamani || bilardo.acilisZamani || new Date().toISOString(),
-            not: bilardo.not || ''
-          };
-          
-          bilardoOdemeDetaylari.push(odemeDetayi);
-        }
+      console.log('✅ Tarihe göre filtrelenmiş bilardo adisyonları:', tariheGoreBilardoAdisyonlar.length);
+      
+      tariheGoreBilardoAdisyonlar.forEach(bilardo => {
+        const tutar = parseFloat(bilardo.bilardoUcreti || bilardo.ucret || bilardo.toplam || 0);
+        
+        const odemeDetayi = {
+          id: bilardo.id || `bilardo_${Date.now()}_${Math.random()}`,
+          masaNo: bilardo.masaNo || bilardo.masaId || 'Bilardo',
+          tutar: tutar,
+          odemeTuru: bilardo.odemeTuru || 'nakit',
+          odemeTipi: 'bilardo',
+          sure: bilardo.sureDakika || bilardo.sure || 0,
+          kapanisZamani: bilardo.kapanisZamani || bilardo.acilisZamani || new Date().toISOString(),
+          not: bilardo.not || '',
+          acilisZamani: bilardo.acilisZamani
+        };
+        
+        bilardoOdemeDetaylari.push(odemeDetayi);
       });
+      
+      console.log('🎱 Bilardo ödeme detayları:', bilardoOdemeDetaylari.length);
       
       // 3. Giderleri analiz et
       const giderData = JSON.parse(localStorage.getItem('mc_giderler') || '[]');
-      const bugunkuGiderler = giderData.filter(g => {
+      console.log('💸 Toplam gider kaydı:', giderData.length);
+      
+      const tariheGoreGiderler = giderData.filter(g => {
         try {
-          const tarih = new Date(g.tarih || g.giderTarihi || Date.now()).toISOString().split('T')[0];
-          return tarih === today;
-        } catch {
+          const giderTarihi = formatDateToYYYYMMDD(g.tarih || g.giderTarihi || Date.now());
+          return giderTarihi === searchDate;
+        } catch (error) {
+          console.error('Gider filtreleme hatası:', error, g);
           return false;
         }
       });
       
-      bugunkuGiderler.forEach(gider => {
+      console.log('✅ Tarihe göre filtrelenmiş giderler:', tariheGoreGiderler.length);
+      
+      tariheGoreGiderler.forEach(gider => {
+        const tutar = parseFloat(gider.miktar || gider.tutar || gider.amount || 0);
+        
         giderDetaylari.push({
-          id: gider.id || `gider_${Date.now()}`,
+          id: gider.id || `gider_${Date.now()}_${Math.random()}`,
           kategori: gider.kategori || gider.giderTuru || 'Diğer',
           aciklama: gider.aciklama || gider.not || gider.desc || '',
-          tutar: parseFloat(gider.miktar || gider.tutar || gider.amount || 0),
-          tarih: gider.tarih || gider.giderTarihi || today,
+          tutar: tutar,
+          tarih: gider.tarih || gider.giderTarihi || searchDate,
           odemeTuru: gider.odemeTuru || 'nakit',
-          belgeNo: gider.belgeNo || giger.documentNo || ''
+          belgeNo: gider.belgeNo || gider.documentNo || ''
         });
       });
       
+      console.log('💸 Gider detayları:', giderDetaylari.length);
+      
+      // DEBUG: Tüm verileri konsola yaz
+      console.log('📊 ANALİZ SONUÇLARI:', {
+        searchDate: searchDate,
+        masaOdemeleri: masaOdemeDetaylari.length,
+        bilardoOdemeleri: bilardoOdemeDetaylari.length,
+        indirimler: indirimDetaylari.length,
+        giderler: giderDetaylari.length,
+        masaOdemeleriDetay: masaOdemeDetaylari.map(o => ({
+          masaNo: o.masaNo,
+          tutar: o.tutar,
+          odemeTuru: o.odemeTuru
+        })),
+        bilardoOdemeleriDetay: bilardoOdemeDetaylari.map(o => ({
+          masaNo: o.masaNo,
+          tutar: o.tutar
+        }))
+      });
+      
     } catch (error) {
-      console.error('Veri analiz hatası:', error);
+      console.error('❌ Veri analiz hatası:', error);
     }
     
     return { 
@@ -165,90 +241,100 @@ const GunSonuDetay = () => {
     };
   }, []);
 
+  // CANLI SÜRE HESAPLAMA
+  const calculateLiveDuration = useCallback((raporData) => {
+    if (!raporData) return;
+    
+    const baslangic = raporData.baslangicZamani ? new Date(raporData.baslangicZamani) : new Date();
+    const bitis = raporData.bitisZamani ? new Date(raporData.bitisZamani) : new Date();
+    
+    setBaslangicZamani(baslangic);
+    setBitisZamani(bitis);
+    
+    const farkMs = bitis - baslangic;
+    const saat = Math.floor(farkMs / 3600000);
+    const dakika = Math.floor((farkMs % 3600000) / 60000);
+    
+    setCanliSure({ saat, dakika });
+  }, []);
+
+  // CANLI SÜRE GÜNCELLEME
+  useEffect(() => {
+    if (!rapor) return;
+    
+    const interval = setInterval(() => {
+      calculateLiveDuration(rapor);
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [rapor, calculateLiveDuration]);
+
+  // RAPOR YÜKLEME
   useEffect(() => {
     const loadRapor = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        console.log('🔄 Gün sonu raporu yükleniyor - ID:', raporId);
+        console.log('🔄 Gün sonu raporu yükleniyor - Parametre:', raporId);
         
-        let foundRapor = null;
+        let searchDate = '';
         
-        // 1. DOĞRUDAN STORAGE'DAN ARA
-        const storageKey = `mycafe_gun_sonu_${raporId}`;
-        const savedData = localStorage.getItem(storageKey);
-        
-        if (savedData) {
-          try {
-            foundRapor = JSON.parse(savedData);
-            console.log('✅ Rapor bulundu:', foundRapor.id);
-          } catch (e) {
-            console.warn('❌ JSON parse hatası:', e);
-          }
-        }
-        
-        // 2. GÜN SONU LİSTESİNDE ARA
-        if (!foundRapor) {
-          const gunSonuListesi = JSON.parse(localStorage.getItem('mycafe_gun_sonu_listesi') || '[]');
-          
-          if (gunSonuListesi.length > 0) {
-            foundRapor = gunSonuListesi.find(r => r.id === raporId) || gunSonuListesi[0];
-          }
-        }
-        
-        // 3. SON ÇARE: Bugünün tarihini kullan
-        if (!foundRapor) {
-          const today = new Date().toISOString().split('T')[0];
-          foundRapor = {
-            id: `rapor_${Date.now()}`,
-            tarih: today,
-            baslangicZamani: new Date(new Date().setHours(8, 0, 0, 0)).toISOString(), // Sabah 08:00
-            bitisZamani: new Date().toISOString(),
-            olusturulmaTarihi: new Date().toISOString()
-          };
-          console.log('⚠️  Rapor bulunamadı, yeni rapor oluşturuldu:', foundRapor.id);
-        }
-        
-        if (foundRapor) {
-          // Tarih filtresini rapor tarihine ayarla
-          const reportDate = foundRapor.tarih || new Date().toISOString().split('T')[0];
-          setTarihFiltresi(reportDate);
-          
-          // Masa, Bilardo, Gider ve İndirimleri analiz et
-          const { 
-            masaOdemeDetaylari, 
-            bilardoOdemeDetaylari, 
-            indirimDetaylari,
-            giderDetaylari 
-          } = analyzeData(reportDate);
-          
-          setMasaOdemeleri(masaOdemeDetaylari);
-          setBilardoOdemeleri(bilardoOdemeDetaylari);
-          setIndirimler(indirimDetaylari);
-          setGiderler(giderDetaylari);
-          setFiltrelenmisMasaOdemeleri(masaOdemeDetaylari);
-          setFiltrelenmisBilardoOdemeleri(bilardoOdemeDetaylari);
-          
-          // Canlı süreyi hesapla
-          calculateLiveDuration(foundRapor);
-          
-          // Raporu formatla
-          const enhancedRapor = {
-            id: foundRapor.id || raporId || `rapor_${Date.now()}`,
-            tarih: foundRapor.tarih || reportDate,
-            baslangicZamani: foundRapor.baslangicZamani || new Date(new Date().setHours(8, 0, 0, 0)).toISOString(),
-            bitisZamani: foundRapor.bitisZamani || new Date().toISOString(),
-            olusturulmaTarihi: foundRapor.olusturulmaTarihi || new Date().toISOString(),
-            ...foundRapor
-          };
-          
-          setRapor(enhancedRapor);
+        // PARAMETRE KONTROLÜ
+        if (raporId === 'today' || !raporId) {
+          // BUGÜNÜN RAPORU
+          searchDate = getTodayDate();
+          console.log('📅 Bugünün raporu aranıyor:', searchDate);
+        } else if (raporId.includes('-') || raporId.includes('.')) {
+          // TARİH FORMATINDA PARAMETRE
+          searchDate = formatDateToYYYYMMDD(raporId);
+          console.log('📅 Tarih parametresine göre aranıyor:', searchDate);
         } else {
-          setError(`Rapor bulunamadı (ID: ${raporId})`);
+          // DİĞER ID'LER (eski format)
+          searchDate = getTodayDate();
+          console.log('📅 Eski ID formatı, bugünün raporu aranıyor:', searchDate);
         }
+        
+        // Tarih filtresini ayarla
+        setTarihFiltresi(searchDate);
+        
+        // Verileri analiz et
+        const { 
+          masaOdemeDetaylari, 
+          bilardoOdemeDetaylari, 
+          indirimDetaylari,
+          giderDetaylari 
+        } = analyzeData(searchDate);
+        
+        setMasaOdemeleri(masaOdemeDetaylari);
+        setBilardoOdemeleri(bilardoOdemeDetaylari);
+        setIndirimler(indirimDetaylari);
+        setGiderler(giderDetaylari);
+        setFiltrelenmisMasaOdemeleri(masaOdemeDetaylari);
+        setFiltrelenmisBilardoOdemeleri(bilardoOdemeDetaylari);
+        
+        // Gün sonu raporu oluştur
+        const enhancedRapor = {
+          id: raporId || `rapor_${Date.now()}`,
+          tarih: searchDate,
+          baslangicZamani: new Date(new Date().setHours(8, 0, 0, 0)).toISOString(),
+          bitisZamani: new Date().toISOString(),
+          olusturulmaTarihi: new Date().toISOString(),
+        };
+        
+        setRapor(enhancedRapor);
+        calculateLiveDuration(enhancedRapor);
+        
+        console.log('✅ Rapor yüklendi:', {
+          tarih: searchDate,
+          masaOdemeleri: masaOdemeDetaylari.length,
+          bilardoOdemeleri: bilardoOdemeDetaylari.length,
+          giderler: giderDetaylari.length,
+          indirimler: indirimDetaylari.length
+        });
+        
       } catch (err) {
-        console.error('Rapor yükleme hatası:', err);
+        console.error('❌ Rapor yükleme hatası:', err);
         setError('Rapor yüklenirken hata oluştu: ' + err.message);
       } finally {
         setLoading(false);
@@ -260,32 +346,18 @@ const GunSonuDetay = () => {
 
   // Tarih filtresi değiştiğinde
   useEffect(() => {
-    if (tarihFiltresi && masaOdemeleri.length > 0) {
-      const filteredMasalar = masaOdemeleri.filter(odeme => {
-        try {
-          const odemeTarihi = new Date(odeme.kapanisZamani).toISOString().split('T')[0];
-          return odemeTarihi === tarihFiltresi;
-        } catch {
-          return false;
-        }
-      });
+    if (tarihFiltresi) {
+      console.log('🔄 Tarih filtresi değişti:', tarihFiltresi);
       
-      const filteredBilardo = bilardoOdemeleri.filter(odeme => {
-        try {
-          const odemeTarihi = new Date(odeme.kapanisZamani).toISOString().split('T')[0];
-          return odemeTarihi === tarihFiltresi;
-        } catch {
-          return false;
-        }
-      });
+      const { 
+        masaOdemeDetaylari, 
+        bilardoOdemeDetaylari 
+      } = analyzeData(tarihFiltresi);
       
-      setFiltrelenmisMasaOdemeleri(filteredMasalar);
-      setFiltrelenmisBilardoOdemeleri(filteredBilardo);
-    } else {
-      setFiltrelenmisMasaOdemeleri(masaOdemeleri);
-      setFiltrelenmisBilardoOdemeleri(bilardoOdemeleri);
+      setFiltrelenmisMasaOdemeleri(masaOdemeDetaylari);
+      setFiltrelenmisBilardoOdemeleri(bilardoOdemeDetaylari);
     }
-  }, [tarihFiltresi, masaOdemeleri, bilardoOdemeleri]);
+  }, [tarihFiltresi, analyzeData]);
 
   // Ödeme türlerine göre toplam hesapla
   const calculatePaymentTotals = (odemeler) => {
@@ -331,6 +403,8 @@ const GunSonuDetay = () => {
 
   const tumTarihleriGoster = () => {
     setTarihFiltresi('');
+    setFiltrelenmisMasaOdemeleri(masaOdemeleri);
+    setFiltrelenmisBilardoOdemeleri(bilardoOdemeleri);
   };
 
   const handleBack = () => {
@@ -385,6 +459,21 @@ const GunSonuDetay = () => {
     }
   };
 
+  // DEBUG: Verileri kontrol et
+  useEffect(() => {
+    console.log('📊 PANEL VERİLERİ:', {
+      masaOdemeleri: masaOdemeleri.length,
+      bilardoOdemeleri: bilardoOdemeleri.length,
+      giderler: giderler.length,
+      indirimler: indirimler.length,
+      tarihFiltresi: tarihFiltresi,
+      toplamMasaGeliri: toplamMasaGeliri,
+      toplamBilardoGeliri: toplamBilardoGeliri,
+      toplamGider: toplamGider,
+      toplamIndirim: toplamIndirim
+    });
+  }, [masaOdemeleri, bilardoOdemeleri, giderler, indirimler, tarihFiltresi]);
+
   if (loading) {
     return (
       <div className="gun-sonu-detay-container">
@@ -392,6 +481,9 @@ const GunSonuDetay = () => {
           <div className="loading-spinner"></div>
           <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#2c3e50' }}>
             RAPOR YÜKLENİYOR...
+          </p>
+          <p style={{ color: '#666', marginTop: '10px' }}>
+            Tarih: {tarihFiltresi ? formatDisplayDate(tarihFiltresi) : 'Bugün'}
           </p>
         </div>
       </div>
@@ -403,7 +495,15 @@ const GunSonuDetay = () => {
       <div className="gun-sonu-detay-container">
         <div className="error-container">
           <h2>⚠️ RAPOR BULUNAMADI</h2>
-          <p>{error || `ID: ${raporId} ile rapor bulunamadı.`}</p>
+          <p>{error || `Parametre: ${raporId} ile rapor bulunamadı.`}</p>
+          <div style={{ marginTop: '20px', padding: '15px', background: '#f8d7da', borderRadius: '8px' }}>
+            <h4>🔍 DEBUG Bilgileri:</h4>
+            <p>Tarih Filtresi: {tarihFiltresi}</p>
+            <p>Masa Ödemeleri: {masaOdemeleri.length}</p>
+            <p>Bilardo Ödemeleri: {bilardoOdemeleri.length}</p>
+            <p>Giderler: {giderler.length}</p>
+            <p>İndirimler: {indirimler.length}</p>
+          </div>
           <button 
             onClick={handleBack} 
             style={{
@@ -427,14 +527,14 @@ const GunSonuDetay = () => {
 
   return (
     <div className="gun-sonu-detay-container">
-      {/* ÜST PANEL - Gün Sonu Raporu ve Tarih Filtresi */}
+      {/* ÜST PANEL */}
       <div className="top-panel">
         <div className="top-panel-content">
           <div className="panel-title">
             <h1>📊 GÜN SONU RAPORU</h1>
             <div className="report-date">
-              <span>📅 TARİH: {formatDate(rapor.tarih)}</span>
-              <span>🆔 RAPOR ID: {rapor.id.substring(0, 8)}...</span>
+              <span>📅 TARİH: {formatDisplayDate(rapor.tarih)}</span>
+              <span>🕒 SAAT: {new Date().toLocaleTimeString('tr-TR')}</span>
             </div>
           </div>
           
@@ -455,7 +555,7 @@ const GunSonuDetay = () => {
               <div className="filter-info">
                 {tarihFiltresi ? (
                   <span className="active-filter">
-                    ✅ FİLTRE AKTİF: {formatDate(tarihFiltresi)}
+                    ✅ FİLTRE AKTİF: {formatDisplayDate(tarihFiltresi)}
                   </span>
                 ) : (
                   <span className="all-dates">📅 TÜM TARİHLER GÖSTERİLİYOR</span>
@@ -466,49 +566,71 @@ const GunSonuDetay = () => {
         </div>
       </div>
 
+      {/* DEBUG PANEL (Geliştirme için) */}
+      <div style={{
+        margin: '10px 0',
+        padding: '10px',
+        background: '#e3f2fd',
+        borderRadius: '8px',
+        fontSize: '12px',
+        border: '1px solid #90caf9'
+      }}>
+        <strong>🔍 DEBUG:</strong> Masa: {masaOdemeleri.length} | Bilardo: {bilardoOdemeleri.length} | 
+        Gider: {giderler.length} | İndirim: {indirimler.length} | 
+        Toplam: {(toplamMasaGeliri + toplamBilardoGeliri).toFixed(2)} ₺
+      </div>
+
       {/* CANLI SÜRE BİLGİLERİ */}
       <div className="duration-info">
         <div className="duration-card">
           <span className="duration-label">⏰ BAŞLANGIÇ ZAMANI</span>
           <span className="duration-value">
-            {baslangicZamani ? formatTime(baslangicZamani) : 'BİLİNMİYOR'}
+            {baslangicZamani ? formatTime(baslangicZamani) : '08:00:00'}
           </span>
         </div>
         
         <div className="duration-card">
           <span className="duration-label">🏁 BİTİŞ ZAMANI</span>
           <span className="duration-value">
-            {bitisZamani ? formatTime(bitisZamani) : 'BİLİNMİYOR'}
+            {bitisZamani ? formatTime(bitisZamani) : formatTime(new Date())}
           </span>
         </div>
         
         <div className="duration-card live">
-          <span className="duration-label">⏱️ CANLI ÇALIŞMA SÜRESİ</span>
+          <span className="duration-label">⏱️ ÇALIŞMA SÜRESİ</span>
           <span className="duration-value highlight">
             {canliSure.saat} SAAT {canliSure.dakika} DAKİKA
           </span>
         </div>
       </div>
 
-      {/* GÜNLÜK ÖZET - Güncellenmiş */}
+      {/* GÜNLÜK ÖZET */}
       <div className="section">
         <h2 className="section-title">📊 GÜNLÜK ÖZET</h2>
         <div className="summary-grid">
           <div className="summary-card primary">
             <div className="summary-label">TOPLAM CİRO</div>
-            <div className="summary-value">{toplamCiro.toLocaleString('tr-TR')} ₺</div>
+            <div className="summary-value">{toplamCiro.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="summary-subtitle">
+              {masaOdemeleri.length + bilardoOdemeleri.length} Adisyon
+            </div>
           </div>
           <div className="summary-card success">
             <div className="summary-label">NET KÂR</div>
-            <div className="summary-value">{netKar.toLocaleString('tr-TR')} ₺</div>
+            <div className="summary-value">{netKar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="summary-subtitle" style={{ color: netKar >= 0 ? '#10b981' : '#ef4444' }}>
+              {netKar >= 0 ? '🔼 Kârlı' : '🔻 Zarar'}
+            </div>
           </div>
           <div className="summary-card warning">
             <div className="summary-label">TOPLAM GİDER</div>
-            <div className="summary-value">{toplamGider.toLocaleString('tr-TR')} ₺</div>
+            <div className="summary-value">{toplamGider.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="summary-subtitle">{giderler.length} Kayıt</div>
           </div>
           <div className="summary-card info">
             <div className="summary-label">BRÜT KÂR</div>
-            <div className="summary-value">{brutKar.toLocaleString('tr-TR')} ₺</div>
+            <div className="summary-value">{brutKar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="summary-subtitle">Ciro - İndirim</div>
           </div>
         </div>
       </div>
@@ -519,26 +641,30 @@ const GunSonuDetay = () => {
         <div className="distribution-grid">
           <div className="detail-card">
             <h3>💰 MASALAR</h3>
-            <div className="detail-value">{toplamMasaGeliri.toLocaleString('tr-TR')} ₺</div>
-            <div className="detail-count">{filtrelenmisMasaOdemeleri.length} ADİSYON</div>
+            <div className="detail-value">{toplamMasaGeliri.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="detail-count">{filtrelenmisMasaOdemeleri.length} ADISYON</div>
+            <div className="detail-sub">Nakit: {(toplamNakit).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
           </div>
           
           <div className="detail-card">
             <h3>🎱 BİLARDO</h3>
-            <div className="detail-value">{toplamBilardoGeliri.toLocaleString('tr-TR')} ₺</div>
-            <div className="detail-count">{filtrelenmisBilardoOdemeleri.length} ADİSYON</div>
+            <div className="detail-value">{toplamBilardoGeliri.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="detail-count">{filtrelenmisBilardoOdemeleri.length} ADISYON</div>
+            <div className="detail-sub">Toplam Süre: {filtrelenmisBilardoOdemeleri.reduce((sum, o) => sum + (o.sure || 0), 0)} dk</div>
           </div>
           
           <div className="detail-card">
             <h3>🎁 İNDİRİMLER</h3>
-            <div className="detail-value negative">{toplamIndirim.toLocaleString('tr-TR')} ₺</div>
+            <div className="detail-value negative">{toplamIndirim.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
             <div className="detail-count">{indirimler.length} İNDİRİM</div>
+            <div className="detail-sub">Ortalama: {(toplamIndirim / (indirimler.length || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
           </div>
           
           <div className="detail-card">
             <h3>💸 GİDERLER</h3>
-            <div className="detail-value expense">{toplamGider.toLocaleString('tr-TR')} ₺</div>
+            <div className="detail-value expense">{toplamGider.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
             <div className="detail-count">{giderler.length} GİDER</div>
+            <div className="detail-sub">Ortalama: {(toplamGider / (giderler.length || 1)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
           </div>
         </div>
       </div>
@@ -549,19 +675,28 @@ const GunSonuDetay = () => {
         <div className="payment-types-grid">
           <div className="payment-card cash">
             <div className="payment-label">💵 NAKİT</div>
-            <div className="payment-value">{toplamNakit.toLocaleString('tr-TR')} ₺</div>
+            <div className="payment-value">{toplamNakit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="payment-percentage">
+              {toplamCiro > 0 ? ((toplamNakit / toplamCiro) * 100).toFixed(1) : '0'}%
+            </div>
           </div>
           <div className="payment-card credit">
             <div className="payment-label">💳 KREDİ KARTI</div>
-            <div className="payment-value">{toplamKredi.toLocaleString('tr-TR')} ₺</div>
+            <div className="payment-value">{toplamKredi.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="payment-percentage">
+              {toplamCiro > 0 ? ((toplamKredi / toplamCiro) * 100).toFixed(1) : '0'}%
+            </div>
           </div>
           <div className="payment-card transfer">
             <div className="payment-label">🏦 HAVALE/EFT</div>
-            <div className="payment-value">{toplamHavaleEft.toLocaleString('tr-TR')} ₺</div>
+            <div className="payment-value">{toplamHavaleEft.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
+            <div className="payment-percentage">
+              {toplamCiro > 0 ? ((toplamHavaleEft / toplamCiro) * 100).toFixed(1) : '0'}%
+            </div>
           </div>
           <div className="payment-card account">
             <div className="payment-label">📝 HESABA YAZ</div>
-            <div className="payment-value">{toplamHesabaYaz.toLocaleString('tr-TR')} ₺</div>
+            <div className="payment-value">{toplamHesabaYaz.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
             <div className="payment-note">(CİRO'YA DAHİL DEĞİL)</div>
           </div>
         </div>
@@ -590,7 +725,7 @@ const GunSonuDetay = () => {
                       <span className="expense-category">{gider.kategori.toUpperCase()}</span>
                     </td>
                     <td className="expense-desc">{gider.aciklama}</td>
-                    <td className="expense-amount">{gider.tutar.toLocaleString('tr-TR')} ₺</td>
+                    <td className="expense-amount">{gider.tutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
                     <td>
                       <span className={`payment-badge ${gider.odemeTuru}`}>
                         {gider.odemeTuru === 'nakit' ? '💵 NAKİT' : 
@@ -607,7 +742,7 @@ const GunSonuDetay = () => {
               <tfoot>
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'right', fontWeight: '900', padding: '20px' }}>
-                    🏁 TOPLAM GİDER: {toplamGider.toLocaleString('tr-TR')} ₺
+                    🏁 TOPLAM GİDER: {toplamGider.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                   </td>
                 </tr>
               </tfoot>
@@ -621,98 +756,114 @@ const GunSonuDetay = () => {
         <h2 className="section-title">📋 MASA VE BİLARDO ÖDEMELERİ</h2>
         
         {/* Masa Ödemeleri Tablosu */}
-        <div className="payment-table-section">
-          <h4>🍽️ MASA ÖDEMELERİ</h4>
-          <div className="table-container">
-            <table className="payment-table">
-              <thead>
-                <tr>
-                  <th>MASA NO</th>
-                  <th>TUTAR</th>
-                  <th>ÖDEME TÜRÜ</th>
-                  <th>ÖDEME TİPİ</th>
-                  <th>KAPANIŞ SAATİ</th>
-                  <th>NOT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrelenmisMasaOdemeleri.map((odeme) => (
-                  <tr key={odeme.id} className={odeme.hesabaYaz ? 'account-payment' : ''}>
-                    <td>{odeme.masaNo}</td>
-                    <td>{odeme.tutar.toLocaleString('tr-TR')} ₺</td>
-                    <td>
-                      <span className={`payment-badge ${odeme.odemeTuru}`}>
-                        {odeme.odemeTuru === 'nakit' ? '💵 NAKİT' : 
-                         odeme.odemeTuru === 'kredi_karti' ? '💳 KREDİ KARTI' : 
-                         odeme.odemeTuru === 'havale_eft' ? '🏦 HAVALE/EFT' : 
-                         odeme.odemeTuru.toUpperCase()}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`payment-type-badge ${odeme.odemeTipi}`}>
-                        {odeme.odemeTipi.toUpperCase()}
-                      </span>
-                    </td>
-                    <td>{formatTime(odeme.kapanisZamani)}</td>
-                    <td className="note-cell">{odeme.not || '-'}</td>
+        {filtrelenmisMasaOdemeleri.length > 0 ? (
+          <div className="payment-table-section">
+            <h4>🍽️ MASA ÖDEMELERİ ({filtrelenmisMasaOdemeleri.length} Adisyon)</h4>
+            <div className="table-container">
+              <table className="payment-table">
+                <thead>
+                  <tr>
+                    <th>MASA NO</th>
+                    <th>TUTAR</th>
+                    <th>ÖDEME TÜRÜ</th>
+                    <th>ÖDEME TİPİ</th>
+                    <th>KAPANIŞ SAATİ</th>
+                    <th>NOT</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'right', fontWeight: '900', padding: '20px' }}>
-                    🏁 TOPLAM MASA GELİRİ: {toplamMasaGeliri.toLocaleString('tr-TR')} ₺
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {filtrelenmisMasaOdemeleri.map((odeme) => (
+                    <tr key={odeme.id} className={odeme.hesabaYaz ? 'account-payment' : ''}>
+                      <td>{odeme.masaNo}</td>
+                      <td>{odeme.tutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
+                      <td>
+                        <span className={`payment-badge ${odeme.odemeTuru}`}>
+                          {odeme.odemeTuru === 'nakit' ? '💵 NAKİT' : 
+                           odeme.odemeTuru === 'kredi_karti' ? '💳 KREDİ KARTI' : 
+                           odeme.odemeTuru === 'havale_eft' ? '🏦 HAVALE/EFT' : 
+                           odeme.odemeTuru.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`payment-type-badge ${odeme.odemeTipi}`}>
+                          {odeme.hesabaYaz ? '📝 HESABA YAZ' : odeme.odemeTipi.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>{formatTime(odeme.kapanisZamani)}</td>
+                      <td className="note-cell">{odeme.not || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'right', fontWeight: '900', padding: '20px' }}>
+                      🏁 TOPLAM MASA GELİRİ: {toplamMasaGeliri.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px', background: '#f8f9fa', borderRadius: '8px', marginBottom: '20px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '10px' }}>📭</div>
+            <h4>Masa Ödemesi Bulunamadı</h4>
+            <p>Bu tarihte kapatılmış masa adisyonu bulunmuyor.</p>
+          </div>
+        )}
 
         {/* Bilardo Ödemeleri Tablosu */}
-        <div className="payment-table-section" style={{ marginTop: '30px' }}>
-          <h4>🎱 BİLARDO ÖDEMELERİ</h4>
-          <div className="table-container">
-            <table className="payment-table">
-              <thead>
-                <tr>
-                  <th>MASA NO</th>
-                  <th>TUTAR</th>
-                  <th>SÜRE (DK)</th>
-                  <th>ÖDEME TÜRÜ</th>
-                  <th>KAPANIŞ SAATİ</th>
-                  <th>NOT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrelenmisBilardoOdemeleri.map((odeme) => (
-                  <tr key={odeme.id}>
-                    <td>{odeme.masaNo}</td>
-                    <td>{odeme.tutar.toLocaleString('tr-TR')} ₺</td>
-                    <td>{odeme.sure}</td>
-                    <td>
-                      <span className={`payment-badge ${odeme.odemeTuru}`}>
-                        {odeme.odemeTuru === 'nakit' ? '💵 NAKİT' : 
-                         odeme.odemeTuru === 'kredi_karti' ? '💳 KREDİ KARTI' : 
-                         odeme.odemeTuru === 'havale_eft' ? '🏦 HAVALE/EFT' : 
-                         odeme.odemeTuru.toUpperCase()}
-                      </span>
-                    </td>
-                    <td>{formatTime(odeme.kapanisZamani)}</td>
-                    <td className="note-cell">{odeme.not || '-'}</td>
+        {filtrelenmisBilardoOdemeleri.length > 0 ? (
+          <div className="payment-table-section" style={{ marginTop: '30px' }}>
+            <h4>🎱 BİLARDO ÖDEMELERİ ({filtrelenmisBilardoOdemeleri.length} Adisyon)</h4>
+            <div className="table-container">
+              <table className="payment-table">
+                <thead>
+                  <tr>
+                    <th>MASA NO</th>
+                    <th>TUTAR</th>
+                    <th>SÜRE (DK)</th>
+                    <th>ÖDEME TÜRÜ</th>
+                    <th>KAPANIŞ SAATİ</th>
+                    <th>NOT</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'right', fontWeight: '900', padding: '20px' }}>
-                    🏁 TOPLAM BİLARDO GELİRİ: {toplamBilardoGeliri.toLocaleString('tr-TR')} ₺
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {filtrelenmisBilardoOdemeleri.map((odeme) => (
+                    <tr key={odeme.id}>
+                      <td>{odeme.masaNo}</td>
+                      <td>{odeme.tutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
+                      <td>{odeme.sure}</td>
+                      <td>
+                        <span className={`payment-badge ${odeme.odemeTuru}`}>
+                          {odeme.odemeTuru === 'nakit' ? '💵 NAKİT' : 
+                           odeme.odemeTuru === 'kredi_karti' ? '💳 KREDİ KARTI' : 
+                           odeme.odemeTuru === 'havale_eft' ? '🏦 HAVALE/EFT' : 
+                           odeme.odemeTuru.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>{formatTime(odeme.kapanisZamani)}</td>
+                      <td className="note-cell">{odeme.not || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'right', fontWeight: '900', padding: '20px' }}>
+                      🏁 TOPLAM BİLARDO GELİRİ: {toplamBilardoGeliri.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px', background: '#f8f9fa', borderRadius: '8px', marginTop: '20px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '10px' }}>🎱</div>
+            <h4>Bilardo Ödemesi Bulunamadı</h4>
+            <p>Bu tarihte kapatılmış bilardo adisyonu bulunmuyor.</p>
+          </div>
+        )}
       </div>
 
       {/* İndirimler */}
@@ -723,13 +874,13 @@ const GunSonuDetay = () => {
             {indirimler.map((indirim) => (
               <div key={indirim.id} className="discount-item">
                 <div className="discount-masa">MASA {indirim.masaNo}</div>
-                <div className="discount-amount">{indirim.tutar.toLocaleString('tr-TR')} ₺</div>
+                <div className="discount-amount">{indirim.tutar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
                 <div className="discount-desc">{indirim.aciklama}</div>
               </div>
             ))}
           </div>
           <div className="discount-total">
-            🏁 TOPLAM İNDİRİM: {toplamIndirim.toLocaleString('tr-TR')} ₺
+            🏁 TOPLAM İNDİRİM: {toplamIndirim.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
           </div>
         </div>
       )}
@@ -739,32 +890,32 @@ const GunSonuDetay = () => {
         <div className="footer-summary">
           <div className="summary-item">
             <span className="summary-label">TOPLAM CİRO:</span>
-            <span className="summary-value">{toplamCiro.toLocaleString('tr-TR')} ₺</span>
+            <span className="summary-value">{toplamCiro.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
           </div>
           <div className="summary-item">
             <span className="summary-label">MASALAR:</span>
-            <span className="summary-value">{toplamMasaGeliri.toLocaleString('tr-TR')} ₺</span>
+            <span className="summary-value">{toplamMasaGeliri.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
           </div>
           <div className="summary-item">
             <span className="summary-label">BİLARDO:</span>
-            <span className="summary-value">{toplamBilardoGeliri.toLocaleString('tr-TR')} ₺</span>
+            <span className="summary-value">{toplamBilardoGeliri.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
           </div>
           <div className="summary-item">
             <span className="summary-label">İNDİRİM:</span>
-            <span className="summary-value">{toplamIndirim.toLocaleString('tr-TR')} ₺</span>
+            <span className="summary-value">{toplamIndirim.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
           </div>
           <div className="summary-item">
             <span className="summary-label">GİDERLER:</span>
-            <span className="summary-value expense">{toplamGider.toLocaleString('tr-TR')} ₺</span>
+            <span className="summary-value expense">{toplamGider.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
           </div>
           <div className="summary-item">
             <span className="summary-label">NET KÂR:</span>
-            <span className="summary-value success">{netKar.toLocaleString('tr-TR')} ₺</span>
+            <span className="summary-value success">{netKar.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
           </div>
         </div>
       </div>
 
-      {/* Geri Dön Butonu (Alt kısımda) */}
+      {/* Geri Dön Butonu */}
       <div style={{ textAlign: 'center', marginTop: '30px', paddingBottom: '20px' }}>
         <button 
           onClick={handleBack} 

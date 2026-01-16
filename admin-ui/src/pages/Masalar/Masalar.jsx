@@ -63,7 +63,7 @@ const formatTime = (date) => {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-// YENİ: Adisyon toplamını al - TÜM ADİSYONLARI KONTROL ET
+// YENİ: Adisyon toplamını al - TÜM ADISYONLARI KONTROL ET
 const getAdisyonToplam = (adisyonId) => {
   try {
     const key = `mc_adisyon_toplam_${adisyonId}`;
@@ -85,6 +85,52 @@ const getMasaToplam = (masaNo) => {
   }
 };
 
+// YENİ: Bugünkü tarihi al
+const getTodayString = () => {
+  return new Date().toISOString().split('T')[0];
+};
+
+// YENİ: Adisyonun bugüne ait olup olmadığını kontrol et
+const isBugunkuAdisyon = (adisyon) => {
+  if (!adisyon || !adisyon.acilisZamani) return false;
+  try {
+    const adisyonTarih = new Date(adisyon.acilisZamani).toISOString().split('T')[0];
+    const bugun = getTodayString();
+    return adisyonTarih === bugun;
+  } catch {
+    return false;
+  }
+};
+
+// YENİ: Bugünkü ve açık adisyonları filtrele
+const filterBugunkuVeAcikAdisyonlar = (adisyonlar) => {
+  const bugun = getTodayString();
+  
+  return adisyonlar.filter(adisyon => {
+    // Tarih kontrolü
+    if (!adisyon.acilisZamani) return false;
+    
+    try {
+      const adisyonTarih = new Date(adisyon.acilisZamani).toISOString().split('T')[0];
+      if (adisyonTarih !== bugun) return false;
+    } catch {
+      return false;
+    }
+    
+    // Kapalı kontrolü
+    const status = adisyon.status?.toUpperCase() || adisyon.durum?.toUpperCase() || "";
+    const kapali = adisyon.kapali || status === "CLOSED" || status === "KAPALI";
+    
+    return !kapali;
+  });
+};
+
+// YENİ: Gün aktif mi kontrol et
+const isGunAktif = () => {
+  const gunDurumu = localStorage.getItem('mycafe_gun_durumu');
+  return gunDurumu === 'aktif';
+};
+
 // --------------------------------------------------
 // MAIN COMPONENT
 // --------------------------------------------------
@@ -97,15 +143,18 @@ export default function Masalar({ onOpenAdisyon }) {
     return normalizeMasalarList(raw);
   });
   const [adisyonlar, setAdisyonlar] = useState(() => readJSON("mc_adisyonlar", []));
+  const [bugunkuAdisyonlar, setBugunkuAdisyonlar] = useState([]);
   const [seciliMasa, setSeciliMasa] = useState(null);
   const [silMasaNo, setSilMasaNo] = useState("");
+  const [gunAktif, setGunAktif] = useState(isGunAktif());
+  const [bugunTarihi, setBugunTarihi] = useState(getTodayString());
   
   // REFS
   const dragSourceMasaNoRef = useRef(null);
   const lastUpdateRef = useRef(Date.now());
 
   // --------------------------------------------------
-  // DATA MANAGEMENT
+  // DATA MANAGEMENT - GUNCELLENDI
   // --------------------------------------------------
   const loadData = useCallback(() => {
     const now = Date.now();
@@ -116,6 +165,14 @@ export default function Masalar({ onOpenAdisyon }) {
     
     const rawMasalar = readJSON("mc_masalar", []);
     const rawAdisyonlar = readJSON("mc_adisyonlar", []);
+    
+    // Gün durumunu kontrol et
+    setGunAktif(isGunAktif());
+    setBugunTarihi(getTodayString());
+    
+    // Bugünkü ve açık adisyonları filtrele
+    const filteredAdisyonlar = filterBugunkuVeAcikAdisyonlar(rawAdisyonlar);
+    setBugunkuAdisyonlar(filteredAdisyonlar);
     
     // Masaları güncelle (normalizasyon korunuyor)
     setMasalar(prev => {
@@ -137,6 +194,14 @@ export default function Masalar({ onOpenAdisyon }) {
     });
     
     setAdisyonlar(rawAdisyonlar);
+    
+    console.log('📊 Masalar.jsx: Veriler yüklendi', {
+      toplamMasa: rawMasalar.length,
+      bugunkuAdisyon: filteredAdisyonlar.length,
+      tumAdisyon: rawAdisyonlar.length,
+      gunAktif: isGunAktif(),
+      bugunTarihi: getTodayString()
+    });
   }, []);
 
   const saveMasalar = useCallback((list) => {
@@ -152,7 +217,7 @@ export default function Masalar({ onOpenAdisyon }) {
   }, []);
 
   // --------------------------------------------------
-  // REAL-TIME UPDATES - DÜZELTİLDİ
+  // REAL-TIME UPDATES - GUNCELLENDI
   // --------------------------------------------------
   useEffect(() => {
     loadData();
@@ -168,23 +233,70 @@ export default function Masalar({ onOpenAdisyon }) {
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('adisyonGuncellendi', handleStorageChange);
     window.addEventListener('odemelerGuncellendi', handleStorageChange);
+    window.addEventListener('gunDurumuDegisti', handleStorageChange);
+    window.addEventListener('gunSonuYapildi', handleStorageChange);
     
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('adisyonGuncellendi', handleStorageChange);
       window.removeEventListener('odemelerGuncellendi', handleStorageChange);
+      window.removeEventListener('gunDurumuDegisti', handleStorageChange);
+      window.removeEventListener('gunSonuYapildi', handleStorageChange);
     };
   }, [loadData]);
 
   // --------------------------------------------------
-  // MASA INFORMATION - BASİTLEŞTİRİLDİ
+  // MASA INFORMATION - GUNCELLENDI (Bugünkü verileri kullan)
   // --------------------------------------------------
   const getMasaBilgi = useCallback((masa) => {
     if (!masa.adisyonId) return { acik: false };
     
-    const anaAdisyon = adisyonlar.find(a => a.id === masa.adisyonId);
-    if (!anaAdisyon) return { acik: false };
+    // YENİ: Sadece bugünkü adisyonları kontrol et
+    const bugun = getTodayString();
+    
+    const anaAdisyon = bugunkuAdisyonlar.find(a => a.id === masa.adisyonId);
+    if (!anaAdisyon) {
+      // Eski adisyonları kontrol et (tarihsel veri için)
+      const eskiAdisyon = adisyonlar.find(a => a.id === masa.adisyonId);
+      if (eskiAdisyon && isBugunkuAdisyon(eskiAdisyon)) {
+        // Bugüne ait ama kapalı olabilir
+        const status = eskiAdisyon.status?.toUpperCase() || eskiAdisyon.durum?.toUpperCase() || "";
+        const kapali = eskiAdisyon.kapali || status === "CLOSED" || status === "KAPALI";
+        
+        if (kapali) {
+          return { acik: false };
+        }
+        
+        const acilis = eskiAdisyon.acilisZamani ? new Date(eskiAdisyon.acilisZamani) : null;
+        if (!acilis || isNaN(acilis.getTime())) return { acik: false };
+        
+        const simdi = new Date();
+        const gecenDakika = Math.floor((simdi - acilis) / 60000);
+        const acilisSaati = formatTime(acilis);
+        
+        // Tutarı hesapla
+        let toplamTutar = parseFloat(eskiAdisyon.toplamTutar || 0) || 0;
+        
+        if (toplamTutar === 0 && eskiAdisyon.kalemler && Array.isArray(eskiAdisyon.kalemler)) {
+          toplamTutar = eskiAdisyon.kalemler.reduce((sum, k) => {
+            const birimFiyat = parseFloat(k.birimFiyat || k.fiyat || 0) || 0;
+            const miktar = parseFloat(k.miktar || k.adet || 1) || 1;
+            return sum + (birimFiyat * miktar);
+          }, 0);
+        }
+        
+        return {
+          acik: true,
+          gecenDakika,
+          acilisSaati,
+          toplamTutar,
+          adisyon: eskiAdisyon,
+          eskiAdisyon: true
+        };
+      }
+      return { acik: false };
+    }
     
     // Status kontrolü - DÜZELTİLDİ
     const status = anaAdisyon.status?.toUpperCase() || anaAdisyon.durum?.toUpperCase() || "";
@@ -205,8 +317,8 @@ export default function Masalar({ onOpenAdisyon }) {
     let toplamTutar = getMasaToplam(masa.no);
     
     if (toplamTutar === 0) {
-      // Masa toplamı yoksa, tüm açık adisyonları topla
-      const masaAdisyonlari = adisyonlar.filter(a => {
+      // Masa toplamı yoksa, BUGÜNKÜ açık adisyonları topla
+      const masaBugunkuAdisyonlari = bugunkuAdisyonlar.filter(a => {
         const masaEslesti = 
           a.masaNo === `MASA ${masa.no}` || 
           a.masaNum === masa.no ||
@@ -218,10 +330,17 @@ export default function Masalar({ onOpenAdisyon }) {
         return masaEslesti && !aKapali;
       });
       
-      masaAdisyonlari.forEach(ad => {
-        const adToplam = (ad.kalemler || []).reduce((sum, k) => {
-          return sum + (Number(k.toplam) || 0);
-        }, 0);
+      masaBugunkuAdisyonlari.forEach(ad => {
+        let adToplam = parseFloat(ad.toplamTutar || 0) || 0;
+        
+        if (adToplam === 0 && ad.kalemler && Array.isArray(ad.kalemler)) {
+          adToplam = ad.kalemler.reduce((sum, k) => {
+            const birimFiyat = parseFloat(k.birimFiyat || k.fiyat || 0) || 0;
+            const miktar = parseFloat(k.miktar || k.adet || 1) || 1;
+            return sum + (birimFiyat * miktar);
+          }, 0);
+        }
+        
         toplamTutar += adToplam;
       });
       
@@ -235,8 +354,9 @@ export default function Masalar({ onOpenAdisyon }) {
       acilisSaati,
       toplamTutar,
       adisyon: anaAdisyon,
+      eskiAdisyon: false
     };
-  }, [adisyonlar]);
+  }, [adisyonlar, bugunkuAdisyonlar]);
 
   // Memoized masa bilgileri
   const masaBilgileri = useMemo(() => {
@@ -251,6 +371,12 @@ export default function Masalar({ onOpenAdisyon }) {
   // MASA OPERATIONS
   // --------------------------------------------------
   const handleAddMasa = useCallback(() => {
+    // Gün aktif değilse uyarı ver
+    if (!gunAktif) {
+      alert('❌ Gün başlatılmamış! Önce günü başlatın.');
+      return;
+    }
+    
     const existingNumbers = masalar.map(m => Number(m.no)).filter(n => !isNaN(n));
     const maxNo = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     
@@ -264,7 +390,7 @@ export default function Masalar({ onOpenAdisyon }) {
     
     const yeniListe = [...masalar, yeniMasa];
     saveMasalar(yeniListe);
-  }, [masalar, saveMasalar]);
+  }, [masalar, saveMasalar, gunAktif]);
 
   const handleDeleteMasa = useCallback(() => {
     const trimmed = silMasaNo.trim();
@@ -342,7 +468,7 @@ export default function Masalar({ onOpenAdisyon }) {
       sourceToplam
     });
     
-    // 1. ADİSYONLARI GÜNCELLE (Masa numarasını değiştir)
+    // 1. ADISYONLARI GÜNCELLE (Masa numarasını değiştir)
     const updatedAdisyonlar = adisyonlar.map(ad => {
       // Ana adisyonu güncelle
       if (ad.id === adisyonId) {
@@ -410,7 +536,7 @@ export default function Masalar({ onOpenAdisyon }) {
       localStorage.setItem(`mc_adisyon_toplam_${adisyonId}`, sourceAdisyonToplam.toString());
     }
     
-    // 4. TÜM DİĞER ADİSYONLARI BUL VE GÜNCELLE
+    // 4. TÜM DİĞER ADISYONLARI BUL VE GÜNCELLE
     const digerAdisyonlar = adisyonlar.filter(ad => 
       (ad.masaNo === `MASA ${sourceNo}` || ad.masaNum === sourceNo) && 
       ad.id !== adisyonId
@@ -445,6 +571,12 @@ export default function Masalar({ onOpenAdisyon }) {
   }, []);
 
   const handleDoubleClick = useCallback((masa) => {
+    // Gün aktif değilse uyarı ver
+    if (!gunAktif) {
+      alert('❌ Gün başlatılmamış! Önce günü başlatın.');
+      return;
+    }
+    
     const bilgi = masaBilgileri[masa.no];
     let adisyonId = masa.adisyonId;
     
@@ -488,9 +620,9 @@ export default function Masalar({ onOpenAdisyon }) {
     if (typeof onOpenAdisyon === "function") {
       onOpenAdisyon({ masaId: masa.no, adisyonId });
     } else {
-      navigate("/adisyon/" + adisyonId);
+      navigate("/adisyondetay/" + masa.no);
     }
-  }, [masalar, masaBilgileri, adisyonlar, onOpenAdisyon, navigate, saveMasalar, saveAdisyonlar]);
+  }, [masalar, masaBilgileri, adisyonlar, onOpenAdisyon, navigate, saveMasalar, saveAdisyonlar, gunAktif]);
 
   // --------------------------------------------------
   // RENDER
@@ -516,16 +648,39 @@ export default function Masalar({ onOpenAdisyon }) {
           gap: "20px",
         }}
       >
-        <h1
-          style={{
-            fontSize: "40px",
-            fontWeight: 900,
-            color: "#3a2a14",
-            margin: 0,
-          }}
-        >
-          Masalar
-        </h1>
+        <div>
+          <h1
+            style={{
+              fontSize: "40px",
+              fontWeight: 900,
+              color: "#3a2a14",
+              margin: 0,
+              marginBottom: "5px",
+            }}
+          >
+            Masalar
+          </h1>
+          
+          {/* GÜN DURUMU BİLGİSİ */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            fontSize: "14px",
+            color: gunAktif ? "#27ae60" : "#e74c3c",
+            fontWeight: 600,
+          }}>
+            <div style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              background: gunAktif ? "#2ecc71" : "#e74c3c",
+            }}></div>
+            <span>{gunAktif ? 'Gün Aktif' : 'Gün Başlatılmamış'}</span>
+            <span style={{ color: "#7f8c8d" }}>•</span>
+            <span style={{ color: "#7f8c8d", fontWeight: 500 }}>Bugün: {bugunTarihi}</span>
+          </div>
+        </div>
 
         {/* ACTION BUTTONS */}
         <div
@@ -536,6 +691,39 @@ export default function Masalar({ onOpenAdisyon }) {
             flexWrap: "wrap",
           }}
         >
+          {/* GÜN BAŞLAT BUTONU (sadece gün aktif değilse) */}
+          {!gunAktif && (
+            <button
+              onClick={() => {
+                if (window.confirm('Günü başlatmak istiyor musunuz?')) {
+                  localStorage.setItem('mycafe_gun_durumu', 'aktif');
+                  localStorage.setItem('mycafe_gun_baslangic', new Date().toISOString());
+                  localStorage.setItem('mycafe_gun_baslangic_kasa', '0');
+                  setGunAktif(true);
+                  window.dispatchEvent(new Event('gunDurumuDegisti'));
+                  alert('✅ Gün başarıyla başlatıldı!');
+                }
+              }}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "999px",
+                border: "none",
+                cursor: "pointer",
+                background: "linear-gradient(135deg, #2ecc71, #27ae60)",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: "14px",
+                boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
+                minWidth: "120px",
+                transition: "transform 0.2s",
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+              onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+            >
+              🚀 Gün Başlat
+            </button>
+          )}
+          
           {/* ADD TABLE */}
           <button
             onClick={handleAddMasa}
@@ -551,9 +739,12 @@ export default function Masalar({ onOpenAdisyon }) {
               boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
               minWidth: "120px",
               transition: "transform 0.2s",
+              opacity: gunAktif ? 1 : 0.5,
+              cursor: gunAktif ? "pointer" : "not-allowed",
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-            onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+            onMouseOver={(e) => gunAktif && (e.currentTarget.style.transform = "scale(1.05)")}
+            onMouseOut={(e) => gunAktif && (e.currentTarget.style.transform = "scale(1)")}
+            title={!gunAktif ? "Gün başlatılmamış" : "Yeni masa ekle"}
           >
             + Masa Ekle
           </button>
@@ -567,6 +758,7 @@ export default function Masalar({ onOpenAdisyon }) {
               background: "rgba(74,55,34,0.15)",
               padding: "6px 10px",
               borderRadius: "999px",
+              opacity: gunAktif ? 1 : 0.5,
             }}
           >
             <span style={{ fontSize: "13px", fontWeight: 600 }}>Masa Sil:</span>
@@ -585,7 +777,9 @@ export default function Masalar({ onOpenAdisyon }) {
                 fontSize: "13px",
                 textAlign: "center",
                 fontWeight: 600,
+                background: gunAktif ? "#fff" : "#f5f5f5",
               }}
+              disabled={!gunAktif}
             />
             <button
               onClick={handleDeleteMasa}
@@ -593,15 +787,16 @@ export default function Masalar({ onOpenAdisyon }) {
                 padding: "6px 10px",
                 borderRadius: "999px",
                 border: "none",
-                cursor: "pointer",
+                cursor: gunAktif ? "pointer" : "not-allowed",
                 background: "linear-gradient(135deg, #e74c3c, #c0392b)",
                 color: "#fff",
                 fontWeight: 700,
                 fontSize: "13px",
                 transition: "opacity 0.2s",
+                opacity: gunAktif ? 1 : 0.5,
               }}
-              onMouseOver={(e) => e.currentTarget.style.opacity = "0.9"}
-              onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
+              onMouseOver={(e) => gunAktif && (e.currentTarget.style.opacity = "0.9")}
+              onMouseOut={(e) => gunAktif && (e.currentTarget.style.opacity = "1")}
             >
               Sil
             </button>
@@ -609,8 +804,30 @@ export default function Masalar({ onOpenAdisyon }) {
         </div>
       </div>
 
+      {/* GÜN BİLGİSİ UYARISI */}
+      {!gunAktif && (
+        <div style={{
+          background: "linear-gradient(135deg, #ffeaa7, #fab1a0)",
+          padding: "12px 18px",
+          borderRadius: "12px",
+          marginBottom: "20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          border: "2px solid #e74c3c",
+        }}>
+          <div style={{ fontSize: "24px" }}>⚠️</div>
+          <div>
+            <div style={{ fontWeight: 700, color: "#d63031" }}>Gün başlatılmamış!</div>
+            <div style={{ fontSize: "14px", color: "#636e72" }}>
+              Masaları kullanmak için önce günü başlatın. "Gün Başlat" butonuna tıklayın.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* EMPTY STATE */}
-      {masalar.length === 0 && (
+      {masalar.length === 0 ? (
         <div
           style={{
             fontSize: "16px",
@@ -622,146 +839,227 @@ export default function Masalar({ onOpenAdisyon }) {
             marginBottom: "30px",
           }}
         >
-          Henüz masa yok. Sağ üstten "+ Masa Ekle" ile masa oluşturabilirsiniz.
+          {gunAktif ? 
+            'Henüz masa yok. Sağ üstten "+ Masa Ekle" ile masa oluşturabilirsiniz.' :
+            'Gün başlatılmamış. Önce günü başlatın.'
+          }
         </div>
-      )}
-
-      {/* TABLE GRID */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: "24px",
-        }}
-      >
-        {masalar.map((masa) => {
-          const bilgi = masaBilgileri[masa.no];
-          const acik = bilgi.acik;
-          const isSelected = seciliMasa === masa.no;
-          
-          return (
-            <div
-              key={`${masa.no}_${masa.id}`}
-              draggable={acik}
-              onDragStart={(e) => handleDragStart(e, masa)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, masa)}
-              onClick={() => handleSingleClick(masa)}
-              onDoubleClick={() => handleDoubleClick(masa)}
-              style={{
-                background: RENK.kart,
-                color: RENK.kartYazi,
-                borderRadius: "26px",
-                height: "240px",
-                padding: "18px 16px",
-                cursor: "pointer",
-                textAlign: "center",
-                boxShadow: isSelected
-                  ? "0 0 0 3px #f5d085, 0 10px 18px rgba(0,0,0,0.35)"
-                  : "0 10px 18px rgba(0,0,0,0.45)",
-                transition: "all 0.15s ease",
-                position: "relative",
-                overflow: "hidden",
-                opacity: isSelected ? 1 : 0.95,
-              }}
-              onMouseOver={(e) => e.currentTarget.style.opacity = "1"}
-              onMouseOut={(e) => e.currentTarget.style.opacity = isSelected ? 1 : 0.95}
-            >
-              {/* TABLE NUMBER */}
-              <div
-                style={{
-                  fontSize: "26px",
-                  fontWeight: 900,
-                  marginBottom: "10px",
-                  color: RENK.altin,
-                }}
-              >
-                Masa {masa.no}
+      ) : (
+        <>
+          {/* BUGÜNKÜ DURUM BİLGİSİ */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+            padding: "10px 15px",
+            background: "rgba(255,255,255,0.2)",
+            borderRadius: "12px",
+            fontSize: "14px",
+          }}>
+            <div style={{ display: "flex", gap: "20px" }}>
+              <div>
+                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Toplam Masa:</span>
+                <span style={{ marginLeft: "5px", fontWeight: 700 }}>{masalar.length}</span>
               </div>
-
-              {/* ICON */}
-              <div
-                style={{
-                  fontSize: "74px",
-                  marginBottom: "10px",
-                  color: acik ? RENK.yesil : RENK.altin,
-                  textShadow: "0 5px 8px rgba(0,0,0,0.4)",
-                  transition: "transform 0.3s",
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.1)"}
-                onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
-              >
-                {acik ? "🔔" : "🪑"}
+              <div>
+                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Bugünkü Açık Adisyon:</span>
+                <span style={{ marginLeft: "5px", fontWeight: 700, color: "#27ae60" }}>
+                  {bugunkuAdisyonlar.length}
+                </span>
               </div>
+              <div>
+                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Bugünkü Tarih:</span>
+                <span style={{ marginLeft: "5px", fontWeight: 700 }}>{bugunTarihi}</span>
+              </div>
+            </div>
+            
+            {bugunkuAdisyonlar.length === 0 && gunAktif && (
+              <div style={{ 
+                fontSize: "12px", 
+                color: "#7f8c8d",
+                fontStyle: "italic" 
+              }}>
+                Bugün henüz açık adisyon yok
+              </div>
+            )}
+          </div>
 
-              {/* TABLE STATUS */}
-              {!acik ? (
+          {/* TABLE GRID */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gap: "24px",
+            }}
+          >
+            {masalar.map((masa) => {
+              const bilgi = masaBilgileri[masa.no];
+              const acik = bilgi.acik;
+              const isSelected = seciliMasa === masa.no;
+              
+              // Eski adisyon uyarısı (bugüne ait değilse)
+              const eskiAdisyonUyarisi = bilgi.acik && bilgi.eskiAdisyon;
+              
+              return (
                 <div
+                  key={`${masa.no}_${masa.id}`}
+                  draggable={acik && gunAktif}
+                  onDragStart={(e) => handleDragStart(e, masa)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, masa)}
+                  onClick={() => handleSingleClick(masa)}
+                  onDoubleClick={() => handleDoubleClick(masa)}
                   style={{
-                    fontSize: "22px",
-                    opacity: 0.85,
-                    marginTop: "10px",
-                    fontWeight: 700,
-                    color: "#b8b8b8",
+                    background: RENK.kart,
+                    color: RENK.kartYazi,
+                    borderRadius: "26px",
+                    height: "240px",
+                    padding: "18px 16px",
+                    cursor: gunAktif ? "pointer" : "not-allowed",
+                    textAlign: "center",
+                    boxShadow: isSelected
+                      ? "0 0 0 3px #f5d085, 0 10px 18px rgba(0,0,0,0.35)"
+                      : "0 10px 18px rgba(0,0,0,0.45)",
+                    transition: "all 0.15s ease",
+                    position: "relative",
+                    overflow: "hidden",
+                    opacity: isSelected ? 1 : 0.95,
+                    border: eskiAdisyonUyarisi ? "2px dashed #e74c3c" : "none",
                   }}
+                  onMouseOver={(e) => e.currentTarget.style.opacity = "1"}
+                  onMouseOut={(e) => e.currentTarget.style.opacity = isSelected ? 1 : 0.95}
                 >
-                  BOŞ
-                </div>
-              ) : (
-                <div>
-                  {/* TIME INFO */}
+                  {/* ESKİ ADISYON UYARISI */}
+                  {eskiAdisyonUyarisi && (
+                    <div style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "8px",
+                      background: "#e74c3c",
+                      color: "white",
+                      fontSize: "10px",
+                      padding: "2px 6px",
+                      borderRadius: "10px",
+                      fontWeight: "bold",
+                    }}>
+                      ESKİ
+                    </div>
+                  )}
+
+                  {/* TABLE NUMBER */}
                   <div
                     style={{
-                      fontSize: "14px",
-                      marginBottom: "8px",
-                      opacity: 0.9,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "0 5px",
+                      fontSize: "26px",
+                      fontWeight: 900,
+                      marginBottom: "10px",
+                      color: RENK.altin,
                     }}
                   >
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span>⏰</span>
-                      <span>{bilgi.acilisSaati}</span>
-                    </div>
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span>⏱️</span>
-                      <span>{formatSure(bilgi.gecenDakika)}</span>
-                    </div>
+                    Masa {masa.no}
                   </div>
 
-                  {/* TOTAL AMOUNT - AnaEkran ile uyumlu */}
+                  {/* ICON */}
                   <div
                     style={{
-                      fontSize: "20px",
-                      fontWeight: 800,
-                      color: RENK.altin,
-                      marginTop: "5px",
+                      fontSize: "74px",
+                      marginBottom: "10px",
+                      color: acik ? RENK.yesil : RENK.altin,
+                      textShadow: "0 5px 8px rgba(0,0,0,0.4)",
+                      transition: "transform 0.3s",
+                      opacity: gunAktif ? 1 : 0.7,
                     }}
+                    onMouseOver={(e) => gunAktif && (e.currentTarget.style.transform = "scale(1.1)")}
+                    onMouseOut={(e) => gunAktif && (e.currentTarget.style.transform = "scale(1)")}
                   >
-                    ₺ {(bilgi.toplamTutar || 0).toFixed(2)}
+                    {acik ? "🔔" : "🪑"}
                   </div>
-                  
-                  {/* DRAG HINT */}
-                  {acik && (
+
+                  {/* TABLE STATUS */}
+                  {!acik ? (
                     <div
                       style={{
-                        fontSize: "11px",
-                        opacity: 0.6,
-                        marginTop: "8px",
-                        fontWeight: 500,
+                        fontSize: "22px",
+                        opacity: 0.85,
+                        marginTop: "10px",
+                        fontWeight: 700,
+                        color: "#b8b8b8",
                       }}
                     >
-                      📍 Sürükleyerek taşıyabilirsiniz
+                      BOŞ
+                    </div>
+                  ) : (
+                    <div>
+                      {/* ESKİ ADISYON UYARISI MESAJI */}
+                      {eskiAdisyonUyarisi && (
+                        <div style={{
+                          fontSize: "11px",
+                          color: "#ff7675",
+                          marginBottom: "5px",
+                          fontWeight: "bold",
+                          background: "rgba(231, 76, 60, 0.1)",
+                          padding: "3px 8px",
+                          borderRadius: "8px",
+                        }}>
+                          ⚠️ Önceki günden kaldı
+                        </div>
+                      )}
+                      
+                      {/* TIME INFO */}
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          marginBottom: "8px",
+                          opacity: 0.9,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "0 5px",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span>⏰</span>
+                          <span>{bilgi.acilisSaati}</span>
+                        </div>
+                        <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span>⏱️</span>
+                          <span>{formatSure(bilgi.gecenDakika)}</span>
+                        </div>
+                      </div>
+
+                      {/* TOTAL AMOUNT - AnaEkran ile uyumlu */}
+                      <div
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: 800,
+                          color: RENK.altin,
+                          marginTop: "5px",
+                        }}
+                      >
+                        ₺ {(bilgi.toplamTutar || 0).toFixed(2)}
+                      </div>
+                      
+                      {/* DRAG HINT */}
+                      {acik && gunAktif && (
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            opacity: 0.6,
+                            marginTop: "8px",
+                            fontWeight: 500,
+                          }}
+                        >
+                          📍 Sürükleyerek taşıyabilirsiniz
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
       
       {/* FOOTER INFO */}
       <div
@@ -774,9 +1072,16 @@ export default function Masalar({ onOpenAdisyon }) {
           borderTop: "1px solid rgba(0,0,0,0.1)",
         }}
       >
-        Toplam {masalar.length} masa • {masalar.filter(m => masaBilgileri[m.no]?.acik).length} açık adisyon
+        <div>
+          Toplam {masalar.length} masa • 
+          Bugün {bugunkuAdisyonlar.length} açık adisyon • 
+          Gün: {gunAktif ? 'Aktif' : 'Başlatılmamış'}
+        </div>
         <div style={{ fontSize: "11px", marginTop: "4px", opacity: 0.7 }}>
-          Tutarlar AnaEkran ile uyumlu • Masa taşıma aktif
+          {gunAktif ? 
+            'Yalnızca bugünkü adisyonlar gösteriliyor • Masa taşıma aktif' :
+            'Gün başlatılmadan işlem yapılamaz'
+          }
         </div>
       </div>
     </div>
