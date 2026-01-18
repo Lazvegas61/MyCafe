@@ -133,9 +133,9 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
     
     if (window.raporMotoruV2 && window.raporMotoruV2.createGunSonuRaporu) {
       rapor = window.raporMotoruV2.createGunSonuRaporu(gunBaslangic, gunBitis);
-    } else if (raporMotoruV2 && raporMotoruV2.createGunSonuRaporu) {
+    } else if (raporMotoruV2 && window.raporMotoruV2.createGunSonuRaporu) {
       // Import edilmişse onu kullan
-      rapor = raporMotoruV2.createGunSonuRaporu(gunBaslangic, gunBitis);
+      rapor = window.raporMotoruV2.createGunSonuRaporu(gunBaslangic, gunBitis);
     } else {
       throw new Error("Rapor motoru bulunamadı!");
     }

@@ -1,7 +1,6 @@
 // File: admin-ui/src/pages/Raporlar/components/RaporKartlari.jsx
 import React, { useEffect, useState } from 'react';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 
 const RaporKartlari = () => {
   const [istatistikler, setIstatistikler] = useState({
@@ -52,9 +51,9 @@ const RaporKartlari = () => {
         const aktifMasalar = masalar.filter(masa => masa.durum === 'dolu');
         
         // Rapor motoru ile hesaplamalar
-        const bugunCiro = raporMotoruV2.toplamCiroHesapla(bugunRaporlar);
-        const buHaftaCiro = raporMotoruV2.toplamCiroHesapla(buHaftaRaporlar);
-        const buAyCiro = raporMotoruV2.toplamCiroHesapla(buAyRaporlar);
+        const bugunCiro = window.raporMotoruV2.toplamCiroHesapla(bugunRaporlar);
+        const buHaftaCiro = window.raporMotoruV2.toplamCiroHesapla(buHaftaRaporlar);
+        const buAyCiro = window.raporMotoruV2.toplamCiroHesapla(buAyRaporlar);
         
         setIstatistikler({
           bugunCiro,

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRaporFiltre } from '../../../context/RaporFiltreContext';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 import TabloBilesenleri from '../components/TabloBilesenleri';
 import GrafikBilesenleri from '../components/GrafikBilesenleri';
 import './BilardoDetay.css';
@@ -63,7 +62,7 @@ const BilardoDetay = () => {
         });
 
         // Bilardo raporunu hesapla
-        const hesaplanmisRapor = raporMotoruV2.bilardoRaporuHesapla(filtrelenmisRaporlar, bilardoAdisyonlar);
+        const hesaplanmisRapor = window.raporMotoruV2.bilardoRaporuHesapla(filtrelenmisRaporlar, bilardoAdisyonlar);
         
         // Silinen masaları da dahil et
         hesaplanmisRapor.masaDurumlari = tumMasalar.map(masa => {

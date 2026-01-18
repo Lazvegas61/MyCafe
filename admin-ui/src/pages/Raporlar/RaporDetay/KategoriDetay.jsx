@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRaporFiltre } from '../../../context/RaporFiltreContext';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 import TabloBilesenleri from '../components/TabloBilesenleri';
 import GrafikBilesenleri from '../components/GrafikBilesenleri';
 import './KategoriDetay.css';
@@ -103,7 +102,7 @@ const KategoriDetay = () => {
         });
 
         // Kategori raporunu hesapla
-        const hesaplanmisRapor = raporMotoruV2.kategoriRaporuHesapla(filtrelenmisRaporlar);
+        const hesaplanmisRapor = window.raporMotoruV2.kategoriRaporuHesapla(filtrelenmisRaporlar);
         
         // Eğer kategori filtresi varsa, sadece o kategoriyi göster
         if (filtreler.kategoriId) {

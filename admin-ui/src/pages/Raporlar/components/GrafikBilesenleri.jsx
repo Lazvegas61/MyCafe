@@ -1,37 +1,44 @@
-// File: admin-ui/src/pages/Raporlar/components/GrafikBilesenleri.jsx
 import React, { useEffect, useRef } from 'react';
 import './GrafikBilesenleri.css';
 
-// Basit CSS grafikleri - Chart.js kullanmadan
+/* ===========================
+   GÜVENLİ SAYI YARDIMCILARI
+=========================== */
+const num = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+
+const fixed = (v, d = 2) => num(v).toFixed(d);
+
+/* ===========================
+   ÖDEME DAĞILIM DONUT
+=========================== */
 export const OdemeDagilimDonut = ({ data }) => {
   const donutRef = useRef(null);
-  
-  useEffect(() => {
-    if (!data || !donutRef.current) return;
-    
-    const total = data.nakit + data.kart + data.hesap;
-    if (total === 0) return;
-    
-    const nakitYuzde = (data.nakit / total) * 100;
-    const kartYuzde = (data.kart / total) * 100;
-    const hesapYuzde = (data.hesap / total) * 100;
-    
-    // CSS custom properties ile donut chart oluştur
-    const style = donutRef.current.style;
-    style.setProperty('--nakit-percent', nakitYuzde);
-    style.setProperty('--kart-percent', kartYuzde);
-    style.setProperty('--hesap-percent', hesapYuzde);
-  }, [data]);
 
-  if (!data || (data.nakit === 0 && data.kart === 0 && data.hesap === 0)) {
+  const nakit = num(data?.nakit);
+  const kart = num(data?.kart);
+  const hesap = num(data?.hesap);
+
+  const total = nakit + kart + hesap;
+
+  useEffect(() => {
+    if (!donutRef.current || total <= 0) return;
+
+    const style = donutRef.current.style;
+    style.setProperty('--nakit-percent', (nakit / total) * 100);
+    style.setProperty('--kart-percent', (kart / total) * 100);
+    style.setProperty('--hesap-percent', (hesap / total) * 100);
+  }, [nakit, kart, hesap, total]);
+
+  if (total <= 0) {
     return (
       <div className="bos-grafik">
         <p>Ödeme verisi bulunamadı.</p>
       </div>
     );
   }
-
-  const total = data.nakit + data.kart + data.hesap;
 
   return (
     <div className="grafik-container">
@@ -41,36 +48,38 @@ export const OdemeDagilimDonut = ({ data }) => {
           <div className="donut-segment kart"></div>
           <div className="donut-segment hesap"></div>
           <div className="donut-center">
-            <span className="donut-total">{total.toFixed(2)} ₺</span>
+            <span className="donut-total">{fixed(total)} ₺</span>
             <span className="donut-label">Toplam</span>
           </div>
         </div>
-        
+
         <div className="donut-legend">
           <div className="legend-item">
             <span className="legend-color nakit"></span>
             <div className="legend-info">
               <span className="legend-label">Nakit</span>
               <span className="legend-value">
-                {data.nakit.toFixed(2)} ₺ ({((data.nakit / total) * 100).toFixed(1)}%)
+                {fixed(nakit)} ₺ ({fixed((nakit / total) * 100, 1)}%)
               </span>
             </div>
           </div>
+
           <div className="legend-item">
             <span className="legend-color kart"></span>
             <div className="legend-info">
               <span className="legend-label">Kart</span>
               <span className="legend-value">
-                {data.kart.toFixed(2)} ₺ ({((data.kart / total) * 100).toFixed(1)}%)
+                {fixed(kart)} ₺ ({fixed((kart / total) * 100, 1)}%)
               </span>
             </div>
           </div>
+
           <div className="legend-item">
             <span className="legend-color hesap"></span>
             <div className="legend-info">
               <span className="legend-label">Hesap</span>
               <span className="legend-value">
-                {data.hesap.toFixed(2)} ₺ ({((data.hesap / total) * 100).toFixed(1)}%)
+                {fixed(hesap)} ₺ ({fixed((hesap / total) * 100, 1)}%)
               </span>
             </div>
           </div>
@@ -80,8 +89,11 @@ export const OdemeDagilimDonut = ({ data }) => {
   );
 };
 
+/* ===========================
+   GÜNLÜK GELİR ÇİZGİ
+=========================== */
 export const GunlukGelirCizgi = ({ data }) => {
-  if (!data || data.length === 0) {
+  if (!Array.isArray(data) || data.length === 0) {
     return (
       <div className="bos-grafik">
         <p>Günlük gelir verisi bulunamadı.</p>
@@ -89,29 +101,34 @@ export const GunlukGelirCizgi = ({ data }) => {
     );
   }
 
-  const maxGelir = Math.max(...data.map(d => d.gelir));
+  const gelirler = data.map(d => num(d?.gelir));
+  const maxGelir = Math.max(...gelirler, 0);
   const chartHeight = 200;
-  
+
   return (
     <div className="grafik-container">
       <div className="cizgi-grafik">
         <div className="chart-bars">
           {data.map((gun, index) => {
-            const barHeight = maxGelir > 0 ? (gun.gelir / maxGelir) * chartHeight : 0;
+            const gelir = num(gun?.gelir);
+            const barHeight = maxGelir > 0 ? (gelir / maxGelir) * chartHeight : 0;
+
             return (
               <div key={index} className="chart-bar-wrapper">
-                <div 
+                <div
                   className="chart-bar"
                   style={{ height: `${barHeight}px` }}
-                  title={`${gun.tarih}: ${gun.gelir.toFixed(2)} ₺`}
+                  title={`${gun?.tarih || '-'}: ${fixed(gelir)} ₺`}
                 >
-                  <div className="bar-value">{gun.gelir.toFixed(0)}</div>
+                  <div className="bar-value">{fixed(gelir, 0)}</div>
                 </div>
                 <div className="bar-label">
-                  {new Date(gun.tarih).toLocaleDateString('tr-TR', { 
-                    day: '2-digit',
-                    month: 'short'
-                  })}
+                  {gun?.tarih
+                    ? new Date(gun.tarih).toLocaleDateString('tr-TR', {
+                        day: '2-digit',
+                        month: 'short'
+                      })
+                    : '--'}
                 </div>
               </div>
             );
@@ -125,8 +142,11 @@ export const GunlukGelirCizgi = ({ data }) => {
   );
 };
 
+/* ===========================
+   KATEGORİ DAĞILIM YATAY
+=========================== */
 export const KategoriDagilimYatay = ({ data }) => {
-  if (!data || data.length === 0) {
+  if (!Array.isArray(data) || data.length === 0) {
     return (
       <div className="bos-grafik">
         <p>Kategori verisi bulunamadı.</p>
@@ -134,30 +154,29 @@ export const KategoriDagilimYatay = ({ data }) => {
     );
   }
 
-  const maxTutar = Math.max(...data.map(d => d.toplamTutar));
-  
+  const tutarlar = data.map(d => num(d?.toplamTutar));
+  const maxTutar = Math.max(...tutarlar, 0);
+
   return (
     <div className="grafik-container">
       <div className="yatay-bars">
         {data.map((kategori, index) => {
-          const barWidth = maxTutar > 0 ? (kategori.toplamTutar / maxTutar) * 100 : 0;
-          
+          const tutar = num(kategori?.toplamTutar);
+          const barWidth = maxTutar > 0 ? (tutar / maxTutar) * 100 : 0;
+
           return (
             <div key={index} className="yatay-bar-wrapper">
               <div className="bar-label">
-                <span className="kategori-ad">{kategori.kategoriAdi}</span>
-                <span className="kategori-adet">{kategori.satisAdedi} adet</span>
+                <span className="kategori-ad">{kategori?.kategoriAdi || '-'}</span>
+                <span className="kategori-adet">{num(kategori?.satisAdedi)} adet</span>
               </div>
               <div className="bar-container">
-                <div 
-                  className="yatay-bar"
-                  style={{ width: `${barWidth}%` }}
-                >
-                  <span className="bar-tutar">{kategori.toplamTutar.toFixed(2)} ₺</span>
+                <div className="yatay-bar" style={{ width: `${barWidth}%` }}>
+                  <span className="bar-tutar">{fixed(tutar)} ₺</span>
                 </div>
               </div>
               <div className="bar-yuzde">
-                {maxTutar > 0 ? ((kategori.toplamTutar / maxTutar) * 100).toFixed(0) : 0}%
+                {fixed((tutar / (maxTutar || 1)) * 100, 0)}%
               </div>
             </div>
           );
@@ -167,8 +186,11 @@ export const KategoriDagilimYatay = ({ data }) => {
   );
 };
 
+/* ===========================
+   ÜRÜN SATIŞ KAR
+=========================== */
 export const UrunSatisKar = ({ data }) => {
-  if (!data || data.length === 0) {
+  if (!Array.isArray(data) || data.length === 0) {
     return (
       <div className="bos-grafik">
         <p>Ürün kar verisi bulunamadı.</p>
@@ -185,28 +207,25 @@ export const UrunSatisKar = ({ data }) => {
           <div className="kar-col maliyet">Maliyet</div>
           <div className="kar-col kar">Kar</div>
         </div>
-        
+
         {data.map((urun, index) => {
-          const karYuzde = urun.maliyet > 0 ? ((urun.kar / urun.maliyet) * 100) : 100;
-          
+          const gelir = num(urun?.gelir);
+          const maliyet = num(urun?.maliyet);
+          const kar = num(urun?.kar);
+          const karYuzde = maliyet > 0 ? (kar / maliyet) * 100 : 0;
+
           return (
             <div key={index} className="kar-row">
               <div className="kar-col urun">
-                <span className="urun-ad">{urun.urunAdi}</span>
-                <span className="urun-adet">{urun.adet} adet</span>
+                <span className="urun-ad">{urun?.urunAdi || '-'}</span>
+                <span className="urun-adet">{num(urun?.adet)} adet</span>
               </div>
-              <div className="kar-col gelir">
-                {urun.gelir.toFixed(2)} ₺
-              </div>
-              <div className="kar-col maliyet">
-                {urun.maliyet.toFixed(2)} ₺
-              </div>
+              <div className="kar-col gelir">{fixed(gelir)} ₺</div>
+              <div className="kar-col maliyet">{fixed(maliyet)} ₺</div>
               <div className="kar-col kar">
-                <div className={`kar-deger ${urun.kar >= 0 ? 'pozitif' : 'negatif'}`}>
-                  {urun.kar.toFixed(2)} ₺
-                  <span className="kar-yuzde">
-                    ({karYuzde.toFixed(1)}%)
-                  </span>
+                <div className={`kar-deger ${kar >= 0 ? 'pozitif' : 'negatif'}`}>
+                  {fixed(kar)} ₺
+                  <span className="kar-yuzde">({fixed(karYuzde, 1)}%)</span>
                 </div>
               </div>
             </div>

@@ -1,8 +1,8 @@
-// File: admin-ui/src/pages/AnaEkran/AnaEkran.jsx (GÜNCELLENMİŞ - GÜN BAŞLANGIÇ KONTROLLÜ)
-import React, { useState, useEffect, useCallback } from "react";
+// File: admin-ui/src/pages/AnaEkran/AnaEkran.jsx (GÜNCELLENMİŞ)
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { useGunDurumu } from "../../context/GunDurumuContext"; // DÜZELTİLDİ
+import { useGunDurumu } from "../../context/GunDurumuContext";
 import "./AnaEkran.css";
 
 export default function AnaEkran() {
@@ -11,1022 +11,1053 @@ export default function AnaEkran() {
     dailySales: { total: 0, normal: 0, bilardo: 0, debt: 0 },
     criticalProducts: [],
     openTables: [],
-    dailyExpenses: 0
+    openAdisyonlar: [],
+    dailyExpenses: 0,
+    gunSuresi: { saat: 0, dakika: 0 },
+    lastUpdated: new Date().toISOString()
   });
   
-  const { gunAktif, gunBilgileri, gunBaslat, gunDurumunuKontrolEt } = useGunDurumu();
-  const [gunSuresi, setGunSuresi] = useState({
-    saat: 0,
-    dakika: 0
-  });
-  
+  const { gunAktif, gunBilgileri } = useGunDurumu();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // GELİŞMİŞ KAPALI KONTROL FONKSİYONU
-  const isAdisyonKapali = useCallback((adisyon) => {
-    if (!adisyon) return true;
-    
-    const isBilardo = adisyon.tur === "BİLARDO";
-    
-    // 1. Temel kapalı kontrolü
-    if (adisyon.kapali === true) {
-      return true;
+  // GÜN SÜRESİNİ HESAPLAYAN FONKSİYON
+  const calculateGunSuresi = useCallback(() => {
+    if (!gunAktif || !gunBilgileri?.baslangicTarih) {
+      return { saat: 0, dakika: 0 };
     }
     
-    // 2. Durum değişkeni kontrolü
-    const durum = adisyon.durum?.toUpperCase();
-    if (durum === "KAPALI" || durum === "KAPATILDI" || durum === "ÖDENDİ") {
-      return true;
-    }
-    
-    // 3. Kapanış zamanı kontrolü
-    if (adisyon.kapanisZamani) {
-      const kapanisZamani = new Date(adisyon.kapanisZamani);
-      if (!isNaN(kapanisZamani.getTime())) {
-        return true;
+    try {
+      const baslangic = new Date(gunBilgileri.baslangicTarih);
+      const simdi = new Date();
+      
+      // Geçersiz tarih kontrolü
+      if (isNaN(baslangic.getTime())) {
+        console.warn("Geçersiz başlangıç tarihi");
+        return { saat: 0, dakika: 0 };
       }
+      
+      const farkMs = simdi - baslangic;
+      
+      // Negatif süre kontrolü
+      if (farkMs < 0) {
+        console.warn("Negatif süre tespit edildi");
+        return { saat: 0, dakika: 0 };
+      }
+      
+      const toplamDakika = Math.floor(farkMs / 60000);
+      const saat = Math.floor(toplamDakika / 60);
+      const dakika = toplamDakika % 60;
+      
+      return { saat, dakika };
+    } catch (error) {
+      console.error("Gün süresi hesaplama hatası:", error);
+      return { saat: 0, dakika: 0 };
     }
-    
-    // 4. Ödemeler dizisi kontrolü
-    if (adisyon.odemeler && Array.isArray(adisyon.odemeler) && adisyon.odemeler.length > 0) {
-      const toplamOdenen = adisyon.odemeler.reduce((sum, odeme) => {
-        return sum + (parseFloat(odeme.miktar) || 0);
+  }, [gunAktif, gunBilgileri]);
+
+  // TOPLAM BORÇ HESAPLAYAN FONKSİYON
+  const getToplamBorc = useCallback(() => {
+    try {
+      const borclar = JSON.parse(localStorage.getItem("mc_borclar") || "[]");
+      const musteriBorclari = JSON.parse(localStorage.getItem("mc_musteriler") || "[]");
+      
+      // Aktif borçlar (kapanmamış)
+      const aktifBorclar = borclar.filter(b => {
+        return !b.kapali && !b.kapanisZamani && b.durum !== "KAPALI";
+      });
+      
+      const toplamBorc = aktifBorclar.reduce((sum, b) => {
+        return sum + (parseFloat(b.tutar || 0) - parseFloat(b.odenen || 0));
       }, 0);
       
-      let toplamTutar = 0;
-      if (isBilardo) {
-        const bilardoUcret = parseFloat(adisyon.bilardoUcret || 0);
-        const ekUrunToplam = parseFloat(adisyon.ekUrunToplam || 0);
-        toplamTutar = bilardoUcret + ekUrunToplam;
-      } else {
-        toplamTutar = parseFloat(adisyon.toplamTutar || 0);
-      }
-      
-      if (toplamOdenen >= toplamTutar) {
-        return true;
-      }
-    }
-    
-    // 5. Bilardo özel kontrolü
-    if (isBilardo && adisyon.sureBitti !== undefined) {
-      if (adisyon.sureBitti === true || adisyon.sureBitti === "true") {
-        return true;
-      }
-    }
-    
-    // 6. Transfer edilmiş adisyon kontrolü
-    if (adisyon.transferEdildi === true || adisyon.transferEdildi === "true") {
-      return true;
-    }
-    
-    return false;
-  }, []);
-
-  // GÜNLÜK GİDERLERİ HESAPLA FONKSİYONU - GÜN BAŞLANGICI KONTROLLÜ
-  const calculateDailyExpenses = useCallback(() => {
-    try {
-      // Gün başlangıcını kontrol et
-      const gunBaslangic = localStorage.getItem('mycafe_gun_baslangic');
-      if (!gunBaslangic) return 0;
-      
-      const gunBaslangicTarih = new Date(gunBaslangic);
-      
-      const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-      
-      const dailyExpenses = giderler
-        .filter(gider => {
-          if (!gider.tarih) return false;
-          const giderTarihi = new Date(gider.tarih);
-          return giderTarihi >= gunBaslangicTarih;
-        })
-        .reduce((sum, gider) => {
-          return sum + (parseFloat(gider.tutar) || 0);
-        }, 0);
-      
-      return dailyExpenses;
+      return toplamBorc;
     } catch (error) {
-      console.error("❌ Gider hesaplama hatası:", error);
+      console.error("Toplam borç hesaplama hatası:", error);
       return 0;
     }
   }, []);
 
-  // GELİŞMİŞ BOŞ ADISYON TEMİZLEME FONKSİYONU
-  const cleanupEmptyAdisyonlar = useCallback(() => {
+  // DASHBOARD VERİSİNİ GÜNCELLEYEN FONKSİYON
+  const updateDashboard = useCallback(() => {
     try {
-      const allAdisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-      const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-      
-      console.log('🧹 ANA EKRAN: Gelişmiş adisyon temizliği başlıyor...', {
-        totalAdisyon: allAdisyonlar.length,
-        totalAcikAdisyon: acikAdisyonlar.length
-      });
-      
-      // 1. mc_adisyonlar'dan kapalı ve boş olanları temizle
-      const filteredAdisyonlar = allAdisyonlar.filter(ad => {
-        if (isAdisyonKapali(ad)) {
-          return true;
-        }
+      // RAPOR MOTORU KONTROLÜ
+      if (!window.raporMotoruV2 || typeof window.raporMotoruV2.getDashboardData !== 'function') {
+        console.warn("Rapor motoru henüz hazır değil");
         
-        let hasItems = false;
+        // Fallback: Manuel hesaplama
+        const bugun = new Date().toISOString().split('T')[0];
         
-        if (ad.tur === "BİLARDO") {
-          const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
-          const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-          if (bilardoUcret > 0 || ekUrunToplam > 0) hasItems = true;
-        } else {
-          if (ad.kalemler && ad.kalemler.length > 0) {
-            const total = ad.kalemler.reduce((sum, kalem) => {
-              const birimFiyat = parseFloat(kalem.birimFiyat || kalem.fiyat || 0);
-              const miktar = parseFloat(kalem.miktar || kalem.adet || 1);
-              return sum + (birimFiyat * miktar);
-            }, 0);
-            if (total > 0) hasItems = true;
-          }
-        }
-        
-        return hasItems;
-      });
-      
-      // 2. mc_acik_adisyonlar'dan kapalı ve boş olanları temizle
-      let filteredAcikAdisyonlar = acikAdisyonlar.filter(ad => {
-        if (isAdisyonKapali(ad)) {
-          console.log('🧹 Kapalı adisyon açık adisyonlar listesinden çıkarıldı:', {
-            id: ad.id,
-            tur: ad.tur,
-            masaNo: ad.masaNo || ad.masaNum
-          });
-          return false;
-        }
-        
-        if (ad.tur === "BİLARDO") {
-          const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
-          const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-          const hasItems = (bilardoUcret + ekUrunToplam) > 0;
-          if (!hasItems) {
-            console.log('🧹 Boş bilardo adisyonu temizlendi:', ad.id);
-          }
-          return hasItems;
-        } else {
-          let total = 0;
-          if (ad.kalemler && ad.kalemler.length > 0) {
-            total = ad.kalemler.reduce((sum, kalem) => {
-              const birimFiyat = parseFloat(kalem.birimFiyat || kalem.fiyat || 0);
-              const miktar = parseFloat(kalem.miktar || kalem.adet || 1);
-              return sum + (birimFiyat * miktar);
-            }, 0);
-          }
-          const hasItems = total > 0;
-          if (!hasItems) {
-            console.log('🧹 Boş normal adisyon temizlendi:', ad.id);
-          }
-          return hasItems;
-        }
-      });
-      
-      // 3. KAPALI BİLARDO ADISYONLARINI TEMİZLEME
-      const kapaliBilardoAdisyonlar = allAdisyonlar.filter(ad => 
-        ad.tur === "BİLARDO" && isAdisyonKapali(ad)
-      );
-      
-      if (kapaliBilardoAdisyonlar.length > 0) {
-        console.log('🎱 Kapalı bilardo adisyonları temizleniyor:', kapaliBilardoAdisyonlar.length);
-        
-        const filteredAcikWithoutClosedBilardo = filteredAcikAdisyonlar.filter(ad => 
-          !(ad.tur === "BİLARDO" && isAdisyonKapali(ad))
-        );
-        
-        const removedCount = filteredAcikAdisyonlar.length - filteredAcikWithoutClosedBilardo.length;
-        if (removedCount > 0) {
-          console.log(`🎱 ${removedCount} kapalı bilardo adisyonu açık adisyonlar listesinden temizlendi.`);
-          filteredAcikAdisyonlar = filteredAcikWithoutClosedBilardo;
-        }
-      }
-      
-      // 4. TUTARSIZLIK KONTROLÜ
-      const acikAdisyonIds = new Set(filteredAcikAdisyonlar.map(ad => ad.id));
-      const finalFilteredAdisyonlar = filteredAdisyonlar.map(ad => {
-        if (acikAdisyonIds.has(ad.id)) {
-          const acikVersiyon = filteredAcikAdisyonlar.find(a => a.id === ad.id);
-          
-          const isKapali1 = isAdisyonKapali(ad);
-          const isKapali2 = isAdisyonKapali(acikVersiyon);
-          
-          if (isKapali1 !== isKapali2) {
-            console.log(`🔄 Adisyon ${ad.id} durum tutarsızlığı düzeltiliyor:`, {
-              onceki: isKapali1,
-              yeni: isKapali2,
-              tur: ad.tur,
-              masaNo: ad.masaNo || ad.masaNum
-            });
-            
-            if (isKapali2) {
-              return { 
-                ...ad, 
-                kapali: true,
-                durum: "KAPALI",
-                kapanisZamani: acikVersiyon.kapanisZamani || new Date().toISOString()
-              };
-            } else {
-              return { 
-                ...ad, 
-                kapali: false,
-                durum: "ACIK"
-              };
-            }
-          }
-        }
-        return ad;
-      });
-      
-      // 5. LocalStorage'ı güncelle
-      localStorage.setItem("mc_adisyonlar", JSON.stringify(finalFilteredAdisyonlar));
-      localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(filteredAcikAdisyonlar));
-      
-      console.log('✅ ANA EKRAN: Gelişmiş adisyon temizliği tamamlandı:', {
-        beforeAll: allAdisyonlar.length,
-        afterAll: finalFilteredAdisyonlar.length,
-        beforeAcik: acikAdisyonlar.length,
-        afterAcik: filteredAcikAdisyonlar.length,
-        removedEmpty: allAdisyonlar.length - finalFilteredAdisyonlar.length + acikAdisyonlar.length - filteredAcikAdisyonlar.length,
-        kapaliBilardoTemizlendi: kapaliBilardoAdisyonlar.length
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('❌ ANA EKRAN: Gelişmiş adisyon temizleme hatası:', error);
-      return false;
-    }
-  }, [isAdisyonKapali]);
-
-  // Dashboard verilerini güncelle fonksiyonu - GUNCELLENDI
-  const updateDashboardData = useCallback(() => {
-    console.log('📊 ANA EKRAN: Dashboard verileri güncelleniyor...');
-    
-    try {
-      // Gün başlangıcını kontrol et
-      const gunBaslangic = localStorage.getItem('mycafe_gun_baslangic');
-      
-      if (!gunBaslangic) {
-        // Gün başlatılmamışsa boş veri göster
-        setDashboardData({
-          dailySales: { total: 0, normal: 0, bilardo: 0, debt: 0 },
-          criticalProducts: [],
-          openTables: [],
-          dailyExpenses: 0
+        // Günlük satışları hesapla (basit)
+        const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
+        const bugunkuAdisyonlar = adisyonlar.filter(a => {
+          const tarih = new Date(a.tarih || a.acilisZamani).toISOString().split('T')[0];
+          return tarih === bugun;
         });
+        
+        const normalSatis = bugunkuAdisyonlar.reduce((sum, a) => {
+          return sum + parseFloat(a.toplamTutar || 0);
+        }, 0);
+        
+        // Bilardo satışları
+        const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
+        const bugunkuBilardo = bilardoAdisyonlar.filter(a => {
+          const tarih = new Date(a.acilisZamani).toISOString().split('T')[0];
+          return tarih === bugun;
+        });
+        
+        const bilardoSatis = bugunkuBilardo.reduce((sum, a) => {
+          return sum + (parseFloat(a.bilardoUcreti || 0) + parseFloat(a.ekUrunToplam || 0));
+        }, 0);
+        
+        // Kritik stok
+        const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
+        const kritikStoklar = urunler.filter(u => {
+          const stok = parseInt(u.stock || 0);
+          const kritikSeviye = parseInt(u.critical || 10);
+          return stok <= kritikSeviye;
+        });
+        
+        // Açık masalar
+        const masalar = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
+        const acikMasalar = masalar.filter(m => m.durum === "DOLU");
+        
+        // Giderler
+        const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
+        const bugunkuGiderler = giderler.filter(g => {
+          const tarih = new Date(g.tarih).toISOString().split('T')[0];
+          return tarih === bugun;
+        });
+        
+        const giderToplam = bugunkuGiderler.reduce((sum, g) => {
+          return sum + parseFloat(g.tutar || 0);
+        }, 0);
+        
+        setDashboardData(prev => ({
+          ...prev,
+          dailySales: {
+            total: normalSatis + bilardoSatis,
+            normal: normalSatis,
+            bilardo: bilardoSatis,
+            debt: getToplamBorc()
+          },
+          criticalProducts: kritikStoklar,
+          openTables: acikMasalar,
+          openAdisyonlar: [],
+          dailyExpenses: giderToplam,
+          gunSuresi: calculateGunSuresi(),
+          lastUpdated: new Date().toISOString()
+        }));
+        
         return;
       }
       
-      const gunBaslangicTarih = new Date(gunBaslangic);
+      // RAPOR MOTORU VARSA ONU KULLAN
+      const dashboardData = window.raporMotoruV2.getDashboardData();
       
-      // Bugünün tarihi
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      // KRİTİK STOK SÖZLEŞMESİ KONTROLÜ
+      let kritikStoklar = [];
+      let kritikStokSayisi = 0;
       
-      const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-      const borclar = JSON.parse(localStorage.getItem("mc_borclar") || "[]");
-      const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-      const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-      
-      // GÜNLÜK SATIŞ HESAPLAMA - GÜN BAŞLANGICINDAN SONRAKİLER
-      const todayNormalSales = adisyonlar
-        .filter(a => {
-          if (!a.acilisZamani) return false;
-          const adisyonTarihi = new Date(a.acilisZamani);
-          const tarihStr = adisyonTarihi.toISOString().split('T')[0];
-          
-          // Sadece bugün VE gün başlangıcından sonraki adisyonlar
-          return tarihStr === todayStr && 
-                 adisyonTarihi >= gunBaslangicTarih && 
-                 isAdisyonKapali(a);
-        })
-        .reduce((sum, a) => sum + (parseFloat(a.toplamTutar || 0) || 0), 0);
-      
-      // Bugünkü borçlar
-      const todayDebts = borclar
-        .filter(b => {
-          if (!b.tarih && !b.acilisZamani) return false;
-          const borcTarihi = b.tarih 
-            ? new Date(b.tarih)
-            : new Date(b.acilisZamani);
-          const tarihStr = borcTarihi.toISOString().split('T')[0];
-          
-          return tarihStr === todayStr && borcTarihi >= gunBaslangicTarih;
-        })
-        .reduce((sum, b) => sum + (parseFloat(b.tutar || b.toplamTutar || 0) || 0), 0);
-      
-      // Bugünkü bilardo satışları
-      const todayBilardoSales = bilardoAdisyonlar
-        .filter(b => {
-          if (!b.acilisZamani) return false;
-          const adisyonTarihi = new Date(b.acilisZamani);
-          const tarihStr = adisyonTarihi.toISOString().split('T')[0];
-          
-          return tarihStr === todayStr && 
-                 adisyonTarihi >= gunBaslangicTarih &&
-                 b.durum === "KAPANDI" && !b.iptal && !b.transferEdildi;
-        })
-        .reduce((sum, b) => {
-          const bilardoUcret = parseFloat(b.bilardoUcret || b.bilardoUcreti || 0) || 0;
-          const ekUrunToplam = parseFloat(b.ekUrunToplam || 0) || 0;
-          return sum + bilardoUcret + ekUrunToplam;
-        }, 0);
-      
-      // KRITIK STOK KONTROLÜ
-      const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
-      const criticalProducts = urunler
-        .filter(u => {
-          const stockTakip = u.stockTakip === true || u.stockTakip === "true";
-          const stock = parseInt(u.stock || 0);
-          const critical = parseInt(u.critical || 10);
-          return stockTakip && stock <= critical;
-        })
-        .slice(0, 5);
-      
-      // GÜNLÜK GİDERLERİ HESAPLA (gün başlangıcından sonraki)
-      const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-      const dailyExpenses = giderler
-        .filter(gider => {
-          if (!gider.tarih) return false;
-          const giderTarihi = new Date(gider.tarih);
-          return giderTarihi >= gunBaslangicTarih;
-        })
-        .reduce((sum, gider) => sum + (parseFloat(gider.tutar) || 0), 0);
-      
-      // AÇIK ADISYONLARI AL (Gün başlangıcından sonra açılmış olanlar)
-      const openTables = [];
-      
-      // Normal masalar
-      adisyonlar
-        .filter(a => !isAdisyonKapali(a))
-        .forEach(ad => {
-          const adisyonTarihi = new Date(ad.acilisZamani);
-          if (adisyonTarihi < gunBaslangicTarih) return;
-          
-          const masaNo = ad.masaNo || `MASA ${ad.masaNum}`;
-          let toplamTutar = 0;
-          
-          if (ad.kalemler && ad.kalemler.length > 0) {
-            toplamTutar = ad.kalemler.reduce((sum, kalem) => {
-              const birimFiyat = parseFloat(kalem.birimFiyat || kalem.fiyat || 0);
-              const miktar = parseFloat(kalem.miktar || kalem.adet || 1);
-              return sum + (birimFiyat * miktar);
-            }, 0);
-          }
-          
-          if (ad.toplamTutar && parseFloat(ad.toplamTutar) > 0) {
-            toplamTutar = parseFloat(ad.toplamTutar);
-          }
-          
-          if (toplamTutar > 0) {
-            openTables.push({
-              id: ad.id || `normal_${ad.masaNo || ad.masaNum}`,
-              no: ad.masaNum || ad.masaNo || "1",
-              masaNo: masaNo,
-              toplamTutar: toplamTutar,
-              tur: "NORMAL",
-              urunSayisi: ad.kalemler?.length || 0,
-              adisyonData: ad
-            });
-          }
+      if (dashboardData.kritikStoklar && Array.isArray(dashboardData.kritikStoklar)) {
+        kritikStoklar = dashboardData.kritikStoklar;
+        kritikStokSayisi = dashboardData.kritikStoklar.length;
+      } else if (dashboardData.kritikStokSayisi !== undefined) {
+        kritikStokSayisi = dashboardData.kritikStokSayisi;
+        // Kritik stok listesini manuel getir
+        const urunler = JSON.parse(localStorage.getItem("mc_urunler") || "[]");
+        kritikStoklar = urunler.filter(u => {
+          const stok = parseInt(u.stock || 0);
+          const kritikSeviye = parseInt(u.critical || 10);
+          return stok <= kritikSeviye;
         });
+      }
       
-      // Bilardo masaları
-      bilardoAdisyonlar
-        .filter(b => b.durum === "ACIK")
-        .forEach(ad => {
-          const adisyonTarihi = new Date(ad.acilisZamani);
-          if (adisyonTarihi < gunBaslangicTarih) return;
-          
-          const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
-          const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-          const toplamTutar = bilardoUcret + ekUrunToplam;
-          
-          if (toplamTutar > 0) {
-            openTables.push({
-              id: ad.id || `bilardo_${ad.masaNo}`,
-              no: ad.masaNo,
-              masaNo: `BİLARDO ${ad.masaNo}`,
-              toplamTutar: toplamTutar,
-              tur: "BİLARDO",
-              urunSayisi: ad.ekUrunler?.length || 0,
-              bilardoUcret: bilardoUcret,
-              ekUrunToplam: ekUrunToplam,
-              adisyonData: ad
-            });
-          }
-        });
+      // GÜNLÜK HESAP KONTROLÜ
+      let gunlukHesap = { normal: 0, bilardo: 0, acikAdisyonlar: 0 };
+      if (dashboardData.gunlukHesap) {
+        gunlukHesap = dashboardData.gunlukHesap;
+      }
       
-      // Açık adisyonları benzersiz yap
-      const uniqueOpenTables = [];
-      const masaNoMap = new Map();
-      
-      openTables.forEach(table => {
-        const masaKey = `${table.tur}_${table.no}`;
-        
-        if (!masaNoMap.has(masaKey)) {
-          masaNoMap.set(masaKey, table);
-          uniqueOpenTables.push(table);
-        } else {
-          const existing = masaNoMap.get(masaKey);
-          if (table.toplamTutar > existing.toplamTutar) {
-            const index = uniqueOpenTables.findIndex(t => t.id === existing.id);
-            if (index !== -1) {
-              uniqueOpenTables[index] = table;
-            }
-            masaNoMap.set(masaKey, table);
-          }
-        }
-      });
-      
-      const newDashboardData = {
-        dailySales: {
-          total: todayNormalSales + todayDebts + todayBilardoSales,
-          normal: todayNormalSales,
-          bilardo: todayBilardoSales,
-          debt: todayDebts
-        },
-        criticalProducts: criticalProducts,
-        openTables: uniqueOpenTables.sort((a, b) => {
-          if (a.tur === "NORMAL" && b.tur === "BİLARDO") return -1;
-          if (a.tur === "BİLARDO" && b.tur === "NORMAL") return 1;
-          
-          const aNum = parseInt(a.no.replace('B', '').replace(/\D/g, ''));
-          const bNum = parseInt(b.no.replace('B', '').replace(/\D/g, ''));
-          return aNum - bNum;
-        }),
-        dailyExpenses: dailyExpenses
-      };
-      
-      setDashboardData(newDashboardData);
-      console.log('✅ ANA EKRAN: Dashboard verileri güncellendi', {
-        dailySales: newDashboardData.dailySales,
-        dailyExpenses: newDashboardData.dailyExpenses,
-        openTables: newDashboardData.openTables.length,
-        criticalProducts: newDashboardData.criticalProducts.length
-      });
-
-    } catch (error) {
-      console.error("❌ ANA EKRAN: Dashboard veri yükleme hatası:", error);
       setDashboardData({
-        dailySales: { total: 0, normal: 0, bilardo: 0, debt: 0 },
-        criticalProducts: [],
-        openTables: [],
-        dailyExpenses: 0
+        // GÜNLÜK HESAP (canlı toplam)
+        dailySales: {
+          total: gunlukHesap.normal + gunlukHesap.bilardo,
+          normal: gunlukHesap.normal,
+          bilardo: gunlukHesap.bilardo,
+          debt: getToplamBorc()
+        },
+        // AÇIK MASALAR (canlı)
+        openTables: dashboardData.acikMasalar || [],
+        // KRİTİK STOK (canlı)
+        criticalProducts: kritikStoklar,
+        criticalStockCount: kritikStokSayisi,
+        // AÇIK ADISYONLAR (canlı)
+        openAdisyonlar: dashboardData.acikAdisyonlar || [],
+        // GÜNLÜK GİDERLER
+        dailyExpenses: dashboardData.dailyExpenses || 0,
+        // GÜN SÜRESİ (hesaplama)
+        gunSuresi: calculateGunSuresi(),
+        // TIMESTAMP (debug için)
+        lastUpdated: new Date().toISOString(),
+        // DEBUG INFO (geliştirme modunda)
+        ...(process.env.NODE_ENV === 'development' && {
+          _debug: {
+            raporMotoruVersion: window.raporMotoruV2?.version || 'unknown',
+            dataSource: dashboardData.timestamp ? 'raporMotoru' : 'fallback',
+            kritikStokFormat: dashboardData.kritikStoklar ? 'array' : dashboardData.kritikStokSayisi ? 'count' : 'none'
+          }
+        })
       });
+      
+      console.log('📊 Dashboard güncellendi:', {
+        saat: new Date().toLocaleTimeString('tr-TR'),
+        normalSatis: gunlukHesap.normal,
+        bilardoSatis: gunlukHesap.bilardo,
+        acikMasalar: (dashboardData.acikMasalar || []).length,
+        kritikStok: kritikStokSayisi
+      });
+      
+    } catch (error) {
+      console.error("Dashboard güncelleme hatası:", error);
+      
+      // Hata durumunda en azından gün süresini güncelle
+      setDashboardData(prev => ({
+        ...prev,
+        gunSuresi: calculateGunSuresi(),
+        lastUpdated: new Date().toISOString(),
+        _error: error.message
+      }));
     }
-  }, [isAdisyonKapali]);
+  }, [calculateGunSuresi, getToplamBorc]);
 
-  // Canlı saat güncellemesi
+  // SAATİ GÜNCELLEYEN EFFECT
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      setCurrentTime(`${hours}:${minutes}:${seconds}`);
+      const timeString = now.toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      setCurrentTime(timeString);
     };
-
+    
     updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    const timeInterval = setInterval(updateTime, 1000);
+    
+    return () => clearInterval(timeInterval);
   }, []);
 
-  // Gün süresini güncelle (gün aktifse)
+  // DASHBOARD GÜNCELLEME EFFECT'İ (ANA EFFECT)
   useEffect(() => {
-    if (gunAktif) {
-      const gunBaslangicZamani = localStorage.getItem('mycafe_gun_baslangic');
-      
-      if (gunBaslangicZamani) {
-        const updateGunSuresi = () => {
-          const now = new Date();
-          const baslangic = new Date(gunBaslangicZamani);
-          const farkMs = now - baslangic;
-          
-          const saat = Math.floor(farkMs / (1000 * 60 * 60));
-          const dakika = Math.floor((farkMs % (1000 * 60 * 60)) / (1000 * 60));
-          
-          setGunSuresi({ saat, dakika });
-        };
-        
-        updateGunSuresi();
-        const interval = setInterval(updateGunSuresi, 60000);
-        
-        return () => clearInterval(interval);
-      }
-    }
-  }, [gunAktif]);
-
-  // SyncService event'lerini dinle
-  useEffect(() => {
-    console.log('🔔 ANA EKRAN: SyncService event listenerları kuruluyor...');
+    console.log('🚀 Dashboard effect başlatılıyor...');
     
-    cleanupEmptyAdisyonlar();
-    updateDashboardData();
-    
-    const handleSyncEvent = (event) => {
-      console.log('📢 ANA EKRAN: Sync event alındı:', event.type, event.detail);
+    // EVENT HANDLER FONKSİYONU
+    const handleDashboardUpdate = (event) => {
+      console.log(`📢 Dashboard event tetiklendi: ${event.type || 'unknown'}`, event.detail || '');
       
-      updateDashboardData();
-      
-      setTimeout(updateDashboardData, 300);
+      // Kısa bir gecikmeyle güncelle (DOM'un hazır olması için)
+      setTimeout(() => {
+        updateDashboard();
+      }, 100);
     };
     
-    const syncEvents = [
-      'sync:masa_güncellendi',
-      'sync:adisyongüncellendi',
-      'sync:fiyat_güncellendi',
-      'sync:kalem_eklendi',
-      'sync:senkronize_et',
-      'sync:masa_temizlendi',
-      'sync:panel_güncellendi',
-      'sync:dashboard_güncellendi',
-      'sync:gider_eklendi',
-      'sync:gider_silindi',
-      'gunSonuYapildi',
-      'gunBaslatildi'
-    ];
-    
-    syncEvents.forEach(eventName => {
-      window.addEventListener(eventName, handleSyncEvent);
-    });
-    
-    const otherEvents = [
-      'storage',
+    // DASHBOARD'U ANINDA GÜNCELLEYEN EVENT'LER
+    const instantUpdateEvents = [
       'adisyonGuncellendi',
+      'odemeAlindi',
       'masaGuncellendi',
-      'bilardoAdisyonGuncellendi',
+      'kasaHareketiEklendi',
+      'gunDurumuDegisti',
+      'stokGuncellendi',
       'urunEklendi',
       'urunSilindi',
       'musteriEklendi',
       'borcEklendi',
-      'borcSilindi',
+      'borcOdendi',
       'giderEklendi',
-      'giderSilindi'
+      'bilardoAdisyonGuncellendi',
+      'bilardoMasaGuncellendi'
     ];
     
-    otherEvents.forEach(eventName => {
-      window.addEventListener(eventName, handleSyncEvent);
+    // EVENT LISTENER'LARI KUR
+    instantUpdateEvents.forEach(eventName => {
+      window.addEventListener(eventName, handleDashboardUpdate);
     });
     
-    const periodicInterval = setInterval(updateDashboardData, 30000);
-    const cleanupInterval = setInterval(cleanupEmptyAdisyonlar, 300000);
-    
-    return () => {
-      syncEvents.forEach(eventName => {
-        window.removeEventListener(eventName, handleSyncEvent);
-      });
-      
-      otherEvents.forEach(eventName => {
-        window.removeEventListener(eventName, handleSyncEvent);
-      });
-      
-      clearInterval(periodicInterval);
-      clearInterval(cleanupInterval);
-      console.log('🧹 ANA EKRAN: Event listenerları temizlendi');
+    // ÖZEL EVENT'LER
+    const handleGunBaslatildi = () => {
+      console.log('🌅 Gün başlatıldı, dashboard resetleniyor');
+      setTimeout(updateDashboard, 500);
     };
-  }, [updateDashboardData, cleanupEmptyAdisyonlar]);
-
-  // Format para
-  const formatPara = useCallback((value) => {
-    try {
-      const numValue = typeof value === 'string' ? parseFloat(value) : value;
-      if (isNaN(numValue)) return "0,00";
+    
+    const handleGunSonuYapildi = (event) => {
+      console.log('🏁 Gün sonu yapıldı, dashboard güncelleniyor', event.detail?.raporId);
+      setTimeout(updateDashboard, 1000);
+    };
+    
+    window.addEventListener("gunBaslatildi", handleGunBaslatildi);
+    window.addEventListener("gunSonuYapildi", handleGunSonuYapildi);
+    
+    // İLK YÜKLEME
+    console.log('🔄 İlk dashboard yüklemesi yapılıyor...');
+    const initialTimeout = setTimeout(() => {
+      updateDashboard();
+    }, 1000);
+    
+    // INTERVAL GÜNCELLEME (EMNİYET KEMERİ - 30 SANİYEDE BİR)
+    const dashboardInterval = setInterval(() => {
+      // Gün aktifse ve 30 saniye geçtiyse güncelle
+      if (gunAktif) {
+        updateDashboard();
+      }
+    }, 30000);
+    
+    // STORAGE DEĞİŞİKLİKLERİNİ DİNLE
+    const handleStorageChange = (event) => {
+      if (!event.key) return;
       
-      return numValue.toLocaleString('tr-TR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+      // Dashboard'u etkileyen key'ler
+      const dashboardKeys = [
+        'mc_adisyonlar',
+        'bilardo_adisyonlar',
+        'mc_masalar',
+        'bilardo',
+        'mc_urunler',
+        'mc_giderler',
+        'mc_borclar',
+        'mc_kasa_hareketleri'
+      ];
+      
+      if (dashboardKeys.some(key => event.key.startsWith(key))) {
+        console.log(`💾 Storage değişti: ${event.key}, dashboard güncelleniyor`);
+        setTimeout(updateDashboard, 200);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // CLEANUP FONKSİYONU
+    return () => {
+      console.log('🧹 Dashboard cleanup yapılıyor...');
+      
+      clearTimeout(initialTimeout);
+      clearInterval(dashboardInterval);
+      
+      // EVENT LISTENER'LARI KALDIR
+      instantUpdateEvents.forEach(eventName => {
+        window.removeEventListener(eventName, handleDashboardUpdate);
       });
-    } catch (error) {
-      console.error("Para formatlama hatası:", error, value);
-      return "0,00";
-    }
-  }, []);
+      
+      window.removeEventListener("gunBaslatildi", handleGunBaslatildi);
+      window.removeEventListener("gunSonuYapildi", handleGunSonuYapildi);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [updateDashboard, gunAktif]);
 
-  // Masa veya bilardo detayına git
-  const goToTableDetail = useCallback((masa) => {
+  // RAPOR MOTORU KONTROL EFFECT'İ
+  useEffect(() => {
+    // Rapor motorunun yüklenmesini bekle
+    const checkRaporMotoru = () => {
+      if (window.raporMotoruV2 && typeof window.raporMotoruV2.getDashboardData === 'function') {
+        console.log('✅ RaporMotoruV2 hazır, dashboard güncelleniyor');
+        updateDashboard();
+        return true;
+      }
+      return false;
+    };
+    
+    // Hemen kontrol et
+    if (!checkRaporMotoru()) {
+      // 3 saniye içinde hazır olmasını bekle
+      const timeout = setTimeout(() => {
+        if (checkRaporMotoru()) {
+          clearInterval(interval);
+        }
+      }, 3000);
+      
+      // 1 saniyede bir kontrol et
+      const interval = setInterval(() => {
+        checkRaporMotoru();
+      }, 1000);
+      
+      return () => {
+        clearTimeout(timeout);
+        clearInterval(interval);
+      };
+    }
+  }, [updateDashboard]);
+
+  // KULLANICI DEĞİŞİKLİĞİNDE DASHBOARD'U GÜNCELLE
+  useEffect(() => {
+    if (user) {
+      console.log('👤 Kullanıcı değişti, dashboard güncelleniyor:', user.username);
+      setTimeout(updateDashboard, 500);
+    }
+  }, [user, updateDashboard]);
+
+  // MEMOIZE EDİLMİŞ HESAPLAMALAR
+  const acikMasaSayisi = useMemo(() => {
+    return dashboardData.openTables.length;
+  }, [dashboardData.openTables]);
+  
+  const toplamCiro = useMemo(() => {
+    return dashboardData.dailySales.total;
+  }, [dashboardData.dailySales.total]);
+  
+  const kritikStokSayisi = useMemo(() => {
+    return dashboardData.criticalStockCount || dashboardData.criticalProducts.length;
+  }, [dashboardData.criticalStockCount, dashboardData.criticalProducts.length]);
+  
+  const acikAdisyonSayisi = useMemo(() => {
+    return dashboardData.openAdisyonlar.length;
+  }, [dashboardData.openAdisyonlar.length]);
+
+  // GÜN DURUMU BİLGİSİ
+  const gunDurumuBilgisi = useMemo(() => {
     if (!gunAktif) {
-      alert('❌ Gün başlatılmamış! Günlük işlemler için sol taraftaki menüden "Gün Başlat" butonuna tıklayın.');
+      return {
+        label: "🔴 Gün Kapalı",
+        color: "#e74c3c",
+        bgColor: "#fdf2f0",
+        actionText: "Gün Başlat"
+      };
+    }
+    
+    return {
+      label: "🟢 Gün Aktif",
+      color: "#27ae60",
+      bgColor: "#f0f9f4",
+      actionText: "Gün Sonu",
+      sure: `${dashboardData.gunSuresi.saat.toString().padStart(2, '0')}:${dashboardData.gunSuresi.dakika.toString().padStart(2, '0')}`
+    };
+  }, [gunAktif, dashboardData.gunSuresi]);
+
+  // NAVİGASYON FONKSİYONLARI
+  const handleNavigate = (path) => {
+    navigate(path);
+  };
+
+  const handleGunBaslat = () => {
+    if (!user) {
+      alert("Önce giriş yapmalısınız.");
+      navigate("/login");
       return;
     }
     
-    console.log('Adisyon detayına gidiliyor:', masa);
-    
-    const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-    const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
-    
-    const adisyonId = masa.adisyonData?.id;
-    let adisyonBulundu = false;
-    
-    if (adisyonId) {
-      const adisyon = adisyonlar.find(a => a.id === adisyonId) || 
-                      acikAdisyonlar.find(a => a.id === adisyonId);
-      
-      if (adisyon) {
-        adisyonBulundu = true;
-        console.log('✅ Adisyon bulundu:', adisyonId);
-      } else {
-        console.warn('⚠️ Adisyon bulunamadı:', adisyonId);
-        
-        const masaNo = masa.no.toString().replace('BİLARDO ', '').replace('B', '').replace(/\D/g, '');
-        
-        if (masa.tur === "BİLARDO") {
-          const bilardoAdisyon = acikAdisyonlar.find(a => 
-            a.tur === "BİLARDO" && 
-            a.masaNo === masaNo
-          ) || adisyonlar.find(a => 
-            a.tur === "BİLARDO" && 
-            a.masaNo === masaNo &&
-            !isAdisyonKapali(a)
-          );
-          
-          if (bilardoAdisyon) {
-            console.log('✅ Bilardo adisyonu masa numarasıyla bulundu:', masaNo);
-            navigate(`/bilardo-adisyon/${masaNo}`);
-            return;
-          }
-        } else {
-          const normalAdisyon = acikAdisyonlar.find(a => 
-            a.tur !== "BİLARDO" && 
-            (a.masaNum === masaNo || a.masaNo === `MASA ${masaNo}`)
-          ) || adisyonlar.find(a => 
-            a.tur !== "BİLARDO" && 
-            (a.masaNum === masaNo || a.masaNo === `MASA ${masaNo}`) &&
-            !isAdisyonKapali(a)
-          );
-          
-          if (normalAdisyon) {
-            console.log('✅ Normal adisyon masa numarasıyla bulndu:', masaNo);
-            navigate(`/adisyondetay/${masaNo}`);
-            return;
-          }
-        }
-      }
-    }
-    
-    if (masa.tur === "BİLARDO") {
-      const masaNumarasi = masa.no.toString().replace('BİLARDO ', '').replace('B', '').replace(/\D/g, '');
-      
-      const bilardoAdisyonlar = acikAdisyonlar.filter(a => 
-        a.tur === "BİLARDO" && a.masaNo === masaNumarasi && !isAdisyonKapali(a)
-      );
-      
-      if (bilardoAdisyonlar.length === 0) {
-        alert('⚠️ Bu bilardo adisyonu bulunamadı veya kapalı. Lütfen masa durumunu kontrol edin.');
-        return;
-      }
-      
-      console.log(`Bilardo adisyonuna gidiliyor: /bilardo-adisyon/${masaNumarasi}`);
-      navigate(`/bilardo-adisyon/${masaNumarasi}`);
+    // AuthContext'ten gunBaslat fonksiyonunu kullan
+    const { gunBaslat } = useAuth();
+    if (gunBaslat) {
+      gunBaslat();
     } else {
-      const masaNumarasi = masa.no.toString().replace('MASA ', '').replace(/\D/g, '');
-      
-      const normalAdisyonlar = acikAdisyonlar.filter(a => 
-        a.tur !== "BİLARDO" && 
-        (a.masaNum === masaNumarasi || a.masaNo === `MASA ${masaNumarasi}`) &&
-        !isAdisyonKapali(a)
-      );
-      
-      if (normalAdisyonlar.length === 0) {
-        alert('⚠️ Bu masa adisyonu bulunamadı veya kapalı. Lütfen masa durumunu kontrol edin.');
-        return;
-      }
-      
-      console.log(`Normal adisyona gidiliyor: /adisyondetay/${masaNumarasi}`);
-      navigate(`/adisyondetay/${masaNumarasi}`);
+      alert("Gün başlatma yetkiniz yok veya sistem hazır değil.");
     }
-  }, [navigate, gunAktif, isAdisyonKapali]);
+  };
 
-  // Raporlar sayfasına git
-  const goToReports = useCallback(() => {
-    navigate('/raporlar');
-  }, [navigate]);
+  // DASHBOARD KARTLARI
+  const dashboardCards = [
+    {
+      title: "Günlük Ciro",
+      value: `${toplamCiro.toFixed(2)} ₺`,
+      subtext: `Normal: ${dashboardData.dailySales.normal.toFixed(2)} ₺ • Bilardo: ${dashboardData.dailySales.bilardo.toFixed(2)} ₺`,
+      icon: "💰",
+      color: "#2ecc71",
+      bgColor: "#f0f9f4",
+      onClick: () => handleNavigate("/raporlar/kasa")
+    },
+    {
+      title: "Açık Masalar",
+      value: acikMasaSayisi.toString(),
+      subtext: `${dashboardData.openTables.filter(m => m.tip === 'NORMAL').length} Normal • ${dashboardData.openTables.filter(m => m.tip === 'BİLARDO').length} Bilardo`,
+      icon: "🍽️",
+      color: "#3498db",
+      bgColor: "#f0f7ff",
+      onClick: () => handleNavigate("/masalar")
+    },
+    {
+      title: "Kritik Stok",
+      value: kritikStokSayisi.toString(),
+      subtext: kritikStokSayisi > 0 ? "⚠️ Dikkat gerekiyor" : "✅ Normal",
+      icon: "📦",
+      color: kritikStokSayisi > 0 ? "#e74c3c" : "#2ecc71",
+      bgColor: kritikStokSayisi > 0 ? "#fdf2f0" : "#f0f9f4",
+      onClick: () => handleNavigate("/urun-stok")
+    },
+    {
+      title: "Açık Adisyon",
+      value: acikAdisyonSayisi.toString(),
+      subtext: `${dashboardData.openAdisyonlar.filter(a => a.tur === 'NORMAL').length} Normal • ${dashboardData.openAdisyonlar.filter(a => a.tur === 'BİLARDO').length} Bilardo`,
+      icon: "🧾",
+      color: "#9b59b6",
+      bgColor: "#f8f0ff",
+      onClick: () => handleNavigate("/raporlar")
+    },
+    {
+      title: "Günlük Gider",
+      value: `${dashboardData.dailyExpenses.toFixed(2)} ₺`,
+      subtext: "Bugünkü toplam gider",
+      icon: "💸",
+      color: "#e67e22",
+      bgColor: "#fef5e9",
+      onClick: () => handleNavigate("/giderler")
+    },
+    {
+      title: "Toplam Borç",
+      value: `${dashboardData.dailySales.debt.toFixed(2)} ₺`,
+      subtext: "Aktif müşteri borçları",
+      icon: "🏦",
+      color: "#34495e",
+      bgColor: "#f4f6f7",
+      onClick: () => handleNavigate("/musteri-islemleri")
+    }
+  ];
 
-  // Giderler sayfasına git
-  const goToExpenses = useCallback(() => {
-    navigate('/giderler');
-  }, [navigate]);
+  // KRİTİK STOK LİSTESİ (sadece ilk 3)
+  const kritikStokListesi = useMemo(() => {
+    return dashboardData.criticalProducts.slice(0, 3).map(urun => ({
+      name: urun.ad || urun.name || "İsimsiz Ürün",
+      stok: parseInt(urun.stock || 0),
+      kritik: parseInt(urun.critical || 10)
+    }));
+  }, [dashboardData.criticalProducts]);
 
+  // AÇIK MASALAR LİSTESİ (sadece ilk 5)
+  const acikMasalarListesi = useMemo(() => {
+    return dashboardData.openTables.slice(0, 5).map(masa => ({
+      no: masa.no || masa.masaNo || "?",
+      tip: masa.tip || (masa.isBilardo ? "BİLARDO" : "NORMAL"),
+      tutar: parseFloat(masa.toplamTutar || 0).toFixed(2),
+      musteri: masa.musteriAdi || "Müşteri Yok"
+    }));
+  }, [dashboardData.openTables]);
+
+  // SON GÜNCELLEME ZAMANI
+  const lastUpdatedText = useMemo(() => {
+    try {
+      const date = new Date(dashboardData.lastUpdated);
+      return date.toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return "Bilinmiyor";
+    }
+  }, [dashboardData.lastUpdated]);
+
+  // RENDER
   return (
-    <div className="ana-wrapper">
-      <div className="top-bar">
-        <div className="title-3d">GÜNLÜK ÖZET</div>
-        <div className="clock-box">{currentTime}</div>
+    <div className="ana-ekran" style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #f5e7d0 0%, #e8d9b5 100%)",
+      padding: "20px",
+      color: "#4b2e05"
+    }}>
+      {/* ÜST BİLGİ ÇUBUĞU */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "25px",
+        padding: "15px 20px",
+        background: "rgba(255, 255, 255, 0.9)",
+        borderRadius: "12px",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)"
+      }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "28px", fontWeight: "800" }}>
+            🎯 MyCafe Dashboard
+          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}>
+            <span style={{ 
+              padding: "4px 10px", 
+              borderRadius: "20px", 
+              background: gunDurumuBilgisi.bgColor,
+              color: gunDurumuBilgisi.color,
+              fontWeight: "bold",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}>
+              {gunDurumuBilgisi.label}
+              {gunDurumuBilgisi.sure && (
+                <span style={{ 
+                  background: "rgba(0,0,0,0.1)", 
+                  padding: "2px 8px", 
+                  borderRadius: "10px",
+                  fontSize: "12px"
+                }}>
+                  {gunDurumuBilgisi.sure}
+                </span>
+              )}
+            </span>
+            <span style={{ fontSize: "13px", color: "#7d6b4f" }}>
+              👤 {user?.adSoyad || user?.username || "Kullanıcı"}
+            </span>
+            <span style={{ fontSize: "13px", color: "#7d6b4f" }}>
+              🕐 {currentTime}
+            </span>
+          </div>
+        </div>
+        
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: "12px", color: "#95a5a6", marginBottom: "4px" }}>
+            Son güncelleme: {lastUpdatedText}
+          </div>
+          <button
+            onClick={updateDashboard}
+            style={{
+              padding: "8px 16px",
+              background: "#4b2e05",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              fontWeight: "600",
+              cursor: "pointer",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            🔄 Yenile
+          </button>
+        </div>
       </div>
 
-      {/* GÜN DURUMU BİLGİ KARTI */}
-      {gunAktif && (
-        <div className="gun-durumu-kart">
-          <div className="gun-durumu-left">
-            <div className="gun-durumu-icon">
-              ⏰
+      {/* DASHBOARD KARTLARI */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+        gap: "20px",
+        marginBottom: "30px"
+      }}>
+        {dashboardCards.map((card, index) => (
+          <div
+            key={index}
+            onClick={card.onClick}
+            style={{
+              background: "white",
+              borderRadius: "12px",
+              padding: "20px",
+              boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)",
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              borderLeft: `4px solid ${card.color}`,
+              position: "relative",
+              overflow: "hidden"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-5px)";
+              e.currentTarget.style.boxShadow = "0 12px 24px rgba(0, 0, 0, 0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(0, 0, 0, 0.08)";
+            }}
+          >
+            <div style={{
+              position: "absolute",
+              right: "20px",
+              top: "20px",
+              fontSize: "32px",
+              opacity: "0.2"
+            }}>
+              {card.icon}
             </div>
-            <div>
-              <div className="gun-suresi">
-                Gün Süresi: {gunSuresi.saat} saat {gunSuresi.dakika} dakika
-              </div>
-              <div className="gun-baslangic">
-                Başlangıç: {new Date(localStorage.getItem('mycafe_gun_baslangic') || new Date()).toLocaleDateString('tr-TR')} {new Date(localStorage.getItem('mycafe_gun_baslangic') || new Date()).toLocaleTimeString('tr-TR')}
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: "14px", color: "#7d6b4f", fontWeight: "600", marginBottom: "5px" }}>
+                  {card.title}
+                </div>
+                <div style={{ fontSize: "32px", fontWeight: "800", color: card.color, marginBottom: "8px" }}>
+                  {card.value}
+                </div>
+                <div style={{ fontSize: "13px", color: "#95a5a6" }}>
+                  {card.subtext}
+                </div>
               </div>
             </div>
+            
+            {/* Hover gösterge */}
+            <div style={{
+              position: "absolute",
+              bottom: "0",
+              left: "0",
+              right: "0",
+              height: "3px",
+              background: card.color,
+              transform: "scaleX(0)",
+              transition: "transform 0.3s ease",
+              transformOrigin: "left"
+            }} />
+            
+            <style>{`
+              div[onclick]:hover > div:last-child {
+                transform: scaleX(1);
+              }
+            `}</style>
+          </div>
+        ))}
+      </div>
+
+      {/* ALT PANELLER */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
+        gap: "20px",
+        marginBottom: "30px"
+      }}>
+        {/* KRİTİK STOK PANELİ */}
+        <div style={{
+          background: "white",
+          borderRadius: "12px",
+          padding: "20px",
+          boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+            <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: kritikStokSayisi > 0 ? "#e74c3c" : "#2ecc71" }}>📦</span>
+              Kritik Stok ({kritikStokSayisi})
+            </h3>
+            {kritikStokSayisi > 0 && (
+              <button
+                onClick={() => handleNavigate("/urun-stok")}
+                style={{
+                  padding: "6px 12px",
+                  background: "#e74c3c",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                STOKU GÜNCELLE
+              </button>
+            )}
           </div>
           
-          <div className="gun-durumu-right">
-            <div className="gun-istatistik">
-              <div className="gun-istatistik-label">Bugünkü Satış</div>
-              <div className="gun-istatistik-deger">
-                {formatPara(dashboardData.dailySales.total)} ₺
-              </div>
-            </div>
-            
-            <div className="gun-istatistik">
-              <div className="gun-istatistik-label">Açık Adisyon</div>
-              <div className="gun-istatistik-deger">
-                {dashboardData.openTables.length}
-              </div>
-            </div>
-            
-            <div className="gun-istatistik">
-              <div className="gun-istatistik-label">Günlük Gider</div>
-              <div className="gun-istatistik-deger">
-                {formatPara(dashboardData.dailyExpenses)} ₺
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* GÜN BAŞLATILMAMIŞ UYARI KARTI (BUTONSUZ) */}
-      {!gunAktif && (
-        <div className="gun-baslat-container">
-          <div className="gun-baslat-kart" style={{
-            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            color: 'white',
-            boxShadow: '0 10px 25px rgba(245, 158, 11, 0.3)'
-          }}>
-            <div className="gun-baslat-icon" style={{ fontSize: '48px' }}>⏸️</div>
-            <div className="gun-baslat-bilgi">
-              <h3 style={{ color: 'white', marginBottom: '10px' }}>Gün Başlatılmamış</h3>
-              <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '16px', lineHeight: '1.5' }}>
-                Günlük işlemleri başlatmak için <strong>sol taraftaki menüden</strong> "Gün Başlat" butonuna tıklayın.
-              </p>
-              <div style={{
-                marginTop: '15px',
-                padding: '10px 15px',
-                background: 'rgba(255,255,255,0.1)',
-                borderRadius: '8px',
-                borderLeft: '4px solid white',
-                fontSize: '14px'
-              }}>
-                📍 <strong>Yönlendirme:</strong> Sol tarafta bulunan sidebar menüsündeki <strong>"🚀 Gün Başlat"</strong> butonunu kullanın.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SATIŞ İSTATİSTİKLERİ (GÜN AKTİFSE) */}
-      {gunAktif && (
-        <>
-          <div className="summary-cards">
-            <div className="sum-card">
-              <div className="sum-icon">💰</div>
-              <div className="sum-title">GÜNLÜK TOPLAM SATIŞ</div>
-              <div className="sum-value">
-                {formatPara(dashboardData.dailySales.total)} ₺
-              </div>
-              <div className="sum-detaylar">
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">🍽 Normal</div>
-                  <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.normal)} ₺</div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">🎱 Bilardo</div>
-                  <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.bilardo)} ₺</div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">📝 Hesaba Yaz</div>
-                  <div className="sum-detay-deger">{formatPara(dashboardData.dailySales.debt)} ₺</div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">📊 Net</div>
-                  <div className="sum-detay-deger">
-                    {formatPara(dashboardData.dailySales.total - dashboardData.dailySales.debt)} ₺
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="sum-card">
-              <div className="sum-icon">🪑</div>
-              <div className="sum-title">AÇIK ADISYONLAR</div>
-              <div className="sum-value">
-                {dashboardData.openTables.length} Masa
-              </div>
-              <div className="sum-detaylar">
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">🍽 Normal</div>
-                  <div className="sum-detay-deger">
-                    {dashboardData.openTables.filter(t => t.tur === "NORMAL").length}
-                  </div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">🎱 Bilardo</div>
-                  <div className="sum-detay-deger">
-                    {dashboardData.openTables.filter(t => t.tur === "BİLARDO").length}
-                  </div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">💵 Toplam Tutar</div>
-                  <div className="sum-detay-deger">
-                    {formatPara(dashboardData.openTables.reduce((sum, t) => {
-                      const tutar = parseFloat(t.toplamTutar) || 0;
-                      return sum + tutar;
-                    }, 0))} ₺
-                  </div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">📦 Toplam Ürün</div>
-                  <div className="sum-detay-deger">
-                    {dashboardData.openTables.reduce((sum, t) => sum + (t.urunSayisi || 0), 0)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="sum-card">
-              <div className="sum-icon">🏦</div>
-              <div className="sum-title">KRITIK STOK</div>
-              <div className="sum-value">
-                {dashboardData.criticalProducts.length} Ürün
-              </div>
-              <div className="critical-products-list">
-                {dashboardData.criticalProducts.slice(0, 3).map((urun, idx) => (
-                  <div key={idx} className="critical-product-item">
-                    <span className="critical-product-name">
-                      {urun.name ? (urun.name.length > 15 ? urun.name.substring(0, 12) + "..." : urun.name) : "İsimsiz"}
-                    </span>
-                    <span className="critical-product-stock">
-                      {urun.stock || 0}/{urun.critical || 10}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* RAPORLAR BUTONU */}
-            <div className="sum-card">
-              <div className="sum-icon">📊</div>
-              <div className="sum-title">RAPORLAR</div>
-              <div className="sum-value">
-                Detaylı Analiz
-              </div>
-              <div className="raporlar-button-container">
-                <div 
-                  className="raporlar-button"
-                  onClick={goToReports}
+          {kritikStokSayisi > 0 ? (
+            <div>
+              {kritikStokListesi.map((urun, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px",
+                    marginBottom: "8px",
+                    background: "#fdf2f0",
+                    borderRadius: "8px",
+                    borderLeft: "3px solid #e74c3c"
+                  }}
                 >
-                  📈 Raporlara Git
-                </div>
-              </div>
-              <div className="sum-detaylar">
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">Günlük Özet</div>
-                  <div className="sum-detay-deger">📋</div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">Kategori Raporu</div>
-                  <div className="sum-detay-deger">📊</div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">Kasa Raporu</div>
-                  <div className="sum-detay-deger">💰</div>
-                </div>
-                <div className="sum-detay-item">
-                  <div className="sum-detay-label">Detaylı Analiz</div>
-                  <div className="sum-detay-deger">🔍</div>
-                </div>
-              </div>
-            </div>
-
-            {/* GİDERLER PANELİ */}
-            <div className="sum-card">
-              <div className="sum-icon">💸</div>
-              <div className="sum-title">GÜNLÜK GİDERLER</div>
-              <div className="sum-value">
-                {formatPara(dashboardData.dailyExpenses)} ₺
-              </div>
-              <div className="expenses-summary">
-                <div className="expenses-net-profit">
-                  <div className="expenses-net-label">Net Kâr:</div>
-                  <div 
-                    className="expenses-net-value"
-                    style={{
-                      color: (dashboardData.dailySales.total - dashboardData.dailySales.debt - dashboardData.dailyExpenses) > 0 ? '#10b981' : '#ef4444'
-                    }}
-                  >
-                    {formatPara(dashboardData.dailySales.total - dashboardData.dailySales.debt - dashboardData.dailyExpenses)} ₺
+                  <div>
+                    <div style={{ fontWeight: "600", fontSize: "14px" }}>{urun.name}</div>
+                    <div style={{ fontSize: "12px", color: "#e74c3c" }}>
+                      Stok: {urun.stok} | Kritik Seviye: {urun.kritik}
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: "4px 10px",
+                    background: "#e74c3c",
+                    color: "white",
+                    borderRadius: "20px",
+                    fontSize: "12px",
+                    fontWeight: "bold"
+                  }}>
+                    {Math.max(0, urun.kritik - urun.stok)} adet eksik
                   </div>
                 </div>
-                <div className="expenses-button-container">
-                  <div 
-                    className="expenses-button"
-                    onClick={goToExpenses}
-                  >
-                    📋 Gider Detayları
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* AÇIK ADISYONLAR PANELİ */}
-          <div className="panel-box-wide">
-            <div className="panel-header-wide">
-              <span>📋 AÇIK ADISYONLAR</span>
-              <span className="panel-small-wide">
-                {dashboardData.openTables.length} Masa • 
-                Toplam: {formatPara(dashboardData.openTables.reduce((sum, t) => {
-                  const tutar = parseFloat(t.toplamTutar) || 0;
-                  return sum + tutar;
-                }, 0))} ₺
-                <span className="live-update-badge"></span>
-              </span>
-            </div>
-            
-            <div className="panel-list-wide">
-              {dashboardData.openTables.length > 0 ? (
-                <div className="table-container-wide">
-                  <table className="open-tables-table">
-                    <thead>
-                      <tr>
-                        <th>MASALAR</th>
-                        <th>MASA TÜRÜ</th>
-                        <th>MASA NO</th>
-                        <th>TOPLAM TUTAR</th>
-                        <th>İŞLEMLER</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dashboardData.openTables.map((masa) => {
-                        const isBilardo = masa.tur === "BİLARDO";
-                        
-                        return (
-                          <tr 
-                            key={masa.id}
-                            className={`table-row ${isBilardo ? 'bilardo-row' : 'normal-row'}`}
-                          >
-                            <td>
-                              <div className="table-icon-cell">
-                                <div className="table-icon">
-                                  {isBilardo ? '🎱' : '🍽'}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="table-type-cell">
-                              <div className="table-type-badge">
-                                {isBilardo ? 'BİLARDO' : 'YEMEK/İÇECEK'}
-                              </div>
-                            </td>
-                            <td className="table-number">
-                              <strong>{masa.masaNo}</strong>
-                            </td>
-                            <td className="table-amount">
-                              <div className="amount-main">
-                                {formatPara(masa.toplamTutar)} ₺
-                              </div>
-                              <div className="amount-details">
-                                {masa.urunSayisi || 0} ürün
-                              </div>
-                            </td>
-                            <td className="table-actions">
-                              <button 
-                                className="action-button"
-                                onClick={() => goToTableDetail(masa)}
-                              >
-                                📋 Detay
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="empty-state-wide">
-                  <div className="empty-icon-wide">✅</div>
-                  <div className="empty-text-wide">Açık Adisyon Bulunmuyor</div>
-                  <div className="empty-subtext-wide">
-                    Yeni adisyon açmak için Masalar sayfasına gidin
-                  </div>
+              ))}
+              
+              {kritikStokSayisi > 3 && (
+                <div style={{
+                  textAlign: "center",
+                  padding: "10px",
+                  color: "#7d6b4f",
+                  fontSize: "13px",
+                  borderTop: "1px dashed #eee",
+                  marginTop: "10px"
+                }}>
+                  + {kritikStokSayisi - 3} daha fazla kritik stok...
                 </div>
               )}
             </div>
+          ) : (
+            <div style={{
+              textAlign: "center",
+              padding: "30px 20px",
+              color: "#27ae60",
+              fontSize: "14px"
+            }}>
+              <div style={{ fontSize: "48px", marginBottom: "10px" }}>✅</div>
+              <div style={{ fontWeight: "600" }}>Kritik stok yok</div>
+              <div style={{ fontSize: "13px", color: "#7d6b4f", marginTop: "5px" }}>
+                Tüm stoklar normal seviyede
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AÇIK MASALAR PANELİ */}
+        <div style={{
+          background: "white",
+          borderRadius: "12px",
+          padding: "20px",
+          boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+            <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "#3498db" }}>🍽️</span>
+              Açık Masalar ({acikMasaSayisi})
+            </h3>
+            <button
+              onClick={() => handleNavigate("/masalar")}
+              style={{
+                padding: "6px 12px",
+                background: "#3498db",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: "600",
+                cursor: "pointer"
+              }}
+            >
+              TÜM MASALAR
+            </button>
           </div>
-        </>
+          
+          {acikMasaSayisi > 0 ? (
+            <div>
+              {acikMasalarListesi.map((masa, index) => (
+                <div
+                  key={index}
+                  onClick={() => handleNavigate(`/adisyondetay/${masa.no}`)}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "10px",
+                    marginBottom: "8px",
+                    background: masa.tip === "BİLARDO" ? "#f0f7ff" : "#f9f9f9",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    borderLeft: `3px solid ${masa.tip === "BİLARDO" ? "#3498db" : "#9b59b6"}`,
+                    transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = masa.tip === "BİLARDO" ? "#e8f4ff" : "#f0f0f0";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = masa.tip === "BİLARDO" ? "#f0f7ff" : "#f9f9f9";
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontWeight: "600", fontSize: "14px" }}>
+                        {masa.tip === "BİLARDO" ? "🎱" : "🍽️"} {masa.no}
+                      </span>
+                      <span style={{
+                        fontSize: "11px",
+                        background: masa.tip === "BİLARDO" ? "#3498db" : "#9b59b6",
+                        color: "white",
+                        padding: "2px 6px",
+                        borderRadius: "10px"
+                      }}>
+                        {masa.tip}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#7d6b4f", marginTop: "2px" }}>
+                      {masa.musteri}
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: "bold", fontSize: "16px", color: "#4b2e05" }}>
+                    {masa.tutar} ₺
+                  </div>
+                </div>
+              ))}
+              
+              {acikMasaSayisi > 5 && (
+                <div style={{
+                  textAlign: "center",
+                  padding: "10px",
+                  color: "#7d6b4f",
+                  fontSize: "13px",
+                  borderTop: "1px dashed #eee",
+                  marginTop: "10px"
+                }}>
+                  + {acikMasaSayisi - 5} daha fazla açık masa...
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{
+              textAlign: "center",
+              padding: "30px 20px",
+              color: "#7d6b4f",
+              fontSize: "14px"
+            }}>
+              <div style={{ fontSize: "48px", marginBottom: "10px" }}>🔄</div>
+              <div style={{ fontWeight: "600" }}>Açık masa yok</div>
+              <div style={{ fontSize: "13px", color: "#95a5a6", marginTop: "5px" }}>
+                Tüm masalar boş veya kapalı
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* HIZLI ERİŞİM BUTONLARI */}
+      <div style={{
+        background: "white",
+        borderRadius: "12px",
+        padding: "20px",
+        boxShadow: "0 6px 16px rgba(0, 0, 0, 0.08)",
+        marginBottom: "30px"
+      }}>
+        <h3 style={{ margin: "0 0 15px 0", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span>⚡</span> Hızlı Erişim
+        </h3>
+        
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: "10px"
+        }}>
+          {[
+            { label: "Masalar", icon: "🍽️", path: "/masalar", color: "#9b59b6" },
+            { label: "Bilardo", icon: "🎱", path: "/bilardo", color: "#3498db" },
+            { label: "Raporlar", icon: "📊", path: "/raporlar", color: "#2ecc71" },
+            { label: "Ürün/Stok", icon: "📦", path: "/urun-stok", color: "#e67e22" },
+            { label: "Müşteriler", icon: "👥", path: "/musteri-islemleri", color: "#34495e" },
+            { label: "Giderler", icon: "💸", path: "/giderler", color: "#e74c3c" },
+            { label: "Personel", icon: "🧑‍🍳", path: "/personel", color: "#1abc9c" },
+            { label: "Ayarlar", icon: "⚙️", path: "/ayarlar", color: "#7f8c8d" }
+          ].map((item, index) => (
+            <button
+              key={index}
+              onClick={() => handleNavigate(item.path)}
+              style={{
+                padding: "15px 10px",
+                background: "white",
+                border: `2px solid ${item.color}20`,
+                borderRadius: "10px",
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "8px",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = `${item.color}10`;
+                e.currentTarget.style.transform = "translateY(-3px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "white";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              <span style={{ fontSize: "24px" }}>{item.icon}</span>
+              <span style={{ fontWeight: "600", fontSize: "13px", color: item.color }}>
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* SİSTEM DURUMU / DEBUG PANELİ (Sadece geliştirme modunda) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{
+          background: "#2c3e50",
+          color: "white",
+          borderRadius: "12px",
+          padding: "15px",
+          fontSize: "12px",
+          marginTop: "20px"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span style={{ fontWeight: "bold", color: "#ecf0f1" }}>🔧 Sistem Durumu</span>
+            <span style={{ 
+              background: dashboardData._error ? "#e74c3c" : "#2ecc71", 
+              padding: "2px 8px", 
+              borderRadius: "10px",
+              fontSize: "10px"
+            }}>
+              {dashboardData._error ? "HATA" : "SAĞLAM"}
+            </span>
+          </div>
+          
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", 
+            gap: "8px",
+            fontFamily: "monospace"
+          }}>
+            <div>
+  Rapor Motoru:{" "}
+  {window.raporMotoruV2 &&
+  typeof window.raporMotoruV2.createGunSonuRaporu === "function"
+    ? "✅"
+    : "❌"}
+</div>
+            <div>Gün Aktif: {gunAktif ? "✅" : "❌"}</div>
+            <div>Kullanıcı: {user ? "✅" : "❌"}</div>
+            <div>Event Dinleyiciler: {Object.keys(window._eventListeners || {}).length}</div>
+            <div>LocalStorage: {localStorage.length} item</div>
+            <div>Render: {Date.now()}</div>
+          </div>
+          
+          {dashboardData._debug && (
+            <div style={{ 
+              marginTop: "10px", 
+              paddingTop: "10px", 
+              borderTop: "1px solid #34495e",
+              fontSize: "11px",
+              color: "#bdc3c7"
+            }}>
+              <div>Data Source: {dashboardData._debug.dataSource}</div>
+              <div>Kritik Stok Format: {dashboardData._debug.kritikStokFormat}</div>
+            </div>
+          )}
+          
+          {dashboardData._error && (
+            <div style={{ 
+              marginTop: "10px", 
+              padding: "8px", 
+              background: "#c0392b",
+              borderRadius: "6px",
+              fontSize: "11px"
+            }}>
+              <strong>HATA:</strong> {dashboardData._error}
+            </div>
+          )}
+        </div>
       )}
+
+      {/* FOOTER */}
+      <div style={{
+        textAlign: "center",
+        marginTop: "30px",
+        paddingTop: "20px",
+        borderTop: "1px solid rgba(0,0,0,0.1)",
+        color: "#7d6b4f",
+        fontSize: "12px"
+      }}>
+        <div>MyCafe POS v2.0 • {new Date().getFullYear()} © Tüm hakları saklıdır.</div>
+        <div style={{ marginTop: "5px", fontSize: "11px" }}>
+          Geliştirici Modu: {process.env.NODE_ENV} • Son güncelleme: {lastUpdatedText}
+        </div>
+      </div>
     </div>
   );
 }

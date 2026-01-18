@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRaporFiltre } from '../../../context/RaporFiltreContext';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 import TabloBilesenleri from '../components/TabloBilesenleri';
 import GrafikBilesenleri from '../components/GrafikBilesenleri';
 import './UrunDetay.css';
@@ -63,7 +62,7 @@ const UrunDetay = () => {
         });
 
         // Ürün raporunu hesapla
-        const hesaplanmisRapor = raporMotoruV2.urunRaporuHesapla(filtrelenmisRaporlar);
+        const hesaplanmisRapor = window.raporMotoruV2.urunRaporuHesapla(filtrelenmisRaporlar);
         
         setUrunVerisi(hesaplanmisRapor);
         setError(null);

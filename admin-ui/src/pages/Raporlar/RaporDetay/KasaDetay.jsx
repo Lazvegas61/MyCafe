@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRaporFiltre } from '../../../context/RaporFiltreContext';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 import TabloBilesenleri from '../components/TabloBilesenleri';
 import GrafikBilesenleri from '../components/GrafikBilesenleri';
 import './KasaDetay.css';
@@ -18,81 +17,44 @@ const KasaDetay = () => {
     const verileriYukle = async () => {
       try {
         setLoading(true);
-        
+
+        // ✅ ZORUNLU KORUMA — TAM OLARAK BURAYA EKLENDİ
+        if (
+          !window.raporMotoruV2 ||
+          typeof window.raporMotoruV2.kasaRaporuHesapla !== 'function'
+        ) {
+          throw new Error('Rapor motoru hazır değil (kasa)');
+        }
+
         // LocalStorage'dan gün sonu raporlarını çek
-        const gunSonuRaporlari = localStorageService.get('mc_gunsonu_raporlar') || [];
-        
+        const gunSonuRaporlari =
+          localStorageService.get('mycafe_gun_sonu_raporlar') || [];
+
         // Filtreleme uygula
         const filtrelenmisRaporlari = gunSonuRaporlari.filter(rapor => {
-          const raporTarihi = new Date(rapor.odemeTarihi || rapor.kapanisZamani);
-          const baslangicTarihi = filtreler.baslangicTarihi ? new Date(filtreler.baslangicTarihi) : null;
-          const bitisTarihi = filtreler.bitisTarihi ? new Date(filtreler.bitisTarihi) : null;
-          
+          const raporTarihi = new Date(rapor.odemeTarihi || rapor.kapanisZamani || rapor.bitis);
+          const baslangicTarihi = filtreler.baslangicTarihi
+            ? new Date(filtreler.baslangicTarihi)
+            : null;
+          const bitisTarihi = filtreler.bitisTarihi
+            ? new Date(filtreler.bitisTarihi)
+            : null;
+
           let tarihUygun = true;
           if (baslangicTarihi) tarihUygun = raporTarihi >= baslangicTarihi;
           if (bitisTarihi) tarihUygun = tarihUygun && raporTarihi <= bitisTarihi;
-          
+
           return tarihUygun;
         });
 
         // Kasa raporunu hesapla
-        const hesaplanmisRapor = raporMotoruV2.kasaRaporuHesapla(filtrelenmisRaporlari);
-        
-        // Kasa hareketlerini oluştur
-        const kasaHareketleri = filtrelenmisRaporlari.flatMap(rapor => {
-          const hareketler = [];
-          
-          // Nakit ödeme varsa
-          if (rapor.nakitOdeme > 0) {
-            hareketler.push({
-              id: `${rapor.id}-nakit`,
-              tarih: rapor.odemeTarihi || rapor.kapanisZamani,
-              tip: 'GELIR',
-              aciklama: `Masa ${rapor.masaNo || rapor.masaNum} - Nakit Ödeme`,
-              masaNo: rapor.masaNo || rapor.masaNum,
-              adisyonId: rapor.id,
-              nakit: rapor.nakitOdeme,
-              kart: 0,
-              hesap: 0
-            });
-          }
-          
-          // Kart ödeme varsa
-          if (rapor.kartOdeme > 0) {
-            hareketler.push({
-              id: `${rapor.id}-kart`,
-              tarih: rapor.odemeTarihi || rapor.kapanisZamani,
-              tip: 'GELIR',
-              aciklama: `Masa ${rapor.masaNo || rapor.masaNum} - Kart Ödeme`,
-              masaNo: rapor.masaNo || rapor.masaNum,
-              adisyonId: rapor.id,
-              nakit: 0,
-              kart: rapor.kartOdeme,
-              hesap: 0
-            });
-          }
-          
-          // Hesap ödeme varsa
-          if (rapor.hesapOdeme > 0) {
-            hareketler.push({
-              id: `${rapor.id}-hesap`,
-              tarih: rapor.odemeTarihi || rapor.kapanisZamani,
-              tip: 'GELIR',
-              aciklama: `Masa ${rapor.masaNo || rapor.masaNum} - Hesaba Yaz`,
-              masaNo: rapor.masaNo || rapor.masaNum,
-              adisyonId: rapor.id,
-              nakit: 0,
-              kart: 0,
-              hesap: rapor.hesapOdeme
-            });
-          }
-          
-          return hareketler;
-        });
-        
-        // Giderleri de ekle
-        const giderler = localStorageService.get('mc_giderler') || [];
-        const filtrelenmisGiderler = giderler.filter(gider => {
+        const hesaplanmisRapor =
+          window.raporMotoruV2.kasaRaporuHesapla(filtrelenmisRaporlari);
+
+        // ✅ GİDER HESAPLAMASI - TEK YERDE!
+        // NOT: giderler ve filtrelenmisGiderler değişkenleri burada tanımlandı
+        const giderlerListesi = localStorageService.get('mc_giderler') || [];
+        const filtrelenmisGiderListesi = giderlerListesi.filter(gider => {
           const giderTarihi = new Date(gider.tarih);
           const baslangicTarihi = filtreler.baslangicTarihi ? new Date(filtreler.baslangicTarihi) : null;
           const bitisTarihi = filtreler.bitisTarihi ? new Date(filtreler.bitisTarihi) : null;
@@ -103,20 +65,104 @@ const KasaDetay = () => {
           
           return tarihUygun;
         });
-        
-        const giderHareketleri = filtrelenmisGiderler.map(gider => ({
+
+        // Gider toplamını hesapla ve rapora ekle
+        const giderToplam = filtrelenmisGiderListesi.reduce((sum, gider) => 
+          sum + parseFloat(gider.tutar || 0), 0);
+
+        // Raporu güncelle
+        hesaplanmisRapor.toplamGider = giderToplam;
+        hesaplanmisRapor.giderSayisi = filtrelenmisGiderListesi.length;
+        hesaplanmisRapor.netKasa = hesaplanmisRapor.toplamGelir - giderToplam;
+
+        // ✅ Günlük gelirler güncellenmiş mi kontrol et
+        if (!hesaplanmisRapor.gunlukGelirler || hesaplanmisRapor.gunlukGelirler.length === 0) {
+          // Günlük gelirleri hesapla
+          const gunlukGelirler = {};
+          filtrelenmisRaporlari.forEach(rapor => {
+            const tarih = rapor.tarih || new Date(rapor.bitis).toISOString().split('T')[0];
+            const gunlukToplam = 
+              parseFloat(rapor.kasa?.nakit || rapor.nakitOdeme || 0) +
+              parseFloat(rapor.kasa?.kart || rapor.kartOdeme || 0) +
+              parseFloat(rapor.kasa?.hesabaYaz || rapor.hesapOdeme || 0);
+            
+            gunlukGelirler[tarih] = (gunlukGelirler[tarih] || 0) + gunlukToplam;
+          });
+
+          hesaplanmisRapor.gunlukGelirler = Object.entries(gunlukGelirler)
+            .map(([tarih, tutar]) => ({ tarih, tutar }))
+            .sort((a, b) => new Date(a.tarih) - new Date(b.tarih));
+        }
+
+        // Kasa hareketlerini oluştur
+        const kasaHareketleri = filtrelenmisRaporlari.flatMap(rapor => {
+          const hareketler = [];
+
+          // Nakit ödeme varsa
+          const nakitOdeme = parseFloat(rapor.kasa?.nakit || rapor.nakitOdeme || 0);
+          if (nakitOdeme > 0) {
+            hareketler.push({
+              id: `${rapor.id}-nakit`,
+              tarih: rapor.odemeTarihi || rapor.kapanisZamani || rapor.bitis,
+              tip: 'GELIR',
+              aciklama: `Masa ${rapor.masaNo || rapor.masaNum || '?'} - Nakit Ödeme`,
+              masaNo: rapor.masaNo || rapor.masaNum || '?',
+              adisyonId: rapor.id,
+              nakit: nakitOdeme,
+              kart: 0,
+              hesap: 0
+            });
+          }
+
+          // Kart ödeme varsa
+          const kartOdeme = parseFloat(rapor.kasa?.kart || rapor.kartOdeme || 0);
+          if (kartOdeme > 0) {
+            hareketler.push({
+              id: `${rapor.id}-kart`,
+              tarih: rapor.odemeTarihi || rapor.kapanisZamani || rapor.bitis,
+              tip: 'GELIR',
+              aciklama: `Masa ${rapor.masaNo || rapor.masaNum || '?'} - Kart Ödeme`,
+              masaNo: rapor.masaNo || rapor.masaNum || '?',
+              adisyonId: rapor.id,
+              nakit: 0,
+              kart: kartOdeme,
+              hesap: 0
+            });
+          }
+
+          // Hesap ödeme varsa
+          const hesapOdeme = parseFloat(rapor.kasa?.hesabaYaz || rapor.hesapOdeme || 0);
+          if (hesapOdeme > 0) {
+            hareketler.push({
+              id: `${rapor.id}-hesap`,
+              tarih: rapor.odemeTarihi || rapor.kapanisZamani || rapor.bitis,
+              tip: 'GELIR',
+              aciklama: `Masa ${rapor.masaNo || rapor.masaNum || '?'} - Hesaba Yaz`,
+              masaNo: rapor.masaNo || rapor.masaNum || '?',
+              adisyonId: rapor.id,
+              nakit: 0,
+              kart: 0,
+              hesap: hesapOdeme
+            });
+          }
+
+          return hareketler;
+        });
+
+        // ✅ GİDER HAREKETLERİNİ OLUŞTUR
+        const giderHareketleri = filtrelenmisGiderListesi.map(gider => ({
           id: `gider-${gider.id}`,
           tarih: gider.tarih,
           tip: 'GIDER',
           aciklama: gider.aciklama || 'Gider',
-          nakit: gider.tutar || 0,
+          nakit: parseFloat(gider.tutar || 0),
           kart: 0,
           hesap: 0
         }));
-        
+
         const tumHareketler = [...kasaHareketleri, ...giderHareketleri]
           .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
-        
+
         setKasaVerisi(hesaplanmisRapor);
         setHareketler(tumHareketler);
         setError(null);
@@ -133,6 +179,7 @@ const KasaDetay = () => {
 
   const handleExportPDF = () => {
     if (kasaVerisi && hareketler.length > 0) {
+      // PDF export logic here
     }
   };
 

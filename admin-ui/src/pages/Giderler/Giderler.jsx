@@ -72,6 +72,14 @@ export default function Giderler() {
     const liste = [...giderler, yeni];
     kaydet(liste);
 
+     // 🔔 DASHBOARD’A HABER VER (KRİTİK SATIR)
+  window.dispatchEvent(
+    new CustomEvent("giderEklendi", {
+      detail: { tarih: yeni.tarih, tutar: yeni.tutar }
+    })
+  );
+  
+
     // Formu temizle
     setUrunAdi("");
     setTutar("");

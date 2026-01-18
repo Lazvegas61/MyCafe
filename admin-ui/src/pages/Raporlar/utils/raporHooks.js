@@ -1,7 +1,6 @@
 // File: admin-ui/src/pages/Raporlar/utils/raporHooks.js (DÜZELTİLMİŞ)
 import { useState, useEffect, useCallback } from 'react';
 import localStorageService from '../../../services/localStorageService';
-import raporMotoruV2 from '../../../services/raporMotoruV2';
 
 
 export const useGunSonuRaporu = (filtreler) => {
@@ -32,7 +31,7 @@ export const useGunSonuRaporu = (filtreler) => {
       });
 
       // DÜZELTME: filtrelenmisRaporlari → filtrelenmisRaporlar
-      const hesaplanmisRapor = raporMotoruV2.gunSonuRaporuHesapla(filtrelenmisRaporlar);
+      const hesaplanmisRapor = window.raporMotoruV2.gunSonuRaporuHesapla(filtrelenmisRaporlar);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);
@@ -75,7 +74,7 @@ export const useKasaRaporu = (filtreler) => {
         return tarihUygun;
       });
 
-      const hesaplanmisRapor = raporMotoruV2.kasaRaporuHesapla(filtrelenmisRaporlari);
+      const hesaplanmisRapor = window.raporMotoruV2.kasaRaporuHesapla(filtrelenmisRaporlari);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);
@@ -122,7 +121,7 @@ export const useUrunRaporu = (filtreler) => {
         return tarihUygun && kategoriUygun;
       });
 
-      const hesaplanmisRapor = raporMotoruV2.urunRaporuHesapla(filtrelenmisRaporlari);
+      const hesaplanmisRapor = window.raporMotoruV2.urunRaporuHesapla(filtrelenmisRaporlari);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);
@@ -165,7 +164,7 @@ export const useKategoriRaporu = (filtreler) => {
         return tarihUygun;
       });
 
-      const hesaplanmisRapor = raporMotoruV2.kategoriRaporuHesapla(filtrelenmisRaporlari);
+      const hesaplanmisRapor = window.raporMotoruV2.kategoriRaporuHesapla(filtrelenmisRaporlari);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);
@@ -217,7 +216,7 @@ export const useMasaRaporu = (filtreler) => {
         return tarihUygun && masaTipiUygun && masaNoUygun;
       });
 
-      const hesaplanmisRapor = raporMotoruV2.masaRaporuHesapla(filtrelenmisRaporlari);
+      const hesaplanmisRapor = window.raporMotoruV2.masaRaporuHesapla(filtrelenmisRaporlari);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);
@@ -266,7 +265,7 @@ export const useBilardoRaporu = (filtreler) => {
         return tarihUygun;
       });
 
-      const hesaplanmisRapor = raporMotoruV2.bilardoRaporuHesapla(filtrelenmisRaporlar, bilardoAdisyonlar);
+      const hesaplanmisRapor = window.raporMotoruV2.bilardoRaporuHesapla(filtrelenmisRaporlar, bilardoAdisyonlar);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);
@@ -312,7 +311,7 @@ export const useGiderRaporu = (filtreler) => {
         return tarihUygun && tipUygun;
       });
 
-      const hesaplanmisRapor = raporMotoruV2.giderRaporuHesapla(filtrelenmisGiderler);
+      const hesaplanmisRapor = window.raporMotoruV2.giderRaporuHesapla(filtrelenmisGiderler);
       
       setRaporVerisi(hesaplanmisRapor);
       setError(null);

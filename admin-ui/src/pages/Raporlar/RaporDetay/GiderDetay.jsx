@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRaporFiltre } from '../../../context/RaporFiltreContext';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 import TabloBilesenleri from '../components/TabloBilesenleri';
 import GrafikBilesenleri from '../components/GrafikBilesenleri';
 import './GiderDetay.css';
@@ -82,7 +81,7 @@ const GiderDetay = () => {
         });
 
         // Gider raporunu hesapla
-        const hesaplanmisRapor = raporMotoruV2.giderRaporuHesapla(filtrelenmisGiderler);
+        const hesaplanmisRapor = window.raporMotoruV2.giderRaporuHesapla(filtrelenmisGiderler);
         
         setGiderVerisi(hesaplanmisRapor);
         setError(null);

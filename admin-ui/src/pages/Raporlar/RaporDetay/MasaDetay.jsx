@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRaporFiltre } from '../../../context/RaporFiltreContext';
 import localStorageService from '../../../services/localStorageService';
-import { raporMotoruV2 } from '../../../services/raporMotoruV2';
 import TabloBilesenleri from '../components/TabloBilesenleri';
 import './MasaDetay.css';
 
@@ -43,7 +42,7 @@ const MasaDetayRapor = () => {
         });
 
         // Masa raporunu hesapla
-        let hesaplanmisRapor = raporMotoruV2.masaRaporuHesapla(filtrelenmisRaporlar);
+        let hesaplanmisRapor = window.raporMotoruV2.masaRaporuHesapla(filtrelenmisRaporlar);
         
         // Masa detaylarını toplam adisyona göre sırala (en çoktan en aza)
         if (hesaplanmisRapor.masaDetaylari) {

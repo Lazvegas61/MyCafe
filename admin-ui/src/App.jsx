@@ -1,4 +1,4 @@
-// File: admin-ui/src/App.jsx (GÜNCELLENMİŞ - ROUTE DÜZELTMELİ)
+// File: admin-ui/src/App.jsx (GÜNCELLENMİŞ - RAPOR MOTORU GLOBAL BAŞLATMA EKLENDİ)
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   BrowserRouter,
@@ -9,13 +9,13 @@ import {
   Navigate,
 } from "react-router-dom";
 
+import "./services/raporMotoruV2";
 import Sidebar from "./components/Sidebar";
 import GlobalSureBittiPopup from "./components/GlobalSureBittiPopup";
 import syncService from "./services/syncService";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { GunDurumuProvider, useGunDurumu } from "./context/GunDurumuContext";
 import { RaporFiltreProvider } from "@/context/RaporFiltreContext";
-import raporMotoruV2 from "./services/raporMotoruV2"; // ✅ Doğru import
 
 /* ------------------------------------------------------------
    🔧 İlk Kurulum Verileri
@@ -23,10 +23,12 @@ import raporMotoruV2 from "./services/raporMotoruV2"; // ✅ Doğru import
 import categoriesData from "./data/initial_categories.json";
 import productsData from "./data/initial_products.json";
 
+// RAPOR MOTORU IMPORT - GÜNCELLENDİ
+
 // SYNC EVENTS sabitleri
 const SYNC_EVENTS = {
   MASA_GUNCELLENDI: 'MASA_GUNCELLENDI',
-  ADISYON_GUNCELLENDI: 'ADISYON_GUNCELLENDI',
+  ADISYON_GUNCELLENDI: 'ADISYON_GUNCELLENDİ',
   FIYAT_GUNCELLENDİ: 'FIYAT_GUNCELLENDİ',
   SENKRONIZE_ET: 'SENKRONIZE_ET',
   KALEM_EKLENDI: 'KALEM_EKLENDI'
@@ -712,6 +714,8 @@ function MainApp() {
     autoFixCategoryAndProducts();
     ensureDemoAdmin();
     
+    // ✅ RAPOR MOTORU GLOBAL BAŞLATMA - EKLENDİ
+       
     // ✅ DEBUG: İlk yüklemede sistem kontrolü (geliştirme modunda)
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 Geliştirme modu: syncDebug aktif');
@@ -988,37 +992,36 @@ function MainApp() {
             />
             
             <Route 
-  path="/raporlar/gun-sonu/today" 
-  element={
-    <ProtectedRoute requiredRole="ADMIN">
-      <Layout>
-        <GunSonuDetay />
-      </Layout>
-    </ProtectedRoute>
-  } 
-/>
+              path="/raporlar/gun-sonu/today" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <GunSonuDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
 
-<Route 
-  path="/raporlar/gun-sonu/:raporId" 
-  element={
-    <ProtectedRoute requiredRole="ADMIN">
-      <Layout>
-        <GunSonuDetay />
-      </Layout>
-    </ProtectedRoute>
-  } 
-/>
+            <Route 
+              path="/raporlar/gun-sonu/:raporId" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <GunSonuDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
 
-<Route 
-  path="/raporlar/gun-sonu" 
-  element={
-    <ProtectedRoute requiredRole="ADMIN">
-      <Layout>
-        <GunSonuDetay />
-      </Layout>
-    </ProtectedRoute>
-  } 
-
+            <Route 
+              path="/raporlar/gun-sonu" 
+              element={
+                <ProtectedRoute requiredRole="ADMIN">
+                  <Layout>
+                    <GunSonuDetay />
+                  </Layout>
+                </ProtectedRoute>
+              } 
             />
             
             <Route 
