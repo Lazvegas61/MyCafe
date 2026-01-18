@@ -1,3 +1,3 @@
+# Reporting / AI context files (NEVER COMMIT)
 REPORTING_FULL_CONTEXT.md
-AI_CONTEXT_FULL.md
-AI_CONTEXT_FILES/
+generate-reporting-full-context.js
