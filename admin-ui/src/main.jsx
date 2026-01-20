@@ -39,11 +39,29 @@ export function updateBackup() {
 // Uygulama yüklenirken backup restore edilir
 restoreBackupIfNeeded();
 
+// ------------------------------------------------------
+//  REACT APP BOOTSTRAP
+// ------------------------------------------------------
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./global.css";
+
+// ------------------------------------------------------
+//  FAZ 2 – RAPOR MOTORU (TEST AMAÇLI GLOBAL BAĞLAMA)
+//  ⚠️ SADECE TEST / DOĞRULAMA İÇİN
+// ------------------------------------------------------
+
+import { computeKasaRaporuV2 } from "./reportCore/computeKasaRaporuV2";
+
+// Console testleri için
+window.computeKasaRaporuV2 = computeKasaRaporuV2;
+
+// ------------------------------------------------------
+//  RENDER
+// ------------------------------------------------------
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useGun } from "../../context/GunContext"; // ✅ GunContext'i import et
 
 // MyCafe Premium Tema Renkleri
 const RENK = {
@@ -63,7 +64,7 @@ const formatTime = (date) => {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
-// YENİ: Adisyon toplamını al - TÜM ADISYONLARI KONTROL ET
+// YENİ: Adisyon toplamını al
 const getAdisyonToplam = (adisyonId) => {
   try {
     const key = `mc_adisyon_toplam_${adisyonId}`;
@@ -85,57 +86,12 @@ const getMasaToplam = (masaNo) => {
   }
 };
 
-// YENİ: Bugünkü tarihi al
-const getTodayString = () => {
-  return new Date().toISOString().split('T')[0];
-};
-
-// YENİ: Adisyonun bugüne ait olup olmadığını kontrol et
-const isBugunkuAdisyon = (adisyon) => {
-  if (!adisyon || !adisyon.acilisZamani) return false;
-  try {
-    const adisyonTarih = new Date(adisyon.acilisZamani).toISOString().split('T')[0];
-    const bugun = getTodayString();
-    return adisyonTarih === bugun;
-  } catch {
-    return false;
-  }
-};
-
-// YENİ: Bugünkü ve açık adisyonları filtrele
-const filterBugunkuVeAcikAdisyonlar = (adisyonlar) => {
-  const bugun = getTodayString();
-  
-  return adisyonlar.filter(adisyon => {
-    // Tarih kontrolü
-    if (!adisyon.acilisZamani) return false;
-    
-    try {
-      const adisyonTarih = new Date(adisyon.acilisZamani).toISOString().split('T')[0];
-      if (adisyonTarih !== bugun) return false;
-    } catch {
-      return false;
-    }
-    
-    // Kapalı kontrolü
-    const status = adisyon.status?.toUpperCase() || adisyon.durum?.toUpperCase() || "";
-    const kapali = adisyon.kapali || status === "CLOSED" || status === "KAPALI";
-    
-    return !kapali;
-  });
-};
-
-// YENİ: Gün aktif mi kontrol et
-const isGunAktif = () => {
-  const gunDurumu = localStorage.getItem('mycafe_gun_durumu');
-  return gunDurumu === 'aktif';
-};
-
 // --------------------------------------------------
 // MAIN COMPONENT
 // --------------------------------------------------
 export default function Masalar({ onOpenAdisyon }) {
   const navigate = useNavigate();
+  const { gun, gunAktif } = useGun(); // ✅ GunContext'ten gün durumunu al
   
   // STATE
   const [masalar, setMasalar] = useState(() => {
@@ -143,18 +99,16 @@ export default function Masalar({ onOpenAdisyon }) {
     return normalizeMasalarList(raw);
   });
   const [adisyonlar, setAdisyonlar] = useState(() => readJSON("mc_adisyonlar", []));
-  const [bugunkuAdisyonlar, setBugunkuAdisyonlar] = useState([]);
+  const [aktifGunAdisyonlar, setAktifGunAdisyonlar] = useState([]);
   const [seciliMasa, setSeciliMasa] = useState(null);
   const [silMasaNo, setSilMasaNo] = useState("");
-  const [gunAktif, setGunAktif] = useState(isGunAktif());
-  const [bugunTarihi, setBugunTarihi] = useState(getTodayString());
   
   // REFS
   const dragSourceMasaNoRef = useRef(null);
   const lastUpdateRef = useRef(Date.now());
 
   // --------------------------------------------------
-  // DATA MANAGEMENT - GUNCELLENDI
+  // DATA MANAGEMENT - GUNCONTEXT İLE UYUMLU
   // --------------------------------------------------
   const loadData = useCallback(() => {
     const now = Date.now();
@@ -166,13 +120,23 @@ export default function Masalar({ onOpenAdisyon }) {
     const rawMasalar = readJSON("mc_masalar", []);
     const rawAdisyonlar = readJSON("mc_adisyonlar", []);
     
-    // Gün durumunu kontrol et
-    setGunAktif(isGunAktif());
-    setBugunTarihi(getTodayString());
+    // ✅ SADECE GunContext'ten al - localStorage'dan DEĞİL
+    const aktifGunId = gun?.gunId || "";
     
-    // Bugünkü ve açık adisyonları filtrele
-    const filteredAdisyonlar = filterBugunkuVeAcikAdisyonlar(rawAdisyonlar);
-    setBugunkuAdisyonlar(filteredAdisyonlar);
+    // Aktif güne ait ve açık adisyonları filtrele
+    const filteredAdisyonlar = rawAdisyonlar.filter(adisyon => {
+      // Gün ID kontrolü - GunContext'ten gelen ile karşılaştır
+      const adisyonGunId = adisyon.gunId || "";
+      if (adisyonGunId !== aktifGunId) return false;
+      
+      // Kapalı kontrolü
+      const status = adisyon.status?.toUpperCase() || adisyon.durum?.toUpperCase() || "";
+      const kapali = adisyon.kapali || status === "CLOSED" || status === "KAPALI";
+      
+      return !kapali;
+    });
+    
+    setAktifGunAdisyonlar(filteredAdisyonlar);
     
     // Masaları güncelle (normalizasyon korunuyor)
     setMasalar(prev => {
@@ -197,12 +161,12 @@ export default function Masalar({ onOpenAdisyon }) {
     
     console.log('📊 Masalar.jsx: Veriler yüklendi', {
       toplamMasa: rawMasalar.length,
-      bugunkuAdisyon: filteredAdisyonlar.length,
+      aktifGunAdisyon: filteredAdisyonlar.length,
       tumAdisyon: rawAdisyonlar.length,
-      gunAktif: isGunAktif(),
-      bugunTarihi: getTodayString()
+      gunAktif,
+      aktifGunId,
     });
-  }, []);
+  }, [gun]); // ✅ gun dependency olarak eklendi
 
   const saveMasalar = useCallback((list) => {
     // Kaydetmeden önce normalize et (sadece eksik alanlar için)
@@ -217,7 +181,7 @@ export default function Masalar({ onOpenAdisyon }) {
   }, []);
 
   // --------------------------------------------------
-  // REAL-TIME UPDATES - GUNCELLENDI
+  // REAL-TIME UPDATES
   // --------------------------------------------------
   useEffect(() => {
     loadData();
@@ -247,78 +211,43 @@ export default function Masalar({ onOpenAdisyon }) {
   }, [loadData]);
 
   // --------------------------------------------------
-  // MASA INFORMATION - GUNCELLENDI (Bugünkü verileri kullan)
+  // MASA INFORMATION - GUNCONTEXT İLE UYUMLU
   // --------------------------------------------------
   const getMasaBilgi = useCallback((masa) => {
     if (!masa.adisyonId) return { acik: false };
     
-    // YENİ: Sadece bugünkü adisyonları kontrol et
-    const bugun = getTodayString();
+    // ✅ SADECE GunContext'ten al - localStorage'dan DEĞİL
+    const aktifGunId = gun?.gunId || "";
     
-    const anaAdisyon = bugunkuAdisyonlar.find(a => a.id === masa.adisyonId);
-    if (!anaAdisyon) {
-      // Eski adisyonları kontrol et (tarihsel veri için)
-      const eskiAdisyon = adisyonlar.find(a => a.id === masa.adisyonId);
-      if (eskiAdisyon && isBugunkuAdisyon(eskiAdisyon)) {
-        // Bugüne ait ama kapalı olabilir
-        const status = eskiAdisyon.status?.toUpperCase() || eskiAdisyon.durum?.toUpperCase() || "";
-        const kapali = eskiAdisyon.kapali || status === "CLOSED" || status === "KAPALI";
-        
-        if (kapali) {
-          return { acik: false };
-        }
-        
-        const acilis = eskiAdisyon.acilisZamani ? new Date(eskiAdisyon.acilisZamani) : null;
-        if (!acilis || isNaN(acilis.getTime())) return { acik: false };
-        
-        const simdi = new Date();
-        const gecenDakika = Math.floor((simdi - acilis) / 60000);
-        const acilisSaati = formatTime(acilis);
-        
-        // Tutarı hesapla
-        let toplamTutar = parseFloat(eskiAdisyon.toplamTutar || 0) || 0;
-        
-        if (toplamTutar === 0 && eskiAdisyon.kalemler && Array.isArray(eskiAdisyon.kalemler)) {
-          toplamTutar = eskiAdisyon.kalemler.reduce((sum, k) => {
-            const birimFiyat = parseFloat(k.birimFiyat || k.fiyat || 0) || 0;
-            const miktar = parseFloat(k.miktar || k.adet || 1) || 1;
-            return sum + (birimFiyat * miktar);
-          }, 0);
-        }
-        
-        return {
-          acik: true,
-          gecenDakika,
-          acilisSaati,
-          toplamTutar,
-          adisyon: eskiAdisyon,
-          eskiAdisyon: true
-        };
-      }
+    // Aktif gün için adisyonları kontrol et
+    const aktifGunAdisyon = aktifGunAdisyonlar.find(a => a.id === masa.adisyonId);
+    
+    if (!aktifGunAdisyon) {
+      // Aktif güne ait değilse, masa boş göster
       return { acik: false };
     }
     
-    // Status kontrolü - DÜZELTİLDİ
-    const status = anaAdisyon.status?.toUpperCase() || anaAdisyon.durum?.toUpperCase() || "";
-    const kapali = anaAdisyon.kapali || status === "CLOSED" || status === "KAPALI";
+    // Status kontrolü
+    const status = aktifGunAdisyon.status?.toUpperCase() || aktifGunAdisyon.durum?.toUpperCase() || "";
+    const kapali = aktifGunAdisyon.kapali || status === "CLOSED" || status === "KAPALI";
     
     if (kapali) {
       return { acik: false };
     }
     
-    const acilis = anaAdisyon.acilisZamani ? new Date(anaAdisyon.acilisZamani) : null;
+    const acilis = aktifGunAdisyon.acilisZamani ? new Date(aktifGunAdisyon.acilisZamani) : null;
     if (!acilis || isNaN(acilis.getTime())) return { acik: false };
     
     const simdi = new Date();
     const gecenDakika = Math.floor((simdi - acilis) / 60000);
     const acilisSaati = formatTime(acilis);
     
-    // YENİ: Masa toplamını AnaEkran ile uyumlu şekilde al
+    // Masa toplamını al
     let toplamTutar = getMasaToplam(masa.no);
     
     if (toplamTutar === 0) {
-      // Masa toplamı yoksa, BUGÜNKÜ açık adisyonları topla
-      const masaBugunkuAdisyonlari = bugunkuAdisyonlar.filter(a => {
+      // Masa toplamı yoksa, aktif gün adisyonlarını topla
+      const masaAktifGunAdisyonlari = aktifGunAdisyonlar.filter(a => {
         const masaEslesti = 
           a.masaNo === `MASA ${masa.no}` || 
           a.masaNum === masa.no ||
@@ -330,7 +259,7 @@ export default function Masalar({ onOpenAdisyon }) {
         return masaEslesti && !aKapali;
       });
       
-      masaBugunkuAdisyonlari.forEach(ad => {
+      masaAktifGunAdisyonlari.forEach(ad => {
         let adToplam = parseFloat(ad.toplamTutar || 0) || 0;
         
         if (adToplam === 0 && ad.kalemler && Array.isArray(ad.kalemler)) {
@@ -353,10 +282,9 @@ export default function Masalar({ onOpenAdisyon }) {
       gecenDakika,
       acilisSaati,
       toplamTutar,
-      adisyon: anaAdisyon,
-      eskiAdisyon: false
+      adisyon: aktifGunAdisyon
     };
-  }, [adisyonlar, bugunkuAdisyonlar]);
+  }, [aktifGunAdisyonlar, gun]); // ✅ gun dependency olarak eklendi
 
   // Memoized masa bilgileri
   const masaBilgileri = useMemo(() => {
@@ -373,7 +301,7 @@ export default function Masalar({ onOpenAdisyon }) {
   const handleAddMasa = useCallback(() => {
     // Gün aktif değilse uyarı ver
     if (!gunAktif) {
-      alert('❌ Gün başlatılmamış! Önce günü başlatın.');
+      alert('❌ Gün başlatılmamış! Günü başlatmak için sidebar\'daki "Gün Başlat" butonunu kullanın.');
       return;
     }
     
@@ -494,14 +422,14 @@ export default function Masalar({ onOpenAdisyon }) {
     // Adisyonları kaydet
     saveAdisyonlar(updatedAdisyonlar);
     
-    // 2. MASALARI GÜNCELLE - DÜZELTİLDİ
+    // 2. MASALARI GÜNCELLE
     const updatedMasalar = masalar.map(m => {
       // Kaynak masayı BOŞALT
       if (m.no === sourceNo) {
         return { 
           ...m, 
           adisyonId: null,
-          durum: "BOŞ", // ✅ DÜZELTME
+          durum: "BOŞ",
           toplamTutar: "0.00",
           guncellemeZamani: new Date().toISOString()
         };
@@ -512,7 +440,7 @@ export default function Masalar({ onOpenAdisyon }) {
         return { 
           ...m, 
           adisyonId: adisyonId,
-          durum: "DOLU", // ✅ DÜZELTME
+          durum: "DOLU",
           toplamTutar: sourceToplam.toFixed(2),
           guncellemeZamani: new Date().toISOString()
         };
@@ -573,7 +501,7 @@ export default function Masalar({ onOpenAdisyon }) {
   const handleDoubleClick = useCallback((masa) => {
     // Gün aktif değilse uyarı ver
     if (!gunAktif) {
-      alert('❌ Gün başlatılmamış! Önce günü başlatın.');
+      alert('❌ Gün başlatılmamış! Günü başlatmak için sidebar\'daki "Gün Başlat" butonunu kullanın.');
       return;
     }
     
@@ -583,10 +511,14 @@ export default function Masalar({ onOpenAdisyon }) {
     if (!bilgi.acik) {
       adisyonId = "ad_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
       
+      // ✅ SADECE GunContext'ten al - localStorage'dan DEĞİL
+      const aktifGunId = gun?.gunId || "";
+      
       const yeniAdisyon = {
         id: adisyonId,
         masaNo: `MASA ${masa.no}`,
         masaNum: masa.no,
+        gunId: aktifGunId, // ✅ Aktif gün ID'sini ekle
         acilisZamani: new Date().toISOString(),
         kalemler: [],
         odemeler: [],
@@ -620,9 +552,30 @@ export default function Masalar({ onOpenAdisyon }) {
     if (typeof onOpenAdisyon === "function") {
       onOpenAdisyon({ masaId: masa.no, adisyonId });
     } else {
-      navigate("/adisyondetay/" + masa.no);
+      navigate(`/adisyon/${adisyonId}`);
     }
-  }, [masalar, masaBilgileri, adisyonlar, onOpenAdisyon, navigate, saveMasalar, saveAdisyonlar, gunAktif]);
+  }, [masalar, masaBilgileri, adisyonlar, onOpenAdisyon, navigate, saveMasalar, saveAdisyonlar, gunAktif, gun]);
+
+  // --------------------------------------------------
+  // DEBUG: Konsola Yaz (isteğe bağlı)
+  // --------------------------------------------------
+  const debugVerileri = useCallback(() => {
+    console.log('🔍 DEBUG Masalar.jsx:', {
+      gunAktif,
+      gunId: gun?.gunId,
+      aktifGunAdisyonlar: aktifGunAdisyonlar.length,
+      tumMasalar: masalar.length,
+      toplamAdisyon: adisyonlar.length
+    });
+    
+    console.table(adisyonlar.slice(0, 5).map(a => ({
+      id: a.id?.substring(0, 8) || '?',
+      masaNo: a.masaNo || a.masaNum || '?',
+      gunId: a.gunId || '?',
+      durum: a.durum,
+      kapali: a.kapali
+    })));
+  }, [gunAktif, gun, aktifGunAdisyonlar, masalar, adisyonlar]);
 
   // --------------------------------------------------
   // RENDER
@@ -678,7 +631,7 @@ export default function Masalar({ onOpenAdisyon }) {
             }}></div>
             <span>{gunAktif ? 'Gün Aktif' : 'Gün Başlatılmamış'}</span>
             <span style={{ color: "#7f8c8d" }}>•</span>
-            <span style={{ color: "#7f8c8d", fontWeight: 500 }}>Bugün: {bugunTarihi}</span>
+            <span style={{ color: "#7f8c8d", fontWeight: 500 }}>Gün ID: {gun?.gunId?.substring(0, 8) || 'Yok'}</span>
           </div>
         </div>
 
@@ -691,39 +644,6 @@ export default function Masalar({ onOpenAdisyon }) {
             flexWrap: "wrap",
           }}
         >
-          {/* GÜN BAŞLAT BUTONU (sadece gün aktif değilse) */}
-          {!gunAktif && (
-            <button
-              onClick={() => {
-                if (window.confirm('Günü başlatmak istiyor musunuz?')) {
-                  localStorage.setItem('mycafe_gun_durumu', 'aktif');
-                  localStorage.setItem('mycafe_gun_baslangic', new Date().toISOString());
-                  localStorage.setItem('mycafe_gun_baslangic_kasa', '0');
-                  setGunAktif(true);
-                  window.dispatchEvent(new Event('gunDurumuDegisti'));
-                  alert('✅ Gün başarıyla başlatıldı!');
-                }
-              }}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "999px",
-                border: "none",
-                cursor: "pointer",
-                background: "linear-gradient(135deg, #2ecc71, #27ae60)",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: "14px",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
-                minWidth: "120px",
-                transition: "transform 0.2s",
-              }}
-              onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-              onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
-            >
-              🚀 Gün Başlat
-            </button>
-          )}
-          
           {/* ADD TABLE */}
           <button
             onClick={handleAddMasa}
@@ -801,26 +721,45 @@ export default function Masalar({ onOpenAdisyon }) {
               Sil
             </button>
           </div>
+
+          {/* DEBUG BUTTON (isteğe bağlı) */}
+          <button
+            onClick={debugVerileri}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "999px",
+              border: "none",
+              background: "#3498db",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: "12px",
+              cursor: "pointer",
+              opacity: 0.7,
+            }}
+            title="Verileri konsola yaz"
+          >
+            🔍 Debug
+          </button>
         </div>
       </div>
 
       {/* GÜN BİLGİSİ UYARISI */}
       {!gunAktif && (
         <div style={{
-          background: "linear-gradient(135deg, #ffeaa7, #fab1a0)",
+          background: "rgba(231, 76, 60, 0.1)",
           padding: "12px 18px",
           borderRadius: "12px",
           marginBottom: "20px",
           display: "flex",
           alignItems: "center",
           gap: "10px",
-          border: "2px solid #e74c3c",
+          border: "1px solid #e74c3c",
         }}>
-          <div style={{ fontSize: "24px" }}>⚠️</div>
+          <div style={{ fontSize: "24px", color: "#e74c3c" }}>ℹ️</div>
           <div>
-            <div style={{ fontWeight: 700, color: "#d63031" }}>Gün başlatılmamış!</div>
+            <div style={{ fontWeight: 700, color: "#e74c3c" }}>Gün başlatılmamış</div>
             <div style={{ fontSize: "14px", color: "#636e72" }}>
-              Masaları kullanmak için önce günü başlatın. "Gün Başlat" butonuna tıklayın.
+              Masaları kullanmak için önce günü başlatın. Gün başlatma işlemi için sidebar'daki "Gün Başlat" butonunu kullanın.
             </div>
           </div>
         </div>
@@ -841,12 +780,12 @@ export default function Masalar({ onOpenAdisyon }) {
         >
           {gunAktif ? 
             'Henüz masa yok. Sağ üstten "+ Masa Ekle" ile masa oluşturabilirsiniz.' :
-            'Gün başlatılmamış. Önce günü başlatın.'
+            'Gün başlatılmamış. Masaları kullanmak için sidebar\'dan günü başlatın.'
           }
         </div>
       ) : (
         <>
-          {/* BUGÜNKÜ DURUM BİLGİSİ */}
+          {/* AKTİF GÜN DURUM BİLGİSİ */}
           <div style={{
             display: "flex",
             justifyContent: "space-between",
@@ -863,24 +802,26 @@ export default function Masalar({ onOpenAdisyon }) {
                 <span style={{ marginLeft: "5px", fontWeight: 700 }}>{masalar.length}</span>
               </div>
               <div>
-                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Bugünkü Açık Adisyon:</span>
+                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Aktif Gün Adisyon:</span>
                 <span style={{ marginLeft: "5px", fontWeight: 700, color: "#27ae60" }}>
-                  {bugunkuAdisyonlar.length}
+                  {aktifGunAdisyonlar.length}
                 </span>
               </div>
               <div>
-                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Bugünkü Tarih:</span>
-                <span style={{ marginLeft: "5px", fontWeight: 700 }}>{bugunTarihi}</span>
+                <span style={{ fontWeight: 600, color: "#3a2a14" }}>Gün ID:</span>
+                <span style={{ marginLeft: "5px", fontWeight: 700, fontSize: "12px", fontFamily: "monospace" }}>
+                  {gun?.gunId?.substring(0, 8) || 'Yok'}
+                </span>
               </div>
             </div>
             
-            {bugunkuAdisyonlar.length === 0 && gunAktif && (
+            {aktifGunAdisyonlar.length === 0 && gunAktif && (
               <div style={{ 
                 fontSize: "12px", 
                 color: "#7f8c8d",
                 fontStyle: "italic" 
               }}>
-                Bugün henüz açık adisyon yok
+                Aktif günde henüz açık adisyon yok
               </div>
             )}
           </div>
@@ -897,9 +838,6 @@ export default function Masalar({ onOpenAdisyon }) {
               const bilgi = masaBilgileri[masa.no];
               const acik = bilgi.acik;
               const isSelected = seciliMasa === masa.no;
-              
-              // Eski adisyon uyarısı (bugüne ait değilse)
-              const eskiAdisyonUyarisi = bilgi.acik && bilgi.eskiAdisyon;
               
               return (
                 <div
@@ -925,28 +863,10 @@ export default function Masalar({ onOpenAdisyon }) {
                     position: "relative",
                     overflow: "hidden",
                     opacity: isSelected ? 1 : 0.95,
-                    border: eskiAdisyonUyarisi ? "2px dashed #e74c3c" : "none",
                   }}
                   onMouseOver={(e) => e.currentTarget.style.opacity = "1"}
                   onMouseOut={(e) => e.currentTarget.style.opacity = isSelected ? 1 : 0.95}
                 >
-                  {/* ESKİ ADISYON UYARISI */}
-                  {eskiAdisyonUyarisi && (
-                    <div style={{
-                      position: "absolute",
-                      top: "8px",
-                      right: "8px",
-                      background: "#e74c3c",
-                      color: "white",
-                      fontSize: "10px",
-                      padding: "2px 6px",
-                      borderRadius: "10px",
-                      fontWeight: "bold",
-                    }}>
-                      ESKİ
-                    </div>
-                  )}
-
                   {/* TABLE NUMBER */}
                   <div
                     style={{
@@ -990,21 +910,6 @@ export default function Masalar({ onOpenAdisyon }) {
                     </div>
                   ) : (
                     <div>
-                      {/* ESKİ ADISYON UYARISI MESAJI */}
-                      {eskiAdisyonUyarisi && (
-                        <div style={{
-                          fontSize: "11px",
-                          color: "#ff7675",
-                          marginBottom: "5px",
-                          fontWeight: "bold",
-                          background: "rgba(231, 76, 60, 0.1)",
-                          padding: "3px 8px",
-                          borderRadius: "8px",
-                        }}>
-                          ⚠️ Önceki günden kaldı
-                        </div>
-                      )}
-                      
                       {/* TIME INFO */}
                       <div
                         style={{
@@ -1027,7 +932,7 @@ export default function Masalar({ onOpenAdisyon }) {
                         </div>
                       </div>
 
-                      {/* TOTAL AMOUNT - AnaEkran ile uyumlu */}
+                      {/* TOTAL AMOUNT */}
                       <div
                         style={{
                           fontSize: "20px",
@@ -1074,13 +979,13 @@ export default function Masalar({ onOpenAdisyon }) {
       >
         <div>
           Toplam {masalar.length} masa • 
-          Bugün {bugunkuAdisyonlar.length} açık adisyon • 
+          Aktif Gün {aktifGunAdisyonlar.length} adisyon • 
           Gün: {gunAktif ? 'Aktif' : 'Başlatılmamış'}
         </div>
         <div style={{ fontSize: "11px", marginTop: "4px", opacity: 0.7 }}>
           {gunAktif ? 
-            'Yalnızca bugünkü adisyonlar gösteriliyor • Masa taşıma aktif' :
-            'Gün başlatılmadan işlem yapılamaz'
+            'Yalnızca aktif gün adisyonları gösteriliyor • Masa taşıma aktif' :
+            'Gün başlatılmadan işlem yapılamaz • Gün başlatmak için sidebar\'ı kullanın'
           }
         </div>
       </div>

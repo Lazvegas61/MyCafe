@@ -1,7 +1,11 @@
+// ===================================================
+// Sidebar.jsx – SADECE TETİKLEYİCİ (KİLİTLİ)
+// ===================================================
+
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import BilardoLogo from "../assets/mc-bilardo-small.png";
-import { useGunDurumu } from "../context/GunDurumuContext";
+import { useGun } from "../context/GunContext";
 
 /* --------------------------------------------------
    🎨 Tema
@@ -11,6 +15,7 @@ const RENK = {
   hover: "#6b4210",
   secili: "#f5d085",
   yazi: "#ffffff",
+  pasif: "rgba(255,255,255,0.45)",
 };
 
 /* --------------------------------------------------
@@ -31,12 +36,12 @@ const menuItems = [
 /* ==================================================
    🧱 SIDEBAR
 ================================================== */
-export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat }) {
+export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { gunSonuYap } = useGunDurumu();
-  const [visible, setVisible] = useState(false);
+  const { gunBaslat, gunKapat, isOpen } = useGun();
 
+  const [visible, setVisible] = useState(false);
   const user = JSON.parse(localStorage.getItem("mc_user") || "null");
 
   useEffect(() => {
@@ -54,6 +59,33 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
   };
 
   /* --------------------------------------------------
+     🚪 Gün Başı – SADECE TETİKLER
+  -------------------------------------------------- */
+  const onGunBasiClick = () => {
+    const ok = gunBaslat();
+    if (ok) {
+      alert("Gün başlatıldı.");
+      navigate("/ana");
+    }
+  };
+
+  /* --------------------------------------------------
+     🚪 Gün Sonu – SADECE TETİKLER
+  -------------------------------------------------- */
+  const onGunSonuClick = () => {
+    const onay = window.confirm(
+      "Gün sonu yapmak istediğinize emin misiniz? Bu işlem geri alınamaz."
+    );
+    if (!onay) return;
+
+    const ok = gunKapat();
+    if (ok) {
+      alert("Gün kapatıldı.");
+      navigate("/raporlar/kasa");
+    }
+  };
+
+  /* --------------------------------------------------
      🚪 Çıkış
   -------------------------------------------------- */
   const handleLogout = () => {
@@ -62,98 +94,6 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
     navigate("/login");
   };
 
-  /* --------------------------------------------------
-     🚀 Gün Başlat
-  -------------------------------------------------- */
-  const handleGunBaslatClick = () => {
-    if (!canStartDay) {
-      alert("❌ Gün başlatma yetkiniz yok.");
-      return;
-    }
-
-    if (onGunBaslat) {
-      onGunBaslat();
-      return;
-    }
-
-    const baslangicZamani = new Date().toISOString();
-
-    localStorage.setItem("mycafe_gun_durumu", "aktif");
-    localStorage.setItem("mycafe_gun_baslangic", baslangicZamani);
-    localStorage.setItem("mycafe_gun_baslangic_kasa", "0");
-    localStorage.setItem("mc_acik_adisyonlar", JSON.stringify([]));
-
-    localStorage.setItem(
-      "mycafe_gun_bilgileri",
-      JSON.stringify({
-        baslangicKasa: 0,
-        nakitGiris: 0,
-        krediKarti: 0,
-        toplamAdisyon: 0,
-        acikAdisyon: 0,
-        gunlukSatis: 0,
-        baslangicTarih: baslangicZamani,
-        sonGuncelleme: baslangicZamani,
-      })
-    );
-
-    if (window.dispatchGlobalEvent) {
-      window.dispatchGlobalEvent("gunDurumuDegisti", { aktif: true });
-      window.dispatchGlobalEvent("gunBaslatildi", { zaman: baslangicZamani });
-    }
-
-    alert("✅ Gün başarıyla başlatıldı.");
-  };
-
-  /* --------------------------------------------------
-     🏁 Gün Sonu (TEK MOTOR)
-  -------------------------------------------------- */
-  const handleGunSonu = () => {
-  if (!canEndDay) {
-    alert("❌ Gün sonu yapma yetkiniz yok.");
-    return;
-  }
-
-  if (!gunAktif) {
-    alert("❌ Gün başlatılmamış.");
-    return;
-  }
-
-  const onay = window.confirm(
-    "GÜN SONU\n\nBugüne ait tüm veriler analiz edilecek ve gün sonu raporu oluşturulacaktır.\n\nDevam etmek istiyor musunuz?"
-  );
-  if (!onay) return;
-
-  try {
-    const gunBaslangic = localStorage.getItem("mycafe_gun_baslangic");
-    const gunBitis = new Date().toISOString();
-
-    // ✅ raporMotoruV2 global olarak kullan
-    let rapor;
-    
-    if (window.raporMotoruV2 && window.raporMotoruV2.createGunSonuRaporu) {
-      rapor = window.raporMotoruV2.createGunSonuRaporu(gunBaslangic, gunBitis);
-    } else if (raporMotoruV2 && window.raporMotoruV2.createGunSonuRaporu) {
-      // Import edilmişse onu kullan
-      rapor = window.raporMotoruV2.createGunSonuRaporu(gunBaslangic, gunBitis);
-    } else {
-      throw new Error("Rapor motoru bulunamadı!");
-    }
-
-    localStorage.setItem("mycafe_gun_durumu", "kapali");
-    gunSonuYap();
-
-    window.dispatchEvent(
-      new CustomEvent("gunSonuYapildi", { detail: rapor })
-    );
-
-    navigate(`/raporlar/gun-sonu/${rapor.id}`);
-    
-  } catch (err) {
-    console.error("❌ Gün sonu hatası:", err);
-    alert("Gün sonu oluşturulurken hata oluştu: " + err.message);
-  }
-};
   /* ==================================================
      🖼️ UI
   ================================================== */
@@ -186,44 +126,48 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
           fontWeight: 700,
         }}
       >
-        {gunAktif ? "🟢 Gün Aktif" : "🔴 Gün Kapalı"}
+        {isOpen ? "🟢 Gün Aktif" : "🔴 Gün Kapalı"}
+
+        {!isOpen && (
+          <button
+            onClick={onGunBasiClick}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              padding: "10px",
+              borderRadius: 8,
+              border: "none",
+              background: "linear-gradient(135deg, #2ecc71, #27ae60)",
+              color: "#fff",
+              fontWeight: 800,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            📅 GÜN BAŞI
+          </button>
+        )}
+
+        {isOpen && (
+          <button
+            onClick={onGunSonuClick}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              padding: "10px",
+              borderRadius: 8,
+              border: "none",
+              background: "linear-gradient(135deg, #e74c3c, #c0392b)",
+              color: "#fff",
+              fontWeight: 800,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            🔚 GÜN SONU
+          </button>
+        )}
       </div>
-
-      {!gunAktif && canStartDay && (
-        <button
-          onClick={handleGunBaslatClick}
-          style={{
-            marginBottom: 16,
-            padding: 14,
-            borderRadius: 14,
-            border: "none",
-            background: "linear-gradient(135deg,#2ecc71,#27ae60)",
-            color: "#fff",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          🚀 Gün Başlat
-        </button>
-      )}
-
-      {gunAktif && canEndDay && (
-        <button
-          onClick={handleGunSonu}
-          style={{
-            marginBottom: 16,
-            padding: 14,
-            borderRadius: 14,
-            border: "none",
-            background: "linear-gradient(135deg,#e74c3c,#c0392b)",
-            color: "#fff",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          🏁 Gün Sonu
-        </button>
-      )}
 
       {/* Logo */}
       <div style={{ marginBottom: 20 }}>
@@ -238,13 +182,21 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
       <div style={{ flex: 1 }}>
         {menuItems.map((item) => {
           const active = isActive(item.path);
-          const disabled = !gunAktif && item.path !== "/ana";
+          const disabled =
+            !isOpen &&
+            item.path !== "/ana" &&
+            item.path !== "/raporlar";
 
           return (
             <Link
               key={item.key}
               to={disabled ? "#" : item.path}
-              onClick={(e) => disabled && e.preventDefault()}
+              onClick={(e) => {
+                if (disabled) {
+                  e.preventDefault();
+                  alert("Gün kapalıyken bu sayfaya erişilemez.");
+                }
+              }}
               style={{
                 display: "flex",
                 gap: 12,
@@ -252,10 +204,17 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
                 marginBottom: 6,
                 borderRadius: 12,
                 textDecoration: "none",
-                color: active ? RENK.secili : RENK.yazi,
-                background: active ? "rgba(245,208,133,0.25)" : "transparent",
-                opacity: disabled ? 0.5 : 1,
+                color: disabled
+                  ? RENK.pasif
+                  : active
+                  ? RENK.secili
+                  : RENK.yazi,
+                background: active
+                  ? "rgba(245,208,133,0.25)"
+                  : "transparent",
                 fontWeight: active ? 800 : 600,
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.6 : 1,
               }}
             >
               <span style={{ width: 26, textAlign: "center" }}>
@@ -265,6 +224,21 @@ export default function Sidebar({ gunAktif, canStartDay, canEndDay, onGunBaslat 
             </Link>
           );
         })}
+      </div>
+
+      {/* Kullanıcı Bilgisi */}
+      <div
+        style={{
+          marginTop: 20,
+          padding: 10,
+          background: "rgba(0,0,0,0.2)",
+          borderRadius: 8,
+          fontSize: 12,
+          textAlign: "center",
+          opacity: 0.8,
+        }}
+      >
+        👤 {user?.ad || user?.username || "Kullanıcı"}
       </div>
 
       {/* Çıkış */}

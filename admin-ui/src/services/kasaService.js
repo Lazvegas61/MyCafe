@@ -4,6 +4,7 @@
    📌 KASA VERİLERİNİ OKUMA ve RAPORLAMA (SADECE OKUMA)
    📌 YAZMA İŞLEMLERİ syncService ÜZERİNDEN YAPILIR
 ------------------------------------------------------------ */
+const __KASA_DEPRECATED__ = true;
 
 // LocalStorage Key'leri - syncService ile SENKRONİZE
 const KASA_HAREKETLERI_KEY = "mc_kasa_hareketleri";
@@ -34,6 +35,11 @@ const kasaService = {
   // TEMEL OKUMA FONKSİYONLARI (SADECE OKUMA)
   // --------------------------------------------------
   oku: (key, defaultValue = []) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.oku çağrıldı – AŞAMA 1 kilidi aktif");
+      return defaultValue;
+    }
+    
     try {
       // ÖNCE localStorageService'den dene
       if (typeof window !== 'undefined' && window.localStorageService) {
@@ -58,6 +64,11 @@ const kasaService = {
    * KRITIK: syncService tarafından oluşturulan verileri okur
    */
   kasaRaporuGetir: (baslangicTarihi, bitisTarihi) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.kasaRaporuGetir çağrıldı – AŞAMA 1 kilidi aktif");
+      return null;
+    }
+    
     console.log('💰 KASA: Rapor oluşturuluyor', { baslangicTarihi, bitisTarihi });
     
     if (!baslangicTarihi || !bitisTarihi) {
@@ -208,6 +219,11 @@ const kasaService = {
    * Günlük kasa raporu
    */
   gunlukKasaRaporu: (tarih = null) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.gunlukKasaRaporu çağrıldı – AŞAMA 1 kilidi aktif");
+      return null;
+    }
+    
     const targetDate = tarih || new Date().toISOString().split('T')[0];
     return kasaService.kasaRaporuGetir(targetDate, targetDate);
   },
@@ -216,6 +232,11 @@ const kasaService = {
    * Haftalık kasa raporu
    */
   haftalikKasaRaporu: (baslangicTarihi = null) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.haftalikKasaRaporu çağrıldı – AŞAMA 1 kilidi aktif");
+      return null;
+    }
+    
     const today = new Date();
     const startDate = baslangicTarihi ? new Date(baslangicTarihi) : new Date(today.setDate(today.getDate() - 7));
     const endDate = new Date();
@@ -230,6 +251,11 @@ const kasaService = {
    * Aylık kasa raporu
    */
   aylikKasaRaporu: (yil = null, ay = null) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.aylikKasaRaporu çağrıldı – AŞAMA 1 kilidi aktif");
+      return null;
+    }
+    
     const today = new Date();
     const targetYear = yil || today.getFullYear();
     const targetMonth = ay !== null ? ay : today.getMonth() + 1;
@@ -247,6 +273,11 @@ const kasaService = {
    * Ödeme tipine göre rapor
    */
   odemeTipiRaporu: (odemeTipi, baslangicTarihi, bitisTarihi) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.odemeTipiRaporu çağrıldı – AŞAMA 1 kilidi aktif");
+      return null;
+    }
+    
     const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
     if (!rapor) return null;
     
@@ -277,6 +308,11 @@ const kasaService = {
    * En çok satış yapılan masalar
    */
   enCokSatisYapanMasalar: (baslangicTarihi, bitisTarihi, limit = 10) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.enCokSatisYapanMasalar çağrıldı – AŞAMA 1 kilidi aktif");
+      return [];
+    }
+    
     const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
     if (!rapor) return [];
     
@@ -305,6 +341,11 @@ const kasaService = {
    * En çok harcama yapan müşteriler
    */
   enCokHarcamaYapanMusteriler: (baslangicTarihi, bitisTarihi, limit = 10) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.enCokHarcamaYapanMusteriler çağrıldı – AŞAMA 1 kilidi aktif");
+      return [];
+    }
+    
     const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
     if (!rapor) return [];
     
@@ -334,6 +375,11 @@ const kasaService = {
    * Saatlik satış analizi
    */
   saatlikSatisAnalizi: (baslangicTarihi, bitisTarihi) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.saatlikSatisAnalizi çağrıldı – AŞAMA 1 kilidi aktif");
+      return [];
+    }
+    
     const rapor = kasaService.kasaRaporuGetir(baslangicTarihi, bitisTarihi);
     if (!rapor) return [];
     
@@ -390,7 +436,7 @@ const kasaService = {
       
       console.log('✅ KASA: Event listener\'lar kuruldu (sadece loglama)');
     } else {
-      console.warn('⚠️ KASA: SyncService bulunamadı, event listener\'lar kurulamadı');
+console.log('ℹ️ KASA: SyncService henüz hazır değil, daha sonra bağlanacak');
     }
   },
 
@@ -402,6 +448,11 @@ const kasaService = {
    * Bugünün kasa durumunu getir
    */
   bugununKasaDurumu: () => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.bugununKasaDurumu çağrıldı – AŞAMA 1 kilidi aktif");
+      return null;
+    }
+    
     const bugun = new Date().toISOString().split('T')[0];
     return kasaService.kasaRaporuGetir(bugun, bugun);
   },
@@ -410,6 +461,19 @@ const kasaService = {
    * Kasa bakiyesini hesapla
    */
   kasaBakiyesiHesapla: (tarih = null) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.kasaBakiyesiHesapla çağrıldı – AŞAMA 1 kilidi aktif");
+      return {
+        tarih: tarih || new Date().toISOString().split('T')[0],
+        gunBasi: 0,
+        tahsilat: 0,
+        gunSonu: 0,
+        beklenenKasa: 0,
+        fark: 0,
+        tamamlandi: false
+      };
+    }
+    
     const targetDate = tarih || new Date().toISOString().split('T')[0];
     
     const gunBasiKayitlari = kasaService.oku(GUN_BASI_KASA_KEY, []);
@@ -447,6 +511,18 @@ const kasaService = {
    * Eksik gün sonu kontrolleri
    */
   eksikGunSonuKontrolu: (baslangicTarihi = null, bitisTarihi = null) => {
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.eksikGunSonuKontrolu çağrıldı – AŞAMA 1 kilidi aktif");
+      return {
+        baslangicTarihi: baslangicTarihi || new Date().toISOString().split('T')[0],
+        bitisTarihi: bitisTarihi || new Date().toISOString().split('T')[0],
+        toplamGun: 0,
+        eksikGunSonu: [],
+        eksikSayisi: 0,
+        tamamGunSonu: 0
+      };
+    }
+    
     const start = baslangicTarihi || new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
     const end = bitisTarihi || new Date().toISOString().split('T')[0];
     
@@ -485,6 +561,11 @@ const kasaService = {
   // --------------------------------------------------
   init: () => {
     console.log('🚀 KASA: KasaService başlatılıyor...');
+    
+    if (__KASA_DEPRECATED__) {
+      console.warn("[DEPRECATED] kasaService.init çağrıldı – AŞAMA 1 kilidi aktif");
+      return false;
+    }
     
     // LocalStorage key'lerini kontrol et (syncService ile senkron)
     const requiredKeys = [

@@ -20,7 +20,7 @@ export default function Login() {
     setError("");
 
     try {
-      const result = login(username, password);
+const result = await login(username, password);
 
       if (result.success) {
         console.log("✅ Giriş başarılı:", result.user);

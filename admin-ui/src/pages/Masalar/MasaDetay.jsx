@@ -1,16 +1,16 @@
 /* ------------------------------------------------------------
-   📌 BİRLEŞTİRİLMİŞ MasaDetay.jsx - FINAL
-   - Masa kartı ve masa detayı birleştirildi
-   - Tasarım DEĞİŞTİRİLMEDİ (Premium Altın-Kahve teması korundu)
-   - Bilardo kodları TAMAMEN TEMIZLENDI
-   - Mantıksal hatalar düzeltildi
-   - Masalar.jsx ile tam uyumlu
+   📌 MasaDetay.jsx - GELİŞTİRİLMİŞ VERSİYON
+   - Premium Altın-Kahve teması korundu
+   - Toplam hesaplama sistemi optimize edildi (cache kaldırıldı)
+   - Masa boşaltma kararı Masalar.jsx'e devredildi
+   - Hata yönetimi iyileştirildi
+   - Kod temizliği ve performans optimizasyonu
 ------------------------------------------------------------- */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-// MyCafe Premium Tema Renkleri (TASARIM DEĞİŞMEDİ)
+// MyCafe Premium Tema Renkleri
 const RENK = {
   arka: "#e5cfa5",
   kart: "#4a3722",
@@ -29,6 +29,7 @@ const readJSON = (key, fallback) => {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
+    console.error(`Error reading ${key} from localStorage`);
     return fallback;
   }
 };
@@ -37,16 +38,21 @@ const writeJSON = (key, data) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
     return true;
-  } catch {
+  } catch (error) {
+    console.error(`Error writing ${key} to localStorage:`, error);
     return false;
   }
 };
 
 const formatSaat = (dateString) => {
   if (!dateString) return "--:--";
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return "--:--";
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "--:--";
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  } catch {
+    return "--:--";
+  }
 };
 
 const formatSure = (dakika) => {
@@ -59,43 +65,33 @@ const formatSure = (dakika) => {
 
 const gecenDakika = (acilis) => {
   if (!acilis) return 0;
-  const bas = new Date(acilis);
-  const simdi = new Date();
-  return Math.floor((simdi - bas) / 60000);
+  try {
+    const bas = new Date(acilis);
+    const simdi = new Date();
+    return Math.floor((simdi - bas) / 60000);
+  } catch {
+    return 0;
+  }
 };
 
 const formatPara = (value) => {
   const num = parseFloat(value || 0);
+  if (isNaN(num)) return "0,00";
   return num.toLocaleString('tr-TR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
 };
 
-// TOPLAM HESAPLAMA - Masalar.jsx ile UYUMLU
+// TEK GERÇEK KAYNAK - Cache kullanmadan doğrudan hesapla
 const hesaplaAdisyonToplam = (adisyon) => {
-  if (!adisyon) return 0;
+  if (!adisyon || !Array.isArray(adisyon.kalemler)) return 0;
   
-  // 1. Önce localStorage'dan kontrol et
-  const storedKey = `mc_adisyon_toplam_${adisyon.id}`;
-  const storedTotal = localStorage.getItem(storedKey);
-  if (storedTotal) {
-    return parseFloat(storedTotal) || 0;
-  }
-  
-  // 2. Yoksa kalemlerden hesapla
-  let toplam = 0;
-  if (Array.isArray(adisyon.kalemler)) {
-    toplam = adisyon.kalemler.reduce((sum, k) => {
-      const adet = Number(k.adet || 0);
-      const fiyat = Number(k.birimFiyat || k.fiyat || 0);
-      return sum + adet * fiyat;
-    }, 0);
-  }
-  
-  // 3. Kaydet (sonraki çağrılarda hızlı erişim için)
-  localStorage.setItem(storedKey, toplam.toFixed(2));
-  return toplam;
+  return adisyon.kalemler.reduce((sum, k) => {
+    const adet = Number(k.adet || 1);
+    const fiyat = Number(k.birimFiyat || k.fiyat || 0);
+    return sum + adet * fiyat;
+  }, 0);
 };
 
 // ------------------------------
@@ -105,77 +101,77 @@ export default function MasaDetay() {
   const { masaNo } = useParams();
   const navigate = useNavigate();
   
-  // STATE
   const [masa, setMasa] = useState(null);
   const [adisyon, setAdisyon] = useState(null);
   const [simdi, setSimdi] = useState(Date.now());
   const [kapanisMesaji, setKapanisMesaji] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   // ------------------------------
-  // MASA + ADISYON YÜKLEME - DÜZELTİLDİ
+  // MASA BULMA (String/Number uyumlu)
+  // ------------------------------
+  const findMasaByNo = useCallback((masalar, targetNo) => {
+    return masalar.find(m => 
+      String(m.no) === String(targetNo) || 
+      String(m.id) === String(targetNo) ||
+      String(m.masaNum) === String(targetNo)
+    );
+  }, []);
+
+  // ------------------------------
+  // VERİ YÜKLEME - Optimize Edilmiş
   // ------------------------------
   const loadData = useCallback(() => {
+    setIsLoading(true);
     console.log('🔄 Masa detay yükleniyor:', masaNo);
     
     const masalar = readJSON("mc_masalar", []);
     const ads = readJSON("mc_adisyonlar", []);
     
-    // MASA BUL - String/Number uyumlu
-    let mevcutMasa = null;
-    
-    // 1. Önce no ile eşleşen masa ara
-    mevcutMasa = masalar.find(m => 
-      String(m.no) === String(masaNo) || 
-      m.id === masaNo ||
-      m.masaNum === masaNo
-    );
-    
-    // 2. Bulunamazsa index ile ara
-    if (!mevcutMasa) {
-      const index = masalar.findIndex(m => String(m.no) === String(masaNo));
-      if (index !== -1) {
-        mevcutMasa = masalar[index];
-      }
-    }
-    
-    setMasa(mevcutMasa || null);
+    // MASA BUL
+    const mevcutMasa = findMasaByNo(masalar, masaNo);
     
     if (!mevcutMasa) {
       console.log('⚠️ Masa bulunamadı:', masaNo);
+      setMasa(null);
       setAdisyon(null);
+      setIsLoading(false);
       return;
     }
     
     console.log('✅ Masa bulundu:', mevcutMasa);
+    setMasa(mevcutMasa);
     
-    // MASA BOŞSA adisyon yok
-    if (mevcutMasa.durum?.toUpperCase() === "BOŞ" || !mevcutMasa.adisyonId) {
+    // MASA BOŞSA veya adisyonId yoksa
+    const isMasaBos = mevcutMasa.durum?.toUpperCase() === "BOŞ" || !mevcutMasa.adisyonId;
+    if (isMasaBos) {
+      console.log('ℹ️ Masa boş, adisyon yok');
       setAdisyon(null);
+      setIsLoading(false);
       return;
     }
     
     // AÇIK ADISYON BUL
-    const acikAdisyon = ads.find(a => 
-      a.id === mevcutMasa.adisyonId &&
-      !["CLOSED", "KAPALI", "KAPALI"].includes((a.status || a.durum || "").toUpperCase())
-    );
+    const acikAdisyon = ads.find(a => {
+      if (a.id !== mevcutMasa.adisyonId) return false;
+      
+      const durum = (a.status || a.durum || "").toUpperCase();
+      return !["CLOSED", "KAPALI", "KAPANDI", "CLOSED"].includes(durum);
+    });
     
     if (!acikAdisyon) {
-      console.log('⚠️ Açık adisyon bulunamadı, masa boş gösterilecek');
-      // Masa durumunu güncelle (BOŞ yap)
-      const updatedMasalar = masalar.map(m => 
-        m.no === mevcutMasa.no ? { ...m, durum: "BOŞ", adisyonId: null } : m
-      );
-      writeJSON("mc_masalar", updatedMasalar);
-      setMasa({ ...mevcutMasa, durum: "BOŞ", adisyonId: null });
+      console.log('⚠️ Açık adisyon bulunamadı');
+      // MASA BOŞALTMA KARARI VERMEYİZ - Sadece UI'da göster
       setAdisyon(null);
+      setIsLoading(false);
       return;
     }
     
     console.log('✅ Açık adisyon bulundu:', acikAdisyon.id);
     setAdisyon(acikAdisyon);
+    setIsLoading(false);
     
-  }, [masaNo]);
+  }, [masaNo, findMasaByNo]);
 
   // ------------------------------
   // REAL-TIME UPDATES
@@ -183,28 +179,37 @@ export default function MasaDetay() {
   useEffect(() => {
     loadData();
     
-    // Her 10 saniyede bir güncelle
     const interval = setInterval(() => {
       setSimdi(Date.now());
-      loadData();
-    }, 10000);
+      // Her 30 saniyede bir veri yenile
+    }, 30000);
     
     const handleStorageChange = () => {
+      console.log('📦 Storage değişikliği algılandı, veri yenileniyor');
       loadData();
     };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('adisyonGuncellendi', handleStorageChange);
+    window.addEventListener('masaDurumGuncellendi', handleStorageChange);
     
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('adisyonGuncellendi', handleStorageChange);
+      window.removeEventListener('masaDurumGuncellendi', handleStorageChange);
     };
   }, [loadData]);
 
   // ------------------------------
-  // MASA KAPATMA - TAM DÜZELTİLDİ
+  // TOPLAM TUTAR - Memoized
+  // ------------------------------
+  const toplamTutar = useMemo(() => {
+    return hesaplaAdisyonToplam(adisyon);
+  }, [adisyon]);
+
+  // ------------------------------
+  // MASA KAPATMA - GÜVENLİ VERSİYON
   // ------------------------------
   const masaKapat = () => {
     if (!adisyon || !masa) {
@@ -212,188 +217,225 @@ export default function MasaDetay() {
       return;
     }
     
-    if (!window.confirm(`Masa ${masaNo} kapatılsın mı?\nToplam: ${formatPara(hesaplaAdisyonToplam(adisyon))} TL`)) {
+    const onayMesaji = `Masa ${masaNo} kapatılsın mı?\n\nToplam: ${formatPara(toplamTutar)} TL\nKalem sayısı: ${(adisyon.kalemler || []).length}`;
+    
+    if (!window.confirm(onayMesaji)) {
       return;
     }
     
     console.log('🔴 MASA KAPATMA BAŞLIYOR:', { masaNo, adisyonId: adisyon.id });
     
-    // 1. ADISYONLARI GÜNCELLE
-    const ads = readJSON("mc_adisyonlar", []);
-    const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
-    
-    if (adisyonIndex === -1) {
-      alert("Adisyon bulunamadı!");
-      return;
-    }
-    
-    const toplamTutar = hesaplaAdisyonToplam(adisyon);
-    const now = new Date().toISOString();
-    
-    // Adisyonu KAPALI yap
-    const guncelAdisyon = {
-      ...ads[adisyonIndex],
-      status: "CLOSED",
-      durum: "KAPALI",
-      kapanisZamani: now,
-      toplamTutar: toplamTutar.toFixed(2),
-      guncellemeZamani: now
-    };
-    
-    ads[adisyonIndex] = guncelAdisyon;
-    writeJSON("mc_adisyonlar", ads);
-    console.log('✅ Adisyon kapatıldı:', guncelAdisyon.id);
-    
-    // 2. MASALARI GÜNCELLE - EN KRITIK KISIM!
-    const masalar = readJSON("mc_masalar", []);
-    const masaIndex = masalar.findIndex(m => String(m.no) === String(masaNo));
-    
-    if (masaIndex === -1) {
-      console.error('❌ Masa bulunamadı:', masaNo);
-      alert("Masa bulunamadı!");
-      return;
-    }
-    
-    // Masayı BOŞ yap ve tüm alanları temizle
-    masalar[masaIndex] = {
-      ...masalar[masaIndex],
-      durum: "BOŞ", // ✅ BU ÇOK ÖNEMLİ!
-      adisyonId: null,
-      toplamTutar: "0.00",
-      acilisZamani: null,
-      kapanisZamani: now,
-      guncellemeZamani: now,
-      renk: "gri",
-      musteriAdi: null,
-      kisiSayisi: null
-    };
-    
-    writeJSON("mc_masalar", masalar);
-    console.log('✅ Masa boşaltıldı:', masaNo);
-    
-    // 3. LOCALSTORAGE TOPLAMLARINI TEMİZLE
-    const masaToplamKey = `mc_masa_toplam_${masaNo}`;
-    const adisyonToplamKey = `mc_adisyon_toplam_${adisyon.id}`;
-    
-    localStorage.removeItem(masaToplamKey);
-    localStorage.removeItem(adisyonToplamKey);
-    console.log('🗑️ Toplam temizlendi:', masaToplamKey, adisyonToplamKey);
-    
-    // 4. KASA HAREKETİ KAYDET (OPSİYONEL)
     try {
-      const kasalar = readJSON("mc_kasalar", []);
-      const kasaHareketi = {
-        id: Date.now().toString(),
-        tarih: now,
-        masaNo: masaNo,
-        adisyonId: adisyon.id,
-        aciklama: `Masa ${masaNo} Kapatıldı`,
-        giren: toplamTutar,
-        cikan: 0,
-        bakiye: 0,
-        tip: "MASA_KAPATMA"
+      // 1. ADISYONU KAPAT
+      const ads = readJSON("mc_adisyonlar", []);
+      const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
+      
+      if (adisyonIndex === -1) {
+        throw new Error("Adisyon bulunamadı!");
+      }
+      
+      const now = new Date().toISOString();
+      
+      // Adisyonu güncelle (SADECE KAPAT)
+      const guncelAdisyon = {
+        ...ads[adisyonIndex],
+        status: "CLOSED",
+        durum: "KAPALI",
+        kapanisZamani: now,
+        toplamTutar: toplamTutar.toFixed(2),
+        guncellemeZamani: now
       };
-      kasalar.push(kasaHareketi);
-      writeJSON("mc_kasalar", kasalar);
-      console.log('💰 Kasa hareketi kaydedildi');
-    } catch (error) {
-      console.warn('⚠️ Kasa kaydedilemedi:', error);
-    }
-    
-    // 5. EVENT'LERİ TETİKLE (Masalar.jsx'in güncellenmesi için)
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: "mc_masalar",
-      newValue: JSON.stringify(masalar)
-    }));
-    
-    window.dispatchEvent(new CustomEvent('adisyonGuncellendi'));
-    window.dispatchEvent(new CustomEvent('odemelerGuncellendi'));
-    
-    // 6. BAŞARI MESAJI
-    setKapanisMesaji(`✅ Masa ${masaNo} başarıyla kapatıldı! Toplam: ${formatPara(toplamTutar)} TL`);
-    
-    // 7. 2 SANİYE SONRA MASALARA YÖNLENDİR
-    setTimeout(() => {
-      navigate("/masalar");
-    }, 2000);
-  };
-
-  // ------------------------------
-  // KALEM SİLME
-  // ------------------------------
-  const kalemSil = (kalemId) => {
-    if (!adisyon || !window.confirm("Bu kalemi silmek istediğinize emin misiniz?")) {
-      return;
-    }
-    
-    const yeniKalemler = (adisyon.kalemler || []).filter(k => k.id !== kalemId);
-    const guncelAdisyon = { ...adisyon, kalemler: yeniKalemler };
-    
-    // Adisyonu güncelle
-    const ads = readJSON("mc_adisyonlar", []);
-    const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
-    
-    if (adisyonIndex !== -1) {
+      
       ads[adisyonIndex] = guncelAdisyon;
       writeJSON("mc_adisyonlar", ads);
+      console.log('✅ Adisyon kapatıldı:', guncelAdisyon.id);
+      
+      // 2. MASA BOŞALTMA İSTEĞİ GÖNDER (Karar Masalar.jsx'e bırakılsın)
+      // Custom event ile Masalar.jsx'e sinyal gönder
+      window.dispatchEvent(new CustomEvent('masaKapatildi', {
+        detail: {
+          masaNo: masaNo,
+          adisyonId: adisyon.id,
+          toplamTutar: toplamTutar,
+          zaman: now
+        }
+      }));
+      
+      // 3. KASA HAREKETİ KAYDET (OPSİYONEL)
+      try {
+        const kasalar = readJSON("mc_kasalar", []);
+        const kasaHareketi = {
+          id: Date.now().toString(),
+          tarih: now,
+          masaNo: masaNo,
+          adisyonId: adisyon.id,
+          aciklama: `Masa ${masaNo} Kapatıldı`,
+          giren: toplamTutar,
+          cikan: 0,
+          bakiye: 0,
+          tip: "MASA_KAPATMA"
+        };
+        kasalar.push(kasaHareketi);
+        writeJSON("mc_kasalar", kasalar);
+        console.log('💰 Kasa hareketi kaydedildi');
+      } catch (error) {
+        console.warn('⚠️ Kasa kaydedilemedi:', error);
+      }
+      
+      // 4. BAŞARI MESAJI VE YÖNLENDİRME
+      setKapanisMesaji(`✅ Masa ${masaNo} başarıyla kapatıldı! Toplam: ${formatPara(toplamTutar)} TL`);
+      
+      // UI'yı güncelle (local state)
       setAdisyon(guncelAdisyon);
       
-      // Toplam tutarı güncelle
-      const yeniToplam = hesaplaAdisyonToplam(guncelAdisyon);
-      localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, yeniToplam.toString());
-      localStorage.setItem(`mc_masa_toplam_${masaNo}`, yeniToplam.toString());
-      
-      // Event tetikle
+      // 5. DİĞER COMPONENT'LERE HABER VER
       window.dispatchEvent(new CustomEvent('adisyonGuncellendi'));
       
-      alert("Kalem silindi.");
+      // 6. 2 SANİYE SONRA MASALARA YÖNLENDİR
+      setTimeout(() => {
+        navigate("/masalar");
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Masa kapatma hatası:', error);
+      alert(`Masa kapatılamadı: ${error.message}`);
     }
   };
 
   // ------------------------------
-  // ADET ARTIR/AZALT
+  // KALEM SİLME - Optimize Edilmiş
+  // ------------------------------
+  const kalemSil = (kalemId) => {
+    if (!adisyon || !kalemId) return;
+    
+    const kalem = adisyon.kalemler?.find(k => k.id === kalemId);
+    if (!kalem) return;
+    
+    const onayMesaji = `"${kalem.urunAd || 'Ürün'}" kalemi silinsin mi?\nBirim: ₺${formatPara(kalem.birimFiyat || kalem.fiyat)}\nAdet: ${kalem.adet || 1}`;
+    
+    if (!window.confirm(onayMesaji)) return;
+    
+    try {
+      const yeniKalemler = (adisyon.kalemler || []).filter(k => k.id !== kalemId);
+      const guncelAdisyon = { 
+        ...adisyon, 
+        kalemler: yeniKalemler,
+        guncellemeZamani: new Date().toISOString()
+      };
+      
+      // Adisyonu güncelle
+      const ads = readJSON("mc_adisyonlar", []);
+      const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
+      
+      if (adisyonIndex !== -1) {
+        ads[adisyonIndex] = guncelAdisyon;
+        writeJSON("mc_adisyonlar", ads);
+        
+        // State'i güncelle
+        setAdisyon(guncelAdisyon);
+        
+        // Diğer component'lere haber ver
+        window.dispatchEvent(new CustomEvent('adisyonGuncellendi'));
+        
+        alert("✅ Kalem başarıyla silindi.");
+      }
+    } catch (error) {
+      console.error('❌ Kalem silme hatası:', error);
+      alert("Kalem silinirken bir hata oluştu.");
+    }
+  };
+
+  // ------------------------------
+  // ADET DEĞİŞTİR
   // ------------------------------
   const adetDegistir = (kalemId, artir = true) => {
     if (!adisyon) return;
     
-    const yeniKalemler = (adisyon.kalemler || []).map(k => {
-      if (k.id !== kalemId) return k;
+    try {
+      const yeniKalemler = (adisyon.kalemler || []).map(k => {
+        if (k.id !== kalemId) return k;
+        
+        const mevcutAdet = k.adet || 1;
+        const yeniAdet = artir ? mevcutAdet + 1 : Math.max(1, mevcutAdet - 1);
+        const birimFiyat = k.birimFiyat || k.fiyat || 0;
+        
+        return {
+          ...k,
+          adet: yeniAdet,
+          toplam: yeniAdet * birimFiyat
+        };
+      });
       
-      const yeniAdet = artir ? (k.adet || 1) + 1 : Math.max(1, (k.adet || 1) - 1);
-      return {
-        ...k,
-        adet: yeniAdet,
-        toplam: yeniAdet * (k.birimFiyat || k.fiyat || 0)
+      const guncelAdisyon = { 
+        ...adisyon, 
+        kalemler: yeniKalemler,
+        guncellemeZamani: new Date().toISOString()
       };
-    });
-    
-    const guncelAdisyon = { ...adisyon, kalemler: yeniKalemler };
-    
-    // Adisyonu güncelle
-    const ads = readJSON("mc_adisyonlar", []);
-    const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
-    
-    if (adisyonIndex !== -1) {
-      ads[adisyonIndex] = guncelAdisyon;
-      writeJSON("mc_adisyonlar", ads);
-      setAdisyon(guncelAdisyon);
       
-      // Toplam tutarı güncelle
-      const yeniToplam = hesaplaAdisyonToplam(guncelAdisyon);
-      localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, yeniToplam.toString());
-      localStorage.setItem(`mc_masa_toplam_${masaNo}`, yeniToplam.toString());
+      // Adisyonu güncelle
+      const ads = readJSON("mc_adisyonlar", []);
+      const adisyonIndex = ads.findIndex(a => a.id === adisyon.id);
       
-      // Event tetikle
-      window.dispatchEvent(new CustomEvent('adisyonGuncellendi'));
+      if (adisyonIndex !== -1) {
+        ads[adisyonIndex] = guncelAdisyon;
+        writeJSON("mc_adisyonlar", ads);
+        
+        // State'i güncelle
+        setAdisyon(guncelAdisyon);
+        
+        // Diğer component'lere haber ver
+        window.dispatchEvent(new CustomEvent('adisyonGuncellendi'));
+      }
+    } catch (error) {
+      console.error('❌ Adet değiştirme hatası:', error);
     }
   };
 
   // ------------------------------
-  // RENDER - MASALAR.JSX TASARIMI KORUNDU
+  // RENDER - YÜKLENİYOR DURUMU
   // ------------------------------
+  if (isLoading) {
+    return (
+      <div style={{
+        background: RENK.arka,
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        flexDirection: "column",
+        gap: "20px"
+      }}>
+        <div style={{
+          fontSize: "24px",
+          fontWeight: "bold",
+          color: "#4a3722"
+        }}>
+          Yükleniyor...
+        </div>
+        <div style={{
+          width: "50px",
+          height: "50px",
+          border: `4px solid ${RENK.altin}`,
+          borderTopColor: "transparent",
+          borderRadius: "50%",
+          animation: "spin 1s linear infinite"
+        }}></div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // ------------------------------
+  // RENDER - MASA BOŞSA
+  // ------------------------------
+  const isMasaBos = !masa || masa.durum?.toUpperCase() === "BOŞ" || !adisyon;
   
-  // MASA BOŞSA - MASALAR.JSX STİLİNDE GÖSTER
-  if (!masa || masa.durum?.toUpperCase() === "BOŞ" || !adisyon) {
+  if (isMasaBos) {
     return (
       <div style={{
         background: RENK.arka,
@@ -405,7 +447,7 @@ export default function MasaDetay() {
         alignItems: "center",
         justifyContent: "center"
       }}>
-        {/* MASALAR.JSX HEADER STİLİ */}
+        {/* HEADER */}
         <div style={{
           display: "flex",
           justifyContent: "space-between",
@@ -426,7 +468,7 @@ export default function MasaDetay() {
           <button
             onClick={() => navigate("/masalar")}
             style={{
-              padding: "8px 14px",
+              padding: "12px 24px",
               borderRadius: "999px",
               border: "none",
               cursor: "pointer",
@@ -435,8 +477,8 @@ export default function MasaDetay() {
               fontWeight: 800,
               fontSize: "14px",
               boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
-              minWidth: "120px",
-              transition: "transform 0.2s",
+              minWidth: "140px",
+              transition: "all 0.2s",
             }}
             onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
             onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
@@ -445,7 +487,7 @@ export default function MasaDetay() {
           </button>
         </div>
 
-        {/* BOŞ MASA KARTI - MASALAR.JSX STİLİNDE */}
+        {/* BOŞ MASA KARTI */}
         <div style={{
           background: RENK.kart,
           color: RENK.kartYazi,
@@ -520,8 +562,9 @@ export default function MasaDetay() {
     );
   }
 
-  // MASA DOLUYSA - DETAYLI GÖSTERİM
-  const toplamTutar = hesaplaAdisyonToplam(adisyon);
+  // ------------------------------
+  // RENDER - MASA DOLUYSA
+  // ------------------------------
   const gecenSüre = gecenDakika(adisyon.acilisZamani);
   const acilisSaati = formatSaat(adisyon.acilisZamani);
 
@@ -532,7 +575,7 @@ export default function MasaDetay() {
       padding: "26px",
       boxSizing: "border-box",
     }}>
-      {/* HEADER - MASALAR.JSX STİLİ */}
+      {/* HEADER */}
       <div style={{
         display: "flex",
         justifyContent: "space-between",
@@ -560,7 +603,7 @@ export default function MasaDetay() {
           <button
             onClick={masaKapat}
             style={{
-              padding: "8px 14px",
+              padding: "12px 24px",
               borderRadius: "999px",
               border: "none",
               cursor: "pointer",
@@ -569,8 +612,8 @@ export default function MasaDetay() {
               fontWeight: 800,
               fontSize: "14px",
               boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
-              minWidth: "140px",
-              transition: "transform 0.2s",
+              minWidth: "160px",
+              transition: "all 0.2s",
             }}
             onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
             onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
@@ -582,7 +625,7 @@ export default function MasaDetay() {
           <button
             onClick={() => navigate("/masalar")}
             style={{
-              padding: "8px 14px",
+              padding: "12px 24px",
               borderRadius: "999px",
               border: "none",
               cursor: "pointer",
@@ -591,8 +634,8 @@ export default function MasaDetay() {
               fontWeight: 800,
               fontSize: "14px",
               boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
-              minWidth: "120px",
-              transition: "transform 0.2s",
+              minWidth: "140px",
+              transition: "all 0.2s",
             }}
             onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
             onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
@@ -606,14 +649,15 @@ export default function MasaDetay() {
       {kapanisMesaji && (
         <div style={{
           marginBottom: "20px",
-          padding: "12px",
+          padding: "15px",
           borderRadius: "10px",
           background: "#d4edda",
           color: "#155724",
           border: "1px solid #c3e6cb",
           textAlign: "center",
           fontSize: "16px",
-          fontWeight: "bold"
+          fontWeight: "bold",
+          animation: "fadeIn 0.5s"
         }}>
           {kapanisMesaji}
         </div>
@@ -625,11 +669,14 @@ export default function MasaDetay() {
         gridTemplateColumns: "1fr 1fr",
         gap: "24px",
         maxWidth: "1200px",
-        margin: "0 auto"
+        margin: "0 auto",
+        '@media (max-width: 900px)': {
+          gridTemplateColumns: "1fr"
+        }
       }}>
-        {/* SOL KOLON: MASA BİLGİLERİ ve ÖZET */}
+        {/* SOL KOLON: MASA BİLGİLERİ */}
         <div>
-          {/* MASA KARTI - MASALAR.JSX STİLİNDE (DOLU) */}
+          {/* MASA KARTI */}
           <div style={{
             background: RENK.kart,
             color: RENK.kartYazi,
@@ -754,7 +801,10 @@ export default function MasaDetay() {
                 <span style={{ fontWeight: "600" }}>Durum:</span>
                 <span style={{
                   color: RENK.yesil,
-                  fontWeight: "bold"
+                  fontWeight: "bold",
+                  background: "rgba(46, 204, 113, 0.1)",
+                  padding: "4px 8px",
+                  borderRadius: "4px"
                 }}>
                   AÇIK
                 </span>
@@ -790,8 +840,9 @@ export default function MasaDetay() {
                 fontWeight: "bold",
                 color: "#4a3722",
                 background: "#f5d085",
-                padding: "6px 12px",
-                borderRadius: "20px"
+                padding: "8px 16px",
+                borderRadius: "20px",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
               }}>
                 ₺ {formatPara(toplamTutar)}
               </div>
@@ -812,6 +863,9 @@ export default function MasaDetay() {
                   fontSize: "16px"
                 }}>
                   🛒 Adisyonda henüz ürün yok
+                  <div style={{ fontSize: "14px", marginTop: "10px" }}>
+                    Ürün eklemek için Masalar sayfasına dönün
+                  </div>
                 </div>
               ) : (
                 <table style={{
@@ -821,7 +875,9 @@ export default function MasaDetay() {
                   <thead>
                     <tr style={{
                       background: "#4a3722",
-                      color: "#ffffff"
+                      color: "#ffffff",
+                      position: "sticky",
+                      top: 0
                     }}>
                       <th style={{ padding: "12px", textAlign: "left", width: "40%" }}>Ürün</th>
                       <th style={{ padding: "12px", textAlign: "center", width: "20%" }}>Adet</th>
@@ -835,8 +891,11 @@ export default function MasaDetay() {
                         key={kalem.id || index}
                         style={{
                           borderBottom: "1px solid #e5cfa5",
-                          background: index % 2 === 0 ? "#fffdf7" : "#fff7e6"
+                          background: index % 2 === 0 ? "#fffdf7" : "#fff7e6",
+                          transition: "background 0.2s"
                         }}
+                        onMouseOver={(e) => e.currentTarget.style.background = "#fff0d9"}
+                        onMouseOut={(e) => e.currentTarget.style.background = index % 2 === 0 ? "#fffdf7" : "#fff7e6"}
                       >
                         <td style={{ padding: "12px" }}>
                           <div style={{ fontWeight: "600" }}>{kalem.urunAd || "Ürün"}</div>
@@ -845,7 +904,7 @@ export default function MasaDetay() {
                               fontSize: "12px",
                               color: "#7f8c8d",
                               fontStyle: "italic",
-                              marginTop: "2px"
+                              marginTop: "4px"
                             }}>
                               📝 {kalem.not}
                             </div>
@@ -862,8 +921,8 @@ export default function MasaDetay() {
                             <button
                               onClick={() => adetDegistir(kalem.id, false)}
                               style={{
-                                width: "24px",
-                                height: "24px",
+                                width: "28px",
+                                height: "28px",
                                 borderRadius: "50%",
                                 border: "1px solid #d0b48c",
                                 background: "#fbe9e7",
@@ -872,8 +931,11 @@ export default function MasaDetay() {
                                 lineHeight: "1",
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center"
+                                justifyContent: "center",
+                                transition: "all 0.2s"
                               }}
+                              onMouseOver={(e) => e.currentTarget.style.background = "#ffcdd2"}
+                              onMouseOut={(e) => e.currentTarget.style.background = "#fbe9e7"}
                             >
                               -
                             </button>
@@ -881,7 +943,8 @@ export default function MasaDetay() {
                             <span style={{
                               fontWeight: "bold",
                               minWidth: "30px",
-                              textAlign: "center"
+                              textAlign: "center",
+                              fontSize: "16px"
                             }}>
                               {kalem.adet || 1}
                             </span>
@@ -889,8 +952,8 @@ export default function MasaDetay() {
                             <button
                               onClick={() => adetDegistir(kalem.id, true)}
                               style={{
-                                width: "24px",
-                                height: "24px",
+                                width: "28px",
+                                height: "28px",
                                 borderRadius: "50%",
                                 border: "1px solid #d0b48c",
                                 background: "#e8f5e9",
@@ -899,8 +962,11 @@ export default function MasaDetay() {
                                 lineHeight: "1",
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center"
+                                justifyContent: "center",
+                                transition: "all 0.2s"
                               }}
+                              onMouseOver={(e) => e.currentTarget.style.background = "#c8e6c9"}
+                              onMouseOut={(e) => e.currentTarget.style.background = "#e8f5e9"}
                             >
                               +
                             </button>
@@ -918,22 +984,25 @@ export default function MasaDetay() {
                             justifyContent: "flex-end",
                             gap: "8px"
                           }}>
-                            <span style={{ fontWeight: "bold" }}>
-                              ₺ {formatPara(kalem.toplam || 0)}
+                            <span style={{ fontWeight: "bold", fontSize: "15px" }}>
+                              ₺ {formatPara((kalem.adet || 1) * (kalem.birimFiyat || kalem.fiyat || 0))}
                             </span>
                             
                             <button
                               onClick={() => kalemSil(kalem.id)}
                               style={{
-                                padding: "4px 8px",
-                                borderRadius: "4px",
+                                padding: "6px 10px",
+                                borderRadius: "6px",
                                 border: "none",
                                 background: RENK.kirmizi,
                                 color: "#ffffff",
                                 cursor: "pointer",
                                 fontSize: "12px",
-                                fontWeight: "bold"
+                                fontWeight: "bold",
+                                transition: "all 0.2s"
                               }}
+                              onMouseOver={(e) => e.currentTarget.style.opacity = "0.9"}
+                              onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
                               title="Sil"
                             >
                               ✕
@@ -976,7 +1045,7 @@ export default function MasaDetay() {
                 marginTop: "8px"
               }}>
                 <span>GENEL TOPLAM:</span>
-                <span style={{ color: RENK.altin }}>
+                <span style={{ color: RENK.altin, fontSize: "18px" }}>
                   ₺ {formatPara(toplamTutar)}
                 </span>
               </div>
@@ -996,9 +1065,16 @@ export default function MasaDetay() {
       }}>
         Masa {masaNo} • Açılış: {acilisSaati} • Geçen Süre: {formatSure(gecenSüre)}
         <div style={{ fontSize: "11px", marginTop: "4px", opacity: 0.7 }}>
-          Adisyon ID: {adisyon.id.substring(0, 16)}...
+          Adisyon ID: {adisyon.id.substring(0, 16)}... • Son güncelleme: {formatSaat(adisyon.guncellemeZamani)}
         </div>
       </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

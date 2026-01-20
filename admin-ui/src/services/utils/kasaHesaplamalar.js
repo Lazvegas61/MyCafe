@@ -10,11 +10,18 @@ import {
   KASA_FARK_DURUMLARI 
 } from '../constants/kasaTipleri';
 
+export const __KASA_HESAPLAMA_KILITLI__ = true;
+
 /**
  * Tarihe göre hareketleri filtrele
  * KRITIK: Ödeme tarihine göre filtreler
  */
 export const tariheGoreFiltrele = (hareketler, baslangicTarihi, bitisTarihi) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return []; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   if (!baslangicTarihi || !bitisTarihi) return [];
   
   return hareketler.filter(hareket => {
@@ -32,6 +39,11 @@ export const tariheGoreFiltrele = (hareketler, baslangicTarihi, bitisTarihi) => 
  * Kasa özetini hesapla
  */
 export const kasaOzetiHesapla = (hareketler, gunBasiKayitlari, gunSonuKayitlari) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return {}; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   // Tahsilatları hesapla (kasaya giren para)
   const toplamTahsilat = hareketler
     .filter(h => h.tip === KASA_TIPLERI.TAHISILAT && h.kasaGirisi === true)
@@ -60,6 +72,11 @@ export const kasaOzetiHesapla = (hareketler, gunBasiKayitlari, gunSonuKayitlari)
  * Ödeme türü dağılımını hesapla
  */
 export const odemeDagilimiHesapla = (hareketler) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return {}; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   const dagilim = {
     nakit: 0,
     kart: 0,
@@ -95,6 +112,11 @@ export const odemeDagilimiHesapla = (hareketler) => {
  * Tahsilat türlerini hesapla
  */
 export const tahsilatTurleriHesapla = (hareketler) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return {}; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   // Adisyon tahsilatı (kasaya giren)
   const adisyonTahsilat = hareketler
     .filter(h => h.tip === KASA_TIPLERI.TAHISILAT && h.kasaGirisi === true)
@@ -121,6 +143,11 @@ export const tahsilatTurleriHesapla = (hareketler) => {
  * Kasa farkı durumunu belirle
  */
 export const kasaFarkiDurumuBelirle = (kasaFarki) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return {}; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   const fark = Math.abs(kasaFarki);
   
   if (fark === 0) {
@@ -152,6 +179,11 @@ export const kasaFarkiDurumuBelirle = (kasaFarki) => {
  * @param {number} gunSayisi - Kaç günlük rapor (varsayılan: 7)
  */
 export const varsayilanTarihAraligiOlustur = (gunSayisi = 7) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return {}; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   const bitis = new Date();
   const baslangic = new Date();
   baslangic.setDate(bitis.getDate() - gunSayisi + 1);
@@ -166,6 +198,11 @@ export const varsayilanTarihAraligiOlustur = (gunSayisi = 7) => {
  * Para formatı (TL)
  */
 export const paraFormati = (tutar) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return "₺ 0.00"; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   if (tutar === null || tutar === undefined) return "₺ 0.00";
   
   const sayi = parseFloat(tutar);
@@ -178,6 +215,11 @@ export const paraFormati = (tutar) => {
  * Hareketleri tarihe göre grupla (günlük)
  */
 export const hareketleriGunlereGoreGrupla = (hareketler) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return []; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   const gruplar = {};
   
   hareketler.forEach(hareket => {
@@ -211,6 +253,11 @@ export const hareketleriGunlereGoreGrupla = (hareketler) => {
  * En çok kullanılan ödeme türünü bul
  */
 export const enCokKullanilanOdemeTipi = (odemeDagilimi) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return 'nakit'; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   const dagilim = { ...odemeDagilimi };
   delete dagilim.hesabaYaz; // Hesaba yaz hariç
   
@@ -225,6 +272,11 @@ export const enCokKullanilanOdemeTipi = (odemeDagilimi) => {
  * Kasa hareketi validasyonu
  */
 export const hareketValidasyonu = (hareket) => {
+  if (__KASA_HESAPLAMA_KILITLI__) {
+    console.warn("[DEPRECATED] kasaHesaplamalar kullanımı engellendi");
+    return { gecerli: false, hatalar: ["Kasa hesaplamaları kilitli"] }; // veya { } / [] – fonksiyon tipine uygun
+  }
+  
   const hatalar = [];
   
   if (!hareket.tip) hatalar.push("Hareket tipi gereklidir");
@@ -243,6 +295,7 @@ export const hareketValidasyonu = (hareket) => {
 };
 
 export default {
+  __KASA_HESAPLAMA_KILITLI__,
   tariheGoreFiltrele,
   kasaOzetiHesapla,
   odemeDagilimiHesapla,

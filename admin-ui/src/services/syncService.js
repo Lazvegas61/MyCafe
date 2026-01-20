@@ -1,5 +1,3 @@
-
-
 // LocalStorage key'leri - STANDARTLAŞTIRILDI
 const MASA_KEY = "mc_masalar";
 const ADISYON_KEY = "mc_adisyonlar";
@@ -14,8 +12,8 @@ const GUN_BASI_KASA_KEY = "mc_gun_basi_kasa";
 const GUN_SONU_KASA_KEY = "mc_gun_sonu_kasa";
 
 // BİLARDO KEY'LERİ - DÜZELTİLDİ: "İ" harfi "I" yapıldı
-const BİLARDO_ADISYON_KEY = "bilardo_adisyonlar";  // DÜZELTİLDİ: ADISYON -> ADISYON
-const BİLARDO_MASALAR_KEY = "bilardo";
+const BILARDO_ADISYON_KEY = "bilardo_adisyonlar";  // DÜZELTİLDİ: ADISYON -> ADISYON
+const BILARDO_MASALAR_KEY = "bilardo";
 
 // SYNC EVENTS - STANDARTLAŞTIRILDI
 const SYNC_EVENTS = {
@@ -47,18 +45,23 @@ const SYNC_EVENTS = {
   KRITIK_STOK: 'KRITIK_STOK'
 };
 
+// localStorageService'i import et (daha güvenli)
+let localStorageService = null;
+
+
 const syncService = {
   // Event listener'lar
   _listeners: {},
   
   // --------------------------------------------------
-  // TEMEL FONKSİYONLAR
+  // TEMEL FONKSİYONLAR - GÜNCELLENDİ: localStorageService API entegrasyonu düzeltildi
   // --------------------------------------------------
   oku: (key, defaultValue = []) => {
     try {
-      // ÖNCE localStorageService'den dene
-      if (typeof window !== 'undefined' && window.localStorageService) {
-        return window.localStorageService.getByKey(key) || defaultValue;
+      // ✅ DÜZELTİLDİ: localStorageService.get() kullan (getByKey değil)
+      if (localStorageService && typeof localStorageService.get === 'function') {
+        const value = localStorageService.get(key);
+        return value !== null && value !== undefined ? value : defaultValue;
       }
       
       // Fallback: direkt localStorage
@@ -72,9 +75,9 @@ const syncService = {
 
   yaz: (key, value) => {
     try {
-      // ÖNCE localStorageService'den dene
-      if (typeof window !== 'undefined' && window.localStorageService) {
-        return window.localStorageService.set(key, value);
+      // ✅ DÜZELTİLDİ: localStorageService.set() kullan
+      if (localStorageService && typeof localStorageService.set === 'function') {
+        return localStorageService.set(key, value);
       }
       
       // Fallback: direkt localStorage
@@ -106,27 +109,26 @@ const syncService = {
   },
 
   emitEvent: (eventName, data = {}) => {
-  console.log(`📢 SYNC: Event yayınlandı - ${eventName}`, data);
-  
-  // Global event yayınla (diğer sayfalar için)
-  if (typeof window !== 'undefined') {
-    // ✅ DÜZELTİLDİ: Küçük harfe çevirirken Türkçe karakter sorunu olmasın
-    const safeEventName = eventName.toLowerCase().replace(/[ıİ]/g, 'i').replace(/[şŞ]/g, 's').replace(/[ğĞ]/g, 'g').replace(/[üÜ]/g, 'u').replace(/[çÇ]/g, 'c').replace(/[öÖ]/g, 'o');
-    const event = new CustomEvent(`sync:${safeEventName}`, { detail: data });
-    window.dispatchEvent(event);
-  }
-  
-  // Local listener'ları çağır
-  if (syncService._listeners[eventName]) {
-    syncService._listeners[eventName].forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error(`❌ Event callback hatası (${eventName}):`, error);
-      }
-    });
-  }
-
+    console.log(`📢 SYNC: Event yayınlandı - ${eventName}`, data);
+    
+    // Global event yayınla (diğer sayfalar için)
+    if (typeof window !== 'undefined') {
+      // ✅ DÜZELTİLDİ: Küçük harfe çevirken Türkçe karakter sorunu olmasın
+      const safeEventName = eventName.toLowerCase().replace(/[ıİ]/g, 'i').replace(/[şŞ]/g, 's').replace(/[ğĞ]/g, 'g').replace(/[üÜ]/g, 'u').replace(/[çÇ]/g, 'c').replace(/[öÖ]/g, 'o');
+      const event = new CustomEvent(`sync:${safeEventName}`, { detail: data });
+      window.dispatchEvent(event);
+    }
+    
+    // Local listener'ları çağır
+    if (syncService._listeners[eventName]) {
+      syncService._listeners[eventName].forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error(`❌ Event callback hatası (${eventName}):`, error);
+        }
+      });
+    }
     
     // Dashboard güncelle (belirli event'ler için)
     const dashboardEvents = [
@@ -137,9 +139,8 @@ const syncService = {
     ];
     
     if (dashboardEvents.includes(eventName)) {
-      setTimeout(() => {
-        syncService.dashboardGuncelle();
-      }, 300);
+      console.warn("[DEPRECATED] dashboardGuncelle tetiklenmesi kilitli (emitEvent)");
+      return;
     }
   },
 
@@ -329,180 +330,8 @@ const syncService = {
   // DASHBOARD PANEL GÜNCELLEME FONKSİYONU
   // --------------------------------------------------
   dashboardGuncelle: () => {
-    console.log('📊 SYNC: Dashboard verileri güncelleniyor...');
-    
-    try {
-      // Tüm dashboard verilerini hesapla
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      
-      // Verileri oku - localStorageService kullan
-      const adisyonlar = syncService.oku(ADISYON_KEY, []);
-      const borclar = syncService.oku(BORC_KEY, []);
-      const kasaHareketleri = syncService.oku(KASA_HAREKETLERI_KEY, []);
-      const bilardoAdisyonlar = syncService.oku(BİLARDO_ADISYON_KEY, []);
-      
-      // Bugünkü satışları hesapla
-      const todayNormalSales = adisyonlar
-        .filter(a => {
-          if (!a.acilisZamani) return false;
-          const tarih = new Date(a.acilisZamani).toISOString().split('T')[0];
-          return tarih === todayStr && a.kapali === true;
-        })
-        .reduce((sum, a) => sum + (parseFloat(a.toplamTutar || 0) || 0), 0);
-      
-      const todayDebts = borclar
-        .filter(b => {
-          if (!b.acilisZamani) return false;
-          const tarih = new Date(b.acilisZamani).toISOString().split('T')[0];
-          return tarih === todayStr;
-        })
-        .reduce((sum, b) => sum + (parseFloat(b.tutar || 0) || 0), 0);
-      
-      // Bugünkü kasa girişlerini hesapla
-      const todayKasaGiris = kasaHareketleri
-        .filter(h => {
-          if (!h.odemeTarihi && !h.tarih) return false;
-          const hareketTarih = (h.odemeTarihi || h.tarih).split('T')[0];
-          return hareketTarih === todayStr && h.kasaGirisi === true;
-        })
-        .reduce((sum, h) => sum + (parseFloat(h.tutar) || 0), 0);
-      
-      // Açık adisyonları hesapla - SADECE ADISYONU OLAN (TUTARI 0'DAN BÜYÜK) MASALAR
-      const acikAdisyonlar = adisyonlar.filter(a => a.kapali === false);
-      let todayBilardoSales = 0;
-      const openTables = [];
-      
-      // Normal açık adisyonlar
-      acikAdisyonlar.forEach(ad => {
-        const isBilardo = ad.tur === "BİLARDO" || ad.isBilardo === true;
-        
-        if (isBilardo) {
-          // Bilardo satışını hesapla
-          const adisyonTarih = new Date(ad.acilisZamani).toISOString().split('T')[0];
-          if (adisyonTarih === todayStr) {
-            const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
-            const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-            todayBilardoSales += (isNaN(bilardoUcret) ? 0 : bilardoUcret) + 
-                                (isNaN(ekUrunToplam) ? 0 : ekUrunToplam);
-          }
-          
-          // Bilardo açık adisyonu - SADECE TUTARI 0'DAN BÜYÜKSE EKLE
-          const bilardoUcret = parseFloat(ad.bilardoUcret || 0);
-          const ekUrunToplam = parseFloat(ad.ekUrunToplam || 0);
-          const toplamTutar = (isNaN(bilardoUcret) ? 0 : bilardoUcret) + 
-                             (isNaN(ekUrunToplam) ? 0 : ekUrunToplam);
-          
-          if (toplamTutar > 0) {
-            openTables.push({
-              id: ad.id || `bilardo_${ad.masaNo}`,
-              no: ad.masaNo,
-              masaNo: `BİLARDO ${ad.masaNo}`,
-              toplamTutar: toplamTutar,
-              tur: "BİLARDO",
-              urunSayisi: ad.ekUrunler?.length || 0,
-              adisyonData: ad
-            });
-          }
-        } else {
-          // Normal masa açık adisyonu - SADECE TUTARI 0'DAN BÜYÜKSE EKLE
-          const masaNo = ad.masaNo || `MASA ${ad.masaNum}`;
-          let toplamTutar = 0;
-          
-          if (ad.kalemler && ad.kalemler.length > 0) {
-            toplamTutar = ad.kalemler.reduce((sum, kalem) => {
-              const birimFiyat = parseFloat(kalem.birimFiyat || kalem.fiyat || 0);
-              const miktar = parseFloat(kalem.miktar || kalem.adet || 1);
-              return sum + (birimFiyat * miktar);
-            }, 0);
-          }
-          
-          if (ad.toplamTutar && parseFloat(ad.toplamTutar) > 0) {
-            toplamTutar = parseFloat(ad.toplamTutar);
-          }
-          
-          // SADECE TUTARI 0'DAN BÜYÜKSE EKLE
-          if (toplamTutar > 0) {
-            openTables.push({
-              id: ad.id || `normal_${ad.masaNo || ad.masaNum}`,
-              no: ad.masaNum || ad.masaNo || "1",
-              masaNo: masaNo,
-              toplamTutar: toplamTutar,
-              tur: "NORMAL",
-              urunSayisi: ad.kalemler?.length || 0,
-              adisyonData: ad
-            });
-          }
-        }
-      });
-      
-      // Bilardo açık adisyonları
-      const acikBilardoAdisyonlar = bilardoAdisyonlar.filter(b => 
-        b.durum === 'ACIK' || b.durum === 'DOLU'
-      );
-      
-      acikBilardoAdisyonlar.forEach(bilardoAd => {
-        const toplamTutar = parseFloat(bilardoAd.bilardoUcreti || 0) + 
-                           parseFloat(bilardoAd.ekUrunToplam || 0);
-        
-        if (toplamTutar > 0) {
-          openTables.push({
-            id: bilardoAd.id || `bilardo_open_${bilardoAd.bilardoMasaNo}`,
-            no: bilardoAd.bilardoMasaNo,
-            masaNo: `BİLARDO ${bilardoAd.bilardoMasaNo}`,
-            toplamTutar: toplamTutar,
-            tur: "BİLARDO",
-            urunSayisi: bilardoAd.ekUrunler?.length || 0,
-            adisyonData: bilardoAd
-          });
-        }
-      });
-      
-      // Kritik stokları hesapla
-      const urunler = syncService.oku(URUN_KEY, []);
-      const criticalProducts = urunler
-        .filter(u => {
-          const stockTakip = u.stockTakip === true || u.stockTakip === "true";
-          const stock = parseInt(u.stock || 0);
-          const critical = parseInt(u.critical || 10);
-          return stockTakip && stock <= critical;
-        })
-        .slice(0, 5);
-      
-      // Dashboard verilerini oluştur
-      const dashboardData = {
-        dailySales: {
-          total: todayNormalSales + todayDebts + todayBilardoSales,
-          normal: todayNormalSales,
-          bilardo: todayBilardoSales,
-          debt: todayDebts
-        },
-        dailyKasa: todayKasaGiris,
-        criticalProducts: criticalProducts,
-        openTables: openTables.sort((a, b) => {
-          if (a.tur === "NORMAL" && b.tur === "BİLARDO") return -1;
-          if (a.tur === "BİLARDO" && b.tur === "NORMAL") return 1;
-          return parseInt(a.no.replace('B', '')) - parseInt(b.no.replace('B', ''));
-        }),
-        lastUpdated: new Date().toISOString()
-      };
-      
-      // Dashboard verisini localStorage'a kaydet
-      syncService.yaz('mc_dashboard_cache', dashboardData);
-      
-      // EVENT YAYINLA - Dashboard güncellendi
-      syncService.emitEvent(SYNC_EVENTS.DASHBOARD_GUNCELLENDI, {
-        dashboardData: dashboardData,
-        zaman: new Date().toISOString()
-      });
-      
-      console.log('✅ SYNC: Dashboard verileri güncellendi', dashboardData);
-      return dashboardData;
-      
-    } catch (error) {
-      console.error('❌ SYNC: Dashboard güncelleme hatası:', error);
-      return null;
-    }
+    console.warn("[DEPRECATED] syncService.dashboardGuncelle kilitli (AŞAMA 1) - reportCore'dan kullanın");
+    return null;
   },
 
   // --------------------------------------------------
@@ -574,7 +403,7 @@ const syncService = {
     
     // Bilardo masasıysa bilardo verilerini de güncelle
     if (isBilardo) {
-      const bilardoMasalar = syncService.oku(BİLARDO_MASALAR_KEY, []);
+      const bilardoMasalar = syncService.oku(BILARDO_MASALAR_KEY, []);
       const bilardoIdx = bilardoMasalar.findIndex(m => 
         m.no === normalizedMasaNo || m.id === Number(normalizedMasaNo)
       );
@@ -586,14 +415,12 @@ const syncService = {
           acik: false,
           aktifAdisyonId: null
         };
-        syncService.yaz(BİLARDO_MASALAR_KEY, bilardoMasalar);
+        syncService.yaz(BILARDO_MASALAR_KEY, bilardoMasalar);
       }
     }
     
     // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
+    console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (masaBosalt)");
     
     syncService.emitEvent(SYNC_EVENTS.MASA_TEMIZLENDI, {
       masaNo: normalizedMasaNo,
@@ -662,7 +489,7 @@ const syncService = {
     
     // Bilardo masasıysa bilardo verilerini de güncelle
     if (isBilardo) {
-      const bilardoMasalar = syncService.oku(BİLARDO_MASALAR_KEY, []);
+      const bilardoMasalar = syncService.oku(BILARDO_MASALAR_KEY, []);
       const bilardoIdx = bilardoMasalar.findIndex(m => 
         m.no === normalizedMasaNo || m.id === Number(normalizedMasaNo)
       );
@@ -675,14 +502,12 @@ const syncService = {
           aktifAdisyonId: adisyonId,
           acilisSaati: new Date().toISOString()
         };
-        syncService.yaz(BİLARDO_MASALAR_KEY, bilardoMasalar);
+        syncService.yaz(BILARDO_MASALAR_KEY, bilardoMasalar);
       }
     }
     
     // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
+    console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (masaAc)");
     
     syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
       masaNo: normalizedMasaNo,
@@ -760,9 +585,7 @@ const syncService = {
     syncService.yaz(MASA_KEY, masalar);
     
     // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
+    console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (guncelMasa)");
     
     syncService.emitEvent(SYNC_EVENTS.MASA_GUNCELLENDI, {
       masaNo: normalizedMasaNo,
@@ -808,9 +631,7 @@ const syncService = {
     syncService.yaz(ADISYON_KEY, adisyonlar);
     
     // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
+    console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (guncelAdisyon)");
     
     // KASA ENTEGRASYONU: Eğer adisyon kapatıldıysa ve ödeme varsa, kasa hareketi oluştur
     if (eskiAdisyon.kapali === false && yeniAdisyon.kapali === true) {
@@ -875,9 +696,7 @@ const syncService = {
     syncService.yaz(ADISYON_KEY, adisyonlar);
     
     // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
+    console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (yeniAdisyon)");
     
     syncService.emitEvent(SYNC_EVENTS.ADISYON_GUNCELLENDI, {
       adisyonId: yeniAdisyon.id,
@@ -939,9 +758,7 @@ const syncService = {
     
     if (masaSuccess) {
       // Dashboard'u güncelle
-      setTimeout(() => {
-        syncService.dashboardGuncelle();
-      }, 100);
+      console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (kapatAdisyon)");
       
       console.log('✅ SYNC: Adisyon kapatıldı ve masa temizlendi', { masaNum, adisyonId });
       return true;
@@ -1017,9 +834,7 @@ const syncService = {
     syncService.guncelMasa(masaNumToUpdate, adisyonId, null, toplamTutar, isBilardo);
     
     // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
+    console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (kalemEkle)");
     
     syncService.emitEvent(SYNC_EVENTS.KALEM_EKLENDI, {
       adisyonId: adisyonId,
@@ -1055,76 +870,72 @@ const syncService = {
   // SENKRONİZASYON İŞLEMLERİ
   // --------------------------------------------------
   senkronizeMasalar: () => {
-  console.log('🔄 SYNC: Tüm masalar senkronize ediliyor...');
-  
-  try {
-    const masalar = syncService.oku(MASA_KEY, []);
-    const adisyonlar = syncService.oku(ADISYON_KEY, []);
+    console.log('🔄 SYNC: Tüm masalar senkronize ediliyor...');
     
-    // ✅ DÜZELTİLDİ: Doğru sabit kullanılıyor
-    const bilardoAdisyonlar = syncService.oku(BİLARDO_ADISYON_KEY, []);
-    
-    const guncellenenMasalar = masalar.map(masa => {
-      if (masa.durum === "BOŞ" || !masa.adisyonId) {
-        return masa;
-      }
+    try {
+      const masalar = syncService.oku(MASA_KEY, []);
+      const adisyonlar = syncService.oku(ADISYON_KEY, []);
+      const bilardoAdisyonlar = syncService.oku(BILARDO_ADISYON_KEY, []);
       
-      const adisyon = adisyonlar.find(a => a.id === masa.adisyonId);
-      if (!adisyon) {
-        console.warn(`⚠️ SYNC: Adisyon bulunamadı (Masa ${masa.no})`, masa.adisyonId);
-        return masa;
-      }
-      
-      const yeniToplam = (adisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
-      
-      let splitToplam = 0;
-      if (masa.ayirId) {
-        const splitAdisyon = adisyonlar.find(a => a.id === masa.ayirId);
-        if (splitAdisyon) {
-          splitToplam = (splitAdisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+      const guncellenenMasalar = masalar.map(masa => {
+        if (masa.durum === "BOŞ" || !masa.adisyonId) {
+          return masa;
         }
-      }
-      
-      const toplamTutar = (yeniToplam + splitToplam).toFixed(2);
-      
-      if (masa.toplamTutar !== toplamTutar) {
-        console.log(`🔄 SYNC: Masa ${masa.no} toplamı güncelleniyor: ${masa.toplamTutar} -> ${toplamTutar}`);
         
-        return {
-          ...masa,
-          toplamTutar: toplamTutar,
-          guncellemeZamani: new Date().toISOString()
-        };
+        const adisyon = adisyonlar.find(a => a.id === masa.adisyonId);
+        if (!adisyon) {
+          console.warn(`⚠️ SYNC: Adisyon bulunamadı (Masa ${masa.no})`, masa.adisyonId);
+          return masa;
+        }
+        
+        const yeniToplam = (adisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+        
+        let splitToplam = 0;
+        if (masa.ayirId) {
+          const splitAdisyon = adisyonlar.find(a => a.id === masa.ayirId);
+          if (splitAdisyon) {
+            splitToplam = (splitAdisyon.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
+          }
+        }
+        
+        const toplamTutar = (yeniToplam + splitToplam).toFixed(2);
+        
+        if (masa.toplamTutar !== toplamTutar) {
+          console.log(`🔄 SYNC: Masa ${masa.no} toplamı güncelleniyor: ${masa.toplamTutar} -> ${toplamTutar}`);
+          
+          return {
+            ...masa,
+            toplamTutar: toplamTutar,
+            guncellemeZamani: new Date().toISOString()
+          };
+        }
+        
+        return masa;
+      });
+      
+      const degisiklikVar = JSON.stringify(masalar) !== JSON.stringify(guncellenenMasalar);
+      if (degisiklikVar) {
+        syncService.yaz(MASA_KEY, guncellenenMasalar);
+        console.log('✅ SYNC: Masalar güncellendi');
       }
       
-      return masa;
-    });
-    
-    const degisiklikVar = JSON.stringify(masalar) !== JSON.stringify(guncellenenMasalar);
-    if (degisiklikVar) {
-      syncService.yaz(MASA_KEY, guncellenenMasalar);
-      console.log('✅ SYNC: Masalar güncellendi');
+      // Dashboard'u güncelle
+      console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (senkronizeMasalar)");
+      
+      syncService.emitEvent(SYNC_EVENTS.SENKRONIZE_ET, {
+        masalar: guncellenenMasalar,
+        zaman: new Date().toISOString(),
+        degisiklikVar: degisiklikVar
+      });
+      
+      console.log('✅ SYNC: Tüm masalar senkronize edildi');
+      return true;
+      
+    } catch (error) {
+      console.error('❌ SYNC: Senkronizasyon hatası:', error);
+      return false;
     }
-    
-    // Dashboard'u güncelle
-    setTimeout(() => {
-      syncService.dashboardGuncelle();
-    }, 100);
-    
-    syncService.emitEvent(SYNC_EVENTS.SENKRONIZE_ET, {
-      masalar: guncellenenMasalar,
-      zaman: new Date().toISOString(),
-      degisiklikVar: degisiklikVar
-    });
-    
-    console.log('✅ SYNC: Tüm masalar senkronize edildi');
-    return true;
-    
-  } catch (error) {
-    console.error('❌ SYNC: Senkronizasyon hatası:', error);
-    return false;
-  }
-},
+  },
 
   // --------------------------------------------------
   // YARDIMCI FONKSİYONLAR
@@ -1145,7 +956,7 @@ const syncService = {
 
   adisyonBul: (adisyonId) => {
     const adisyonlar = syncService.oku(ADISYON_KEY, []);
-    const bilardoAdisyonlar = syncService.oku(BİLARDO_ADISYON_KEY, []);
+    const bilardoAdisyonlar = syncService.oku(BILARDO_ADISYON_KEY, []);
     
     // Önce normal adisyonlarda ara
     const normalAdisyon = adisyonlar.find(a => a.id === adisyonId);
@@ -1187,7 +998,7 @@ const syncService = {
 
   // Bilardo adisyonlarını getir
   bilardoAdisyonlariGetir: (acikMi = null) => {
-    const tumAdisyonlar = syncService.oku(BİLARDO_ADISYON_KEY, []);
+    const tumAdisyonlar = syncService.oku(BILARDO_ADISYON_KEY, []);
     
     if (acikMi === null) return tumAdisyonlar;
     
@@ -1197,60 +1008,62 @@ const syncService = {
   },
 
   // --------------------------------------------------
-  // BAŞLATMA KONTROLÜ (GUNCELLENDI)
+  // BAŞLATMA KONTROLÜ (GUNCELLENDİ)
   // --------------------------------------------------
   init: () => {
-  console.log('🚀 SYNC: SyncService başlatılıyor...');
-  
-  // 1. ÖNCE localStorageService kontrol et
-  if (typeof window !== 'undefined' && !window.localStorageService) {
-    console.error('❌ SYNC: localStorageService bulunamadı!');
-    return false;
-  }
-  
-  // 2. LocalStorage key'lerini kontrol et, yoksa oluştur
-  const requiredKeys = [
-    KASA_HAREKETLERI_KEY,
-    GUN_BASI_KASA_KEY,
-    GUN_SONU_KASA_KEY,
-    MASA_KEY,
-    ADISYON_KEY,
-    BİLARDO_ADISYON_KEY  // ✅ DÜZELTİLDİ: Doğru sabit
-  ];
-  
-  requiredKeys.forEach(key => {
-    if (!localStorage.getItem(key)) {
-      syncService.yaz(key, []);
-      console.log(`📦 SYNC: ${key} key oluşturuldu`);
+    console.log('🚀 SYNC: SyncService başlatılıyor...');
+    
+    // ✅ DÜZELTİLDİ: localStorageService kontrolü düzeltildi
+    if (typeof window !== 'undefined' && window.localStorageService) {
+      localStorageService = window.localStorageService;
+      console.log('✅ SYNC: localStorageService bağlandı:', !!localStorageService);
+    } else {
+console.log('ℹ️ SYNC: localStorageService henüz hazır değil (ilk yükleme)');
     }
-  });
-  
-  // 3. Global event listener'ları kur
-  if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (event) => {
-      if (event.key && event.key.startsWith('mc_')) {
-        console.log('💾 SYNC: Storage değişti:', event.key);
-        
-        // 500ms sonra senkronize et (debounce)
-        clearTimeout(window.syncDebounce);
-        window.syncDebounce = setTimeout(() => {
-          syncService.senkronizeMasalar();
-          syncService.dashboardGuncelle();
-        }, 500);
+    
+    // LocalStorage key'lerini kontrol et, yoksa oluştur
+    const requiredKeys = [
+      KASA_HAREKETLERI_KEY,
+      GUN_BASI_KASA_KEY,
+      GUN_SONU_KASA_KEY,
+      MASA_KEY,
+      ADISYON_KEY,
+      BILARDO_ADISYON_KEY
+    ];
+    
+    requiredKeys.forEach(key => {
+      if (!localStorage.getItem(key)) {
+        syncService.yaz(key, []);
+        console.log(`📦 SYNC: ${key} key oluşturuldu`);
       }
     });
+    
+    // Global event listener'ları kur
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (event.key && event.key.startsWith('mc_')) {
+          console.log('💾 SYNC: Storage değişti:', event.key);
+          
+          // 500ms sonra senkronize et (debounce)
+          clearTimeout(window.syncDebounce);
+          window.syncDebounce = setTimeout(() => {
+            syncService.senkronizeMasalar();
+            console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (init)");
+          }, 500);
+        }
+      });
+    }
+    
+    // İlk senkronizasyonu yap (1 saniye sonra)
+    setTimeout(() => {
+      syncService.senkronizeMasalar();
+      console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (init)");
+      console.log('✅ SYNC: İlk senkronizasyon tamamlandı');
+    }, 1000);
+    
+    console.log('✅ SYNC: SyncService başlatıldı');
+    return true;
   }
-  
-  // 4. İlk senkronizasyonu yap (1 saniye sonra)
-  setTimeout(() => {
-    syncService.senkronizeMasalar();
-    syncService.dashboardGuncelle();
-    console.log('✅ SYNC: İlk senkronizasyon tamamlandı');
-  }, 1000);
-  
-  console.log('✅ SYNC: SyncService başlatıldı');
-  return true;
-}
 };
 
 // Otomatik başlat

@@ -10,6 +10,7 @@ import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import "./Giderler.css";
+import { kasaHareketiEkle } from "../../services/utils/kasaHareketleri";
 
 export default function Giderler() {
   const [giderler, setGiderler] = useState([]);
@@ -50,45 +51,66 @@ export default function Giderler() {
   };
 
   // -----------------------------------------
-  //   GİDER EKLE
+  //   GİDER EKLE (GÜNCELLENDİ - MODEL C)
   // -----------------------------------------
   const ekle = () => {
     if (!urunAdi || !tutar || !miktar || !birim) {
-      alert("Zorunlu alanları doldurunuz!");
+      alert("Lütfen tüm zorunlu alanları doldurunuz!");
       return;
     }
 
-    const yeni = {
+    const numericTutar = parseFloat(tutar);
+    const numericMiktar = parseFloat(miktar);
+    const toplamTutar = numericTutar * numericMiktar;
+
+    if (!toplamTutar || toplamTutar <= 0) {
+      alert("Geçerli bir gider tutarı giriniz.");
+      return;
+    }
+
+    // 1️⃣ GİDER KAYDI (ESKİ YAPI – KORUNUYOR)
+    const yeniGider = {
       id: Date.now(),
       urunAdi,
-      tutar: Number(tutar),
-      miktar: Number(miktar),
+      tutar: numericTutar,
+      toplamTutar: toplamTutar, // RaporMotoruV2 için kritik alan
+      miktar: numericMiktar,
       birim,
       not,
       kategori: kategori || "Diğer",
       tarih: new Date().toISOString(),
+      type: "GIDER",
+      islemTipi: "CIKIS" // Kasadan para çıkışı olduğunu belirtir
     };
 
-    const liste = [...giderler, yeni];
-    kaydet(liste);
+    // 1. Kendi listesini güncelle
+    const yeniListe = [yeniGider, ...giderler];
+    setGiderler(yeniListe);
+    localStorage.setItem("mc_giderler", JSON.stringify(yeniListe));
 
-     // 🔔 DASHBOARD’A HABER VER (KRİTİK SATIR)
-  window.dispatchEvent(
-    new CustomEvent("giderEklendi", {
-      detail: { tarih: yeni.tarih, tutar: yeni.tutar }
-    })
-  );
-  
+    // 2️⃣ KASA HAREKETİ (MODEL C – YENİ)
+    kasaHareketiEkle({
+      id: `kasa_gider_${Date.now()}`,
+      tip: "GIDER",
+      kaynak: "GIDER",
+      tutar: -toplamTutar, // ❗ EKSİ
+      tarih: yeniGider.tarih,
+      aciklama: `${urunAdi} - ${miktar} ${birim}`
+    });
+
+    // 3. Global Uyarıcıları Tetikle (HATA ÇÖZÜMÜ)
+    window.dispatchEvent(new StorageEvent("storage", { key: "mc_giderler" }));
+    window.dispatchEvent(new CustomEvent("kasaGuncellendi"));
+    window.dispatchEvent(new CustomEvent("giderEklendi", { detail: yeniGider }));
 
     // Formu temizle
-    setUrunAdi("");
-    setTutar("");
-    setMiktar("");
-    setBirim("");
-    setNot("");
+    setUrunAdi(""); 
+    setTutar(""); 
+    setMiktar(""); 
+    setBirim(""); 
+    setNot(""); 
     setKategori("");
-    
-    alert("Gider başarıyla eklendi!");
+    alert("Gider başarıyla kaydedildi ve kasaya işlendi.");
   };
 
   // -----------------------------------------

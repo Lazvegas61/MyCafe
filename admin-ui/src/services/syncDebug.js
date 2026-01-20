@@ -16,7 +16,6 @@ const syncDebug = {
       { name: 'syncService', obj: window.syncService },
       { name: 'localStorageService', obj: window.localStorageService },
       { name: 'kasaService', obj: window.kasaService },
-      { name: 'raporMotoruV2', obj: window.raporMotoruV2 }
     ];
     
     services.forEach(service => {
