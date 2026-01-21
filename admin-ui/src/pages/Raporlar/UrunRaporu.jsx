@@ -65,7 +65,13 @@ const UrunRaporu = () => {
   const urunSayisi = rapor.length;
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+    <div style={{
+      padding: 24,
+      margin: 0,
+      minHeight: "100vh",
+      background: "#f9f6f0",
+      boxSizing: "border-box"
+    }}>
       {/* BAŞLIK */}
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: 0, color: "#7a3e06" }}>
@@ -80,29 +86,60 @@ const UrunRaporu = () => {
       <div
         style={{
           background: "#fff",
-          padding: 16,
-          borderRadius: 10,
-          boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+          padding: 20,
+          borderRadius: 12,
+          boxShadow: "0 2px 12px rgba(0,0,0,.08)",
           display: "flex",
-          gap: 16,
+          flexWrap: "wrap",
+          gap: 20,
           marginBottom: 24
         }}
       >
-        <div>
-          <label>Başlangıç Tarihi</label>
+        <div style={{ flex: "1", minWidth: "200px" }}>
+          <div style={{ 
+            fontSize: 14, 
+            fontWeight: "500", 
+            color: "#555",
+            marginBottom: 8 
+          }}>
+            Başlangıç Tarihi
+          </div>
           <input
             type="date"
             value={baslangic}
             onChange={e => setBaslangic(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 8,
+              fontSize: 14,
+              boxSizing: "border-box"
+            }}
           />
         </div>
 
-        <div>
-          <label>Bitiş Tarihi</label>
+        <div style={{ flex: "1", minWidth: "200px" }}>
+          <div style={{ 
+            fontSize: 14, 
+            fontWeight: "500", 
+            color: "#555",
+            marginBottom: 8 
+          }}>
+            Bitiş Tarihi
+          </div>
           <input
             type="date"
             value={bitis}
             onChange={e => setBitis(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              border: "1px solid #ddd",
+              borderRadius: 8,
+              fontSize: 14,
+              boxSizing: "border-box"
+            }}
           />
         </div>
       </div>
@@ -111,8 +148,8 @@ const UrunRaporu = () => {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))",
-          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+          gap: 20,
           marginBottom: 24
         }}
       >
@@ -138,59 +175,79 @@ const UrunRaporu = () => {
         style={{
           background: "#fff",
           borderRadius: 12,
-          boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-          overflow: "hidden"
+          boxShadow: "0 2px 12px rgba(0,0,0,.08)",
+          overflow: "hidden",
+          marginBottom: 16
         }}
       >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead style={{ background: "#f1e2c6" }}>
-            <tr>
-              <Th>Ürün</Th>
-              <Th>Kategori</Th>
-              <Th align="center">Adet</Th>
-              <Th align="right">Toplam</Th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {rapor.length === 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ 
+            width: "100%", 
+            borderCollapse: "collapse",
+            minWidth: "600px"
+          }}>
+            <thead style={{ background: "#f1e2c6" }}>
               <tr>
-                <td colSpan={4} style={{ padding: 20, textAlign: "center" }}>
-                  Seçilen aralıkta ürün satışı bulunamadı
-                </td>
+                <Th>Ürün</Th>
+                <Th>Kategori</Th>
+                <Th align="center">Adet</Th>
+                <Th align="right">Toplam</Th>
               </tr>
-            )}
+            </thead>
 
-            {rapor.map((row, i) => (
-              <tr
-                key={row.urunAdi}
-                style={{
-                  background: i % 2 === 0 ? "#fff" : "#faf5ea"
-                }}
-              >
-                <Td>{row.urunAdi}</Td>
-                <Td>{row.kategori}</Td>
-                <Td align="center">{row.adet}</Td>
-                <Td align="right">
-                  {row.toplam.toLocaleString("tr-TR")} ₺
-                </Td>
+            <tbody>
+              {rapor.length === 0 && (
+                <tr>
+                  <td colSpan={4} style={{ 
+                    padding: "40px 20px", 
+                    textAlign: "center",
+                    color: "#888",
+                    fontSize: 15
+                  }}>
+                    Seçilen aralıkta ürün satışı bulunamadı
+                  </td>
+                </tr>
+              )}
+
+              {rapor.map((row, i) => (
+                <tr
+                  key={row.urunAdi}
+                  style={{
+                    background: i % 2 === 0 ? "#fff" : "#faf5ea"
+                  }}
+                >
+                  <Td>{row.urunAdi}</Td>
+                  <Td>{row.kategori}</Td>
+                  <Td align="center">{row.adet}</Td>
+                  <Td align="right">
+                    {row.toplam.toLocaleString("tr-TR")} ₺
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+
+            <tfoot>
+              <tr style={{ background: "#f5e7d0" }}>
+                <Th colSpan={3}>GENEL TOPLAM</Th>
+                <Th align="right">
+                  {genelToplam.toLocaleString("tr-TR")} ₺
+                </Th>
               </tr>
-            ))}
-          </tbody>
-
-          <tfoot>
-            <tr style={{ background: "#f5e7d0" }}>
-              <Th colSpan={3}>GENEL TOPLAM</Th>
-              <Th align="right">
-                {genelToplam.toLocaleString("tr-TR")} ₺
-              </Th>
-            </tr>
-          </tfoot>
-        </table>
+            </tfoot>
+          </table>
+        </div>
       </div>
 
       {/* ALT BİLGİ */}
-      <div style={{ marginTop: 16, fontSize: 12, color: "#777" }}>
+      <div style={{ 
+        marginTop: 16, 
+        fontSize: 13, 
+        color: "#777",
+        padding: "12px 16px",
+        background: "#fff",
+        borderRadius: 8,
+        boxShadow: "0 1px 4px rgba(0,0,0,.05)"
+      }}>
         Bu rapor yalnızca <strong>GELİR</strong> tipindeki ürün satışlarını içerir.
       </div>
     </div>
@@ -205,16 +262,27 @@ const OzetKart = ({ baslik, deger, renk }) => (
   <div
     style={{
       background: "#fff",
-      padding: 16,
+      padding: 20,
       borderRadius: 12,
-      boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-      borderLeft: `4px solid ${renk}`
+      boxShadow: "0 2px 12px rgba(0,0,0,.08)",
+      borderLeft: `5px solid ${renk}`,
+      height: "100%",
+      boxSizing: "border-box"
     }}
   >
-    <div style={{ fontSize: 13, color: "#555", marginBottom: 6 }}>
+    <div style={{ 
+      fontSize: 14, 
+      color: "#555", 
+      marginBottom: 8,
+      fontWeight: "500" 
+    }}>
       {baslik}
     </div>
-    <div style={{ fontSize: 22, fontWeight: "bold", color: renk }}>
+    <div style={{ 
+      fontSize: 28, 
+      fontWeight: "bold", 
+      color: renk 
+    }}>
       {deger}
     </div>
   </div>
@@ -224,9 +292,12 @@ const Th = ({ children, align, colSpan }) => (
   <th
     colSpan={colSpan}
     style={{
-      padding: 12,
+      padding: "16px 20px",
       textAlign: align || "left",
-      borderBottom: "1px solid #ddd"
+      borderBottom: "2px solid #ddd",
+      fontWeight: "600",
+      color: "#444",
+      fontSize: 14
     }}
   >
     {children}
@@ -236,9 +307,10 @@ const Th = ({ children, align, colSpan }) => (
 const Td = ({ children, align }) => (
   <td
     style={{
-      padding: 12,
+      padding: "14px 20px",
       textAlign: align || "left",
-      borderBottom: "1px solid #eee"
+      borderBottom: "1px solid #eee",
+      fontSize: 14
     }}
   >
     {children}

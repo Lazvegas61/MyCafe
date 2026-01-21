@@ -1,10 +1,10 @@
 /* ============================================================
-   📄 DOSYA: Giderler.jsx (GÜNCEL - TAM SAYFA)
+   📄 DOSYA: Giderler.jsx (GÜNCEL - TAM SAYFA - TABLO GÖRÜNÜMÜ)
    📌 AMAÇ:
    MyCafe — Gider Takip Modülü
-   - Yeni tasarım uygulandı
-   - Resimdeki layout'a göre düzenlendi
-   - mcFinansHavuzu entegrasyonu eklendi
+   - Tablo görünümü uygulandı
+   - Silme işlemi kaldırıldı
+   - mcFinansHavuzu entegrasyonu korundu
 ============================================================ */
 
 import React, { useState, useEffect } from "react";
@@ -125,27 +125,6 @@ export default function Giderler() {
     setNot(""); 
     setKategori("");
     alert("Gider başarıyla kaydedildi ve kasaya işlendi.");
-  };
-
-  // -----------------------------------------
-  //   GİDER SİL
-  // -----------------------------------------
-  const sil = (id) => {
-    if (!window.confirm("Bu gideri silmek istediğinize emin misiniz?")) return;
-    
-    const silinecekGider = giderler.find(g => g.id === id);
-    const liste = giderler.filter(g => g.id !== id);
-    
-    // Finans havuzundan da sil
-    if (silinecekGider) {
-      mcFinansHavuzu.giderSilindigindeKaydet({
-        id: silinecekGider.id,
-        tutar: silinecekGider.toplamTutar
-      });
-    }
-    
-    kaydet(liste);
-    alert("Gider silindi.");
   };
 
   // -----------------------------------------
@@ -452,7 +431,7 @@ export default function Giderler() {
           </div>
         </div>
 
-        {/* SAĞ KOLON - YENİ TASARIMA GÖRE DÜZENLENDİ */}
+        {/* SAĞ KOLON - TABLO GÖRÜNÜMÜ */}
         <div className="column report-column">
           {/* FİLTRE PANELİ - ÜSTTE */}
           <div className="filter-panel">
@@ -577,7 +556,7 @@ export default function Giderler() {
             </div>
           </div>
 
-          {/* GİDER KAYITLARI BAŞLIĞI */}
+          {/* GİDER KAYITLARI TABLOSU */}
           <div className="gider-list-header">
             <h3>GİDER KAYITLARI</h3>
             <div className="list-count">
@@ -585,39 +564,45 @@ export default function Giderler() {
             </div>
           </div>
 
-          {/* GİDER LİSTESİ - BÜYÜK */}
-          <div className="gider-list-container">
+          {/* TABLO GÖRÜNÜMÜ - YENİ */}
+          <div className="gider-table-container">
             {filtrelenmisGiderler.length > 0 ? (
-              <div className="gider-list">
-                {filtrelenmisGiderler.map((g) => (
-                  <div key={g.id} className="gider-card">
-                    <div className="gider-header">
-                      <div className="gider-kategori">{g.kategori}</div>
-                      <div className="gider-tarih">
-                        {formatDateTime(g.tarih)}
-                      </div>
-                      <button 
-                        onClick={() => sil(g.id)} 
-                        className="btn-delete"
-                        title="Sil"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                    
-                    <div className="gider-body">
-                      <div className="gider-urun">{g.urunAdi}</div>
-                      <div className="gider-detay">
-                        <span>{g.miktar} {g.birim}</span>
-                        <span className="gider-not">{g.not || "Açıklama yok"}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="gider-footer">
-                      <div className="gider-tutar">{g.tutar.toFixed(2)} ₺</div>
-                    </div>
-                  </div>
-                ))}
+              <div className="gider-table-wrapper">
+                <table className="gider-table">
+                  <thead>
+                    <tr>
+                      <th>KATEGORİ</th>
+                      <th>ÜRÜN/HİZMET ADI</th>
+                      <th>TARİH</th>
+                      <th>TUTAR (₺)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtrelenmisGiderler.map((g) => (
+                      <tr key={g.id} className="gider-table-row">
+                        <td>
+                          <span className="table-kategori">{g.kategori}</span>
+                        </td>
+                        <td>
+                          <div className="table-urun">{g.urunAdi}</div>
+                          {g.not && (
+                            <div className="table-not">{g.not}</div>
+                          )}
+                          <div className="table-detay">
+                            {g.miktar} {g.birim}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="table-tarih">{formatDate(g.tarih)}</div>
+                          <div className="table-saat">{formatTime(g.tarih)}</div>
+                        </td>
+                        <td>
+                          <div className="table-tutar">{g.tutar.toFixed(2)} ₺</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="empty-list">

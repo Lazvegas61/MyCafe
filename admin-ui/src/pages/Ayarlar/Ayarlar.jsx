@@ -71,15 +71,61 @@ export default function Ayarlar() {
     window.location.reload();
   }
 
-  // 📌 VERİ YEDEĞİ AL
+  // 📌 TAM YEDEKLEME FONKSİYONU (Ürünler Dahil)
   const handleBackup = () => {
     const backupData = {
       date: new Date().toISOString(),
+      version: "2.0",
+      system: "MyCafe Bilardo & Kafe Yönetim Sistemi",
+      
+      // Kullanıcı ve Sistem
       user: localStorage.getItem("mc_user") ? JSON.parse(localStorage.getItem("mc_user")) : null,
+      sistemAyarlari: localStorage.getItem("sistem_ayarlari") ? JSON.parse(localStorage.getItem("sistem_ayarlari")) : null,
+      
+      // Bilardo
       bilardoUcretleri: localStorage.getItem("bilardo_ucretleri") ? JSON.parse(localStorage.getItem("bilardo_ucretleri")) : null,
-      popupAyarlari: localStorage.getItem("bilardo_popup_ayarlari") ? JSON.parse(localStorage.getItem("bilardo_popup_ayarlari")) : null,
-      masalar: localStorage.getItem("bilardo_masalar") ? JSON.parse(localStorage.getItem("bilardo_masalar")) : null,
+      bilardoMasalari: localStorage.getItem("bilardo_masalar") ? JSON.parse(localStorage.getItem("bilardo_masalar")) : null,
+      bilardoPopupAyarlari: localStorage.getItem("bilardo_popup_ayarlari") ? JSON.parse(localStorage.getItem("bilardo_popup_ayarlari")) : null,
+      
+      // Müşteri İşlemleri (HESABA YAZ kayıtları)
+      musteriler: localStorage.getItem("mc_musteriler") ? JSON.parse(localStorage.getItem("mc_musteriler")) : null,
+      adisyonlar: localStorage.getItem("mc_adisyonlar") ? JSON.parse(localStorage.getItem("mc_adisyonlar")) : null,
+      borclar: localStorage.getItem("mc_borclar") ? JSON.parse(localStorage.getItem("mc_borclar")) : null,
+      tahsilatlar: localStorage.getItem("mc_tahbilat") ? JSON.parse(localStorage.getItem("mc_tahbilat")) : null,
+      
+      // Finans
+      finansHavuzu: localStorage.getItem("mc_finans_havuzu") ? JSON.parse(localStorage.getItem("mc_finans_havuzu")) : null,
+      giderler: localStorage.getItem("mc_giderler") ? JSON.parse(localStorage.getItem("mc_giderler")) : null,
+      
+      // Ürünler ve Menü
+      urunler: localStorage.getItem("mc_urunler") ? JSON.parse(localStorage.getItem("mc_urunler")) : null,
+      urunKategorileri: localStorage.getItem("mc_urun_kategorileri") ? JSON.parse(localStorage.getItem("mc_urun_kategorileri")) : null,
+      urunFiyatListesi: localStorage.getItem("urun_fiyat_listesi") ? JSON.parse(localStorage.getItem("urun_fiyat_listesi")) : null,
+      menuKategorileri: localStorage.getItem("mc_menu_kategorileri") ? JSON.parse(localStorage.getItem("mc_menu_kategorileri")) : null,
+      
+      // Siparişler
       siparisler: localStorage.getItem("siparisler") ? JSON.parse(localStorage.getItem("siparisler")) : null,
+      aktifSiparisler: localStorage.getItem("mc_aktif_siparisler") ? JSON.parse(localStorage.getItem("mc_aktif_siparisler")) : null,
+      
+      // Raporlar
+      raporlar: localStorage.getItem("mc_raporlar") ? JSON.parse(localStorage.getItem("mc_raporlar")) : null,
+      gunlukRaporlar: localStorage.getItem("mc_gunluk_raporlar") ? JSON.parse(localStorage.getItem("mc_gunluk_raporlar")) : null,
+      
+      // Diğer Ayarlar
+      masaAyarlari: localStorage.getItem("mc_masa_ayarlari") ? JSON.parse(localStorage.getItem("mc_masa_ayarlari")) : null,
+      printerAyarlari: localStorage.getItem("mc_printer_ayarlari") ? JSON.parse(localStorage.getItem("mc_printer_ayarlari")) : null,
+      
+      // Backup Metadata
+      backupInfo: {
+        totalSize: JSON.stringify(backupData).length,
+        itemCount: Object.keys(backupData).filter(key => 
+          backupData[key] !== null && 
+          backupData[key] !== undefined &&
+          !['date', 'version', 'system', 'backupInfo'].includes(key)
+        ).length,
+        timestamp: new Date().toISOString(),
+        generatedBy: user?.username || "System"
+      }
     };
 
     const dataStr = JSON.stringify(backupData, null, 2);
@@ -87,13 +133,13 @@ export default function Ayarlar() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `mycafe_backup_${new Date().toISOString().split("T")[0]}.json`;
+    link.download = `mycafe_complete_backup_${new Date().toISOString().split("T")[0]}_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    alert("Veri yedeği başarıyla indirildi!");
+    alert(`✅ Tam yedek başarıyla indirildi!\n\n📦 Toplam ${backupData.backupInfo.itemCount} kategori yedeklendi.\n💾 Boyut: ${Math.round(backupData.backupInfo.totalSize / 1024)} KB`);
   };
 
   // GÜNCELLENMİŞ: Bilardo ücretlerini kaydet
@@ -122,6 +168,98 @@ export default function Ayarlar() {
     localStorage.setItem("bilardo_popup_ayarlari", JSON.stringify(popupAyarlari));
     alert("Popup ayarları kaydedildi!");
   }
+
+  // 📌 GERİ YÜKLEME FONKSİYONU (Ürünler Dahil)
+  const handleRestore = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const backupData = JSON.parse(e.target.result);
+        
+        if (!backupData.version || !backupData.system) {
+          alert("❌ Geçersiz yedek dosyası! Bu MyCafe yedek dosyası değil.");
+          return;
+        }
+        
+        // Kullanıcıya onay al
+        const confirmRestore = window.confirm(
+          `Yedek Dosyası Bilgileri:\n\n` +
+          `• Sistem: ${backupData.system}\n` +
+          `• Versiyon: ${backupData.version}\n` +
+          `• Tarih: ${backupData.date ? new Date(backupData.date).toLocaleString('tr-TR') : 'Bilinmiyor'}\n` +
+          `• Öğe Sayısı: ${backupData.backupInfo?.itemCount || 'Bilinmiyor'}\n\n` +
+          `Bu yedek dosyasını geri yüklemek istiyor musunuz?\n\n` +
+          `⚠️ UYARI: Mevcut verilerin üzerine yazılacak!`
+        );
+        
+        if (!confirmRestore) {
+          event.target.value = '';
+          return;
+        }
+        
+        // Her bir veriyi localStorage'a geri yükle
+        let restoredCount = 0;
+        const keysToRestore = [
+          'user', 'sistemAyarlari',
+          'bilardoUcretleri', 'bilardoMasalari', 'bilardoPopupAyarlari',
+          'musteriler', 'adisyonlar', 'borclar', 'tahsilatlar',
+          'finansHavuzu', 'giderler',
+          'urunler', 'urunKategorileri', 'urunFiyatListesi', 'menuKategorileri',
+          'siparisler', 'aktifSiparisler',
+          'raporlar', 'gunlukRaporlar',
+          'masaAyarlari', 'printerAyarlari'
+        ];
+        
+        keysToRestore.forEach(key => {
+          if (backupData[key] !== null && backupData[key] !== undefined) {
+            let storageKey;
+            switch(key) {
+              case 'user': storageKey = 'mc_user'; break;
+              case 'musteriler': storageKey = 'mc_musteriler'; break;
+              case 'adisyonlar': storageKey = 'mc_adisyonlar'; break;
+              case 'borclar': storageKey = 'mc_borclar'; break;
+              case 'tahsilatlar': storageKey = 'mc_tahbilat'; break;
+              case 'finansHavuzu': storageKey = 'mc_finans_havuzu'; break;
+              case 'giderler': storageKey = 'mc_giderler'; break;
+              case 'urunler': storageKey = 'mc_urunler'; break;
+              case 'urunKategorileri': storageKey = 'mc_urun_kategorileri'; break;
+              case 'menuKategorileri': storageKey = 'mc_menu_kategorileri'; break;
+              case 'aktifSiparisler': storageKey = 'mc_aktif_siparisler'; break;
+              case 'raporlar': storageKey = 'mc_raporlar'; break;
+              case 'gunlukRaporlar': storageKey = 'mc_gunluk_raporlar'; break;
+              case 'masaAyarlari': storageKey = 'mc_masa_ayarlari'; break;
+              case 'printerAyarlari': storageKey = 'mc_printer_ayarlari'; break;
+              default: storageKey = key;
+            }
+            
+            localStorage.setItem(storageKey, JSON.stringify(backupData[key]));
+            restoredCount++;
+            console.log(`✅ Geri yüklendi: ${key} → ${storageKey}`);
+          }
+        });
+        
+        event.target.value = '';
+        
+        alert(`✅ Geri yükleme tamamlandı!\n\n📥 ${restoredCount} veri kategorisi geri yüklendi.\n🔄 Sayfayı yenilemeniz önerilir.`);
+        
+        setTimeout(() => {
+          if (window.confirm("Sayfa yenilensin mi?")) {
+            window.location.reload();
+          }
+        }, 1000);
+        
+      } catch (error) {
+        console.error("Geri yükleme hatası:", error);
+        alert(`❌ Geri yükleme başarısız!\n\nHata: ${error.message}\n\nLütfen geçerli bir yedek dosyası seçtiğinizden emin olun.`);
+        event.target.value = '';
+      }
+    };
+    
+    reader.readAsText(file);
+  };
 
   // 📌 TAB YÖNETİMİ
   const tabs = [
@@ -339,30 +477,31 @@ export default function Ayarlar() {
       )}
 
       {/* GÜNCELLEME PANELİ */}
-{panel === "guncelle" && (
-  <div className="ayar-kutu">
-    <h2>🔄 Sistem Güncellemeleri</h2>
-    
-    <div className="input-grup">
-      <button
-        className="kaydet-button"
-        onClick={handleCheckUpdates}
-        disabled={updating}
-        style={{ background: updating ? '#95a5a6' : '#3498db' }}
-      >
-        {updating ? "🔄 Kontrol Ediliyor..." : "🔄 Güncellemeleri Kontrol Et"}
-      </button>
-    </div>
-    
-    <div className="uyari-kutu">
-      <div className="uyari-icon">💡</div>
-      <div className="uyari-icerik">
-        <h3>Güncelleme Bilgisi</h3>
-        <p>Güncelleme kontrolü yapmak için butona tıklayın. Yeni güncelleme varsa size bildirilecektir.</p>
-      </div>
-    </div>
-  </div>
-)}
+      {panel === "guncelle" && (
+        <div className="ayar-kutu">
+          <h2>🔄 Sistem Güncellemeleri</h2>
+          
+          <div className="input-grup">
+            <button
+              className="kaydet-button"
+              onClick={handleCheckUpdates}
+              disabled={updating}
+              style={{ background: updating ? '#95a5a6' : '#3498db' }}
+            >
+              {updating ? "🔄 Kontrol Ediliyor..." : "🔄 Güncellemeleri Kontrol Et"}
+            </button>
+          </div>
+          
+          <div className="uyari-kutu">
+            <div className="uyari-icon">💡</div>
+            <div className="uyari-icerik">
+              <h3>Güncelleme Bilgisi</h3>
+              <p>Güncelleme kontrolü yapmak için butona tıklayın. Yeni güncelleme varsa size bildirilecektir.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* YEDEK & KURTARMA PANELİ */}
       {panel === "yedek" && (
         <div className="ayar-kutu">
@@ -373,58 +512,263 @@ export default function Ayarlar() {
             <div className="uyari-icerik">
               <h3>Önemli Uyarı</h3>
               <p>Veri yedekleri sadece bu tarayıcıda geçerlidir. Düzenli yedek almayı unutmayın!</p>
+              <p><strong>Öneri:</strong> Yedekleri Google Drive veya başka bir bulut servisine yükleyin.</p>
             </div>
           </div>
 
           <div className="temizleme-bilgi">
-            <h3>📦 Yedeklenecek Veriler:</h3>
+            <h3>📦 Yedeklenecek Veriler (Tüm Sistem):</h3>
             <ul>
-              <li>• Kullanıcı Bilgileri</li>
-              <li>• Bilardo Masaları</li>
-              <li>• Ücret Tarifesi</li>
-              <li>• Popup Ayarları</li>
-              <li>• Sipariş Geçmişi</li>
+              <li>• 👤 <strong>Kullanıcı Bilgileri</strong> (Giriş, rol, yetkiler)</li>
+              <li>• 🎱 <strong>Bilardo Sistemi</strong> (Masalar, ücretler, bildirimler)</li>
+              <li>• 💰 <strong>Ücret Tarifesi</strong> (30dk, 1saat, dakika ücreti)</li>
+              <li>• 🔔 <strong>Bildirim Ayarları</strong> (Popup, ses, otomatik kapanma)</li>
+              <li>• 👥 <strong>Müşteri İşlemleri</strong> (Hesaba yaz kayıtları, borç defteri)</li>
+              <li>• 📋 <strong>Adisyon Kayıtları</strong> (Tüm kapalı ve açık adisyonlar)</li>
+              <li>• 💳 <strong>Borç Kayıtları</strong> (Yeni borç sistemi kayıtları)</li>
+              <li>• 🏦 <strong>Tahsilatlar</strong> (Alınan tüm ödemeler)</li>
+              <li>• 💵 <strong>Finans Havuzu</strong> (Tüm parasal hareketler)</li>
+              <li>• 📉 <strong>Giderler</strong> (Sistemde kayıtlı tüm giderler)</li>
+              <li>• 🛒 <strong>Ürünler ve Menü</strong> (Tüm ürünler, kategoriler, fiyatlar)</li>
+              <li>• ☕ <strong>Sipariş Geçmişi</strong> (Tüm adisyon ve ödemeler)</li>
+              <li>• 📊 <strong>Raporlar</strong> (Günlük, haftalık, aylık istatistikler)</li>
+              <li>• ⚙️ <strong>Sistem Ayarları</strong> (Kafe adı, çalışma saatleri)</li>
+              <li>• 🖨️ <strong>Yazıcı Ayarları</strong> (Fatura ve fiş yazdırma)</li>
             </ul>
           </div>
 
           <div className="input-grup">
             <button onClick={handleBackup} className="kaydet-button">
-              💾 Veri Yedeği Al (JSON İndir)
+              💾 Tüm Verilerin Yedeğini Al (JSON İndir)
             </button>
+            <small className="text-muted">Tüm sistem verilerini tek dosyada yedekler</small>
           </div>
 
           <div className="input-grup">
-            <label>Veri Geri Yükle</label>
+            <label>📥 Veri Geri Yükle</label>
             <input 
               type="file" 
               accept=".json"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    try {
-                      const data = JSON.parse(event.target.result);
-                      alert("Geri yükleme özelliği yakında eklenecek!");
-                      console.log("Yedek verisi:", data);
-                    } catch (error) {
-                      alert("Geçersiz yedek dosyası!");
-                    }
-                  };
-                  reader.readAsText(file);
-                }
-              }}
+              onChange={handleRestore}
+              id="restoreFileInput"
             />
-            <small className="text-muted">JSON formatında yedek dosyası seçin</small>
+            <small className="text-muted">MyCafe yedek dosyası seçin (.json formatında)</small>
+          </div>
+
+          <div className="temizleme-bilgi">
+            <h3>🔄 Parçalı Yedek İşlemleri</h3>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '15px' }}>
+              <button 
+                onClick={() => {
+                  const masalar = localStorage.getItem("bilardo_masalar");
+                  if (masalar) {
+                    const blob = new Blob([masalar], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `bilardo_masalar_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    alert("🎱 Sadece bilardo masaları yedeklendi!");
+                  } else {
+                    alert("❌ Yedeklenecek masa verisi bulunamadı!");
+                  }
+                }}
+                className="kaydet-button"
+                style={{ flex: '1', minWidth: '200px', background: '#9b59b6', fontSize: '14px', padding: '12px' }}
+              >
+                🎱 Sadece Masaları Yedekle
+              </button>
+              
+              <button 
+                onClick={() => {
+                  const siparisler = localStorage.getItem("siparisler");
+                  if (siparisler) {
+                    const blob = new Blob([siparisler], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `siparisler_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    alert("☕ Sadece sipariş geçmişi yedeklendi!");
+                  } else {
+                    alert("❌ Yedeklenecek sipariş verisi bulunamadı!");
+                  }
+                }}
+                className="kaydet-button"
+                style={{ flex: '1', minWidth: '200px', background: '#2ecc71', fontSize: '14px', padding: '12px' }}
+              >
+                ☕ Sadece Siparişleri Yedekle
+              </button>
+              
+              <button 
+                onClick={() => {
+                  // Tüm müşteri işlem verilerini topla
+                  const musteriData = {
+                    musteriler: localStorage.getItem("mc_musteriler"),
+                    adisyonlar: localStorage.getItem("mc_adisyonlar"),
+                    borclar: localStorage.getItem("mc_borclar"),
+                    tahsilatlar: localStorage.getItem("mc_tahbilat")
+                  };
+                  
+                  const availableData = Object.entries(musteriData)
+                    .filter(([key, value]) => value !== null)
+                    .map(([key]) => key);
+                  
+                  if (availableData.length > 0) {
+                    const blob = new Blob([JSON.stringify(musteriData, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `musteri_islemleri_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    
+                    alert(`👥 Müşteri işlemleri yedeklendi!\n\n📋 Yedeklenen veriler:\n${availableData.map(item => `• ${item}`).join('\n')}`);
+                  } else {
+                    alert("❌ Yedeklenecek müşteri işlem verisi bulunamadı!");
+                  }
+                }}
+                className="kaydet-button"
+                style={{ flex: '1', minWidth: '200px', background: '#16a085', fontSize: '14px', padding: '12px' }}
+              >
+                👥 Sadece Müşteri İşlemlerini Yedekle
+              </button>
+              
+              <button 
+                onClick={() => {
+                  // Ürün verilerini topla
+                  const urunData = {
+                    urunler: localStorage.getItem("mc_urunler"),
+                    urunKategorileri: localStorage.getItem("mc_urun_kategorileri"),
+                    urunFiyatListesi: localStorage.getItem("urun_fiyat_listesi"),
+                    menuKategorileri: localStorage.getItem("mc_menu_kategorileri")
+                  };
+                  
+                  const availableData = Object.entries(urunData)
+                    .filter(([key, value]) => value !== null)
+                    .map(([key]) => key);
+                  
+                  if (availableData.length > 0) {
+                    const blob = new Blob([JSON.stringify(urunData, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `urunler_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    
+                    alert(`🛒 Ürünler yedeklendi!\n\n📋 Yedeklenen veriler:\n${availableData.map(item => `• ${item}`).join('\n')}`);
+                  } else {
+                    alert("❌ Yedeklenecek ürün verisi bulunamadı!");
+                  }
+                }}
+                className="kaydet-button"
+                style={{ flex: '1', minWidth: '200px', background: '#f39c12', fontSize: '14px', padding: '12px' }}
+              >
+                🛒 Sadece Ürünleri Yedekle
+              </button>
+              
+              <button 
+                onClick={() => {
+                  const finansHavuzu = localStorage.getItem("mc_finans_havuzu");
+                  if (finansHavuzu) {
+                    const blob = new Blob([finansHavuzu], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `finans_havuzu_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    alert("💰 Sadece finans havuzu yedeklendi!");
+                  } else {
+                    alert("❌ Finans havuzu verisi bulunamadı!");
+                  }
+                }}
+                className="kaydet-button"
+                style={{ flex: '1', minWidth: '200px', background: '#8e44ad', fontSize: '14px', padding: '12px' }}
+              >
+                💰 Sadece Finans Havuzunu Yedekle
+              </button>
+            </div>
           </div>
 
           {(user?.role === "SUPERADMIN" || user?.role === "ADMIN") && (
             <div className="temizleme-bilgi" style={{ borderLeft: '4px solid #e74c3c' }}>
-              <h3 style={{ color: '#e74c3c' }}>⚠️ Tehlikeli İşlemler</h3>
-              <p>Bu işlem tüm verileri kalıcı olarak silecektir. Sadece gerektiğinde kullanın.</p>
+              <h3 style={{ color: '#e74c3c' }}>⚠️ Tehlikeli İşlemler (Yönetici)</h3>
+              <p>Bu işlemler tüm verileri kalıcı olarak silecektir. Sadece gerektiğinde kullanın.</p>
               
-              <button onClick={resetLocalStorage} className="temizle-button">
-                🗑️ Tüm Verileri Temizle & Sistemi Sıfırla
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '15px' }}>
+                <button 
+                  onClick={() => {
+                    if (window.confirm("Sadece bilardo masaları sıfırlanacak. Emin misiniz?")) {
+                      localStorage.removeItem("bilardo_masalar");
+                      alert("🎱 Bilardo masaları sıfırlandı!");
+                    }
+                  }}
+                  className="temizle-button"
+                  style={{ flex: '1', minWidth: '150px', background: '#e67e22', fontSize: '14px', padding: '12px' }}
+                >
+                  🎱 Sadece Masaları Temizle
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (window.confirm("Sadece sipariş geçmişi silinecek. Emin misiniz?")) {
+                      localStorage.removeItem("siparisler");
+                      alert("☕ Sipariş geçmişi temizlendi!");
+                    }
+                  }}
+                  className="temizle-button"
+                  style={{ flex: '1', minWidth: '150px', background: '#d35400', fontSize: '14px', padding: '12px' }}
+                >
+                  ☕ Sadece Siparişleri Temizle
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (window.confirm("TÜM müşteri işlem verileri silinecek!\n\nBu işlem şunları silecek:\n• Müşteri kayıtları\n• Adisyon kayıtları\n• Borç kayıtları\n• Tahsilatlar\n\nEmin misiniz?")) {
+                      localStorage.removeItem("mc_musteriler");
+                      localStorage.removeItem("mc_adisyonlar");
+                      localStorage.removeItem("mc_borclar");
+                      localStorage.removeItem("mc_tahbilat");
+                      alert("✅ Müşteri işlem verileri temizlendi!\n\nNot: Finans havuzu verileri korundu.");
+                    }
+                  }}
+                  className="temizle-button"
+                  style={{ flex: '1', minWidth: '150px', background: '#16a085', fontSize: '14px', padding: '12px' }}
+                >
+                  👥 Müşteri İşlemlerini Temizle
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (window.confirm("Ürün verileri silinecek! Bu işlem tüm ürünleri, kategorileri ve fiyat listesini silecek. Emin misiniz?")) {
+                      localStorage.removeItem("mc_urunler");
+                      localStorage.removeItem("mc_urun_kategorileri");
+                      localStorage.removeItem("urun_fiyat_listesi");
+                      localStorage.removeItem("mc_menu_kategorileri");
+                      alert("🛒 Ürün verileri temizlendi!");
+                    }
+                  }}
+                  className="temizle-button"
+                  style={{ flex: '1', minWidth: '150px', background: '#f39c12', fontSize: '14px', padding: '12px' }}
+                >
+                  🛒 Ürünleri Temizle
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (window.confirm("Finans havuzu verileri silinecek. Bu işlem tüm parasal hareket kayıtlarını silecektir. Emin misiniz?")) {
+                      localStorage.removeItem("mc_finans_havuzu");
+                      alert("💰 Finans havuzu temizlendi!");
+                    }
+                  }}
+                  className="temizle-button"
+                  style={{ flex: '1', minWidth: '150px', background: '#9b59b6', fontSize: '14px', padding: '12px' }}
+                >
+                  💰 Sadece Finans Havuzunu Temizle
+                </button>
+              </div>
+              
+              <button onClick={resetLocalStorage} className="temizle-button" style={{ marginTop: '15px' }}>
+                🗑️ TÜM VERİLERİ TEMİZLE & SİSTEMİ SIFIRLA
               </button>
             </div>
           )}
@@ -448,6 +792,26 @@ export default function Ayarlar() {
               </button>
               <button onClick={() => setPanel("guncelle")} className="kaydet-button" style={{ flex: '1', minWidth: '200px', background: '#3498db' }}>
                 🔄 Güncelleme Kontrolü
+              </button>
+              <button 
+                onClick={() => {
+                  const urunler = localStorage.getItem("mc_urunler");
+                  if (urunler) {
+                    const blob = new Blob([urunler], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `urunler_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    alert("🛒 Ürünler hızlı yedeklendi!");
+                  } else {
+                    alert("❌ Ürün verisi bulunamadı!");
+                  }
+                }}
+                className="kaydet-button" 
+                style={{ flex: '1', minWidth: '200px', background: '#f39c12' }}
+              >
+                🛒 Ürünleri Hızlı Yedekle
               </button>
             </div>
           </div>

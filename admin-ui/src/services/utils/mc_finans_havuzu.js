@@ -197,7 +197,14 @@ export const tumAdisyonlariFinansHavuzunaAktar = () => {
         (adisyon.kalemler ? adisyon.kalemler.reduce((sum, kalem) => 
           sum + (Number(kalem.birimFiyat || 0) * Number(kalem.adet || 1)), 0) : 0);
       
-      console.log(`📝 Adisyon ${adisyon.id}: Ödeme Türü = ${odemeTuru}, Tutar = ${toplamTutar}`);
+      // Masa numarasını doğru şekilde al
+      const masaId = adisyon.masaId || 
+                     adisyon.masaNum || 
+                     adisyon.masaNo || 
+                     adisyon.masa ||
+                     (adisyon.aciklama ? (adisyon.aciklama.match(/MASA\s+(\d+)/i) ? adisyon.aciklama.match(/MASA\s+(\d+)/i)[1] : null) : null);
+      
+      console.log(`📝 Adisyon ${adisyon.id}: Ödeme Türü = ${odemeTuru}, Tutar = ${toplamTutar}, Masa ID = ${masaId}`);
       
       // GELİR kaydı oluştur (HESABA_YAZ hariç)
       if (odemeTuru !== "HESABA_YAZ") {
@@ -211,7 +218,7 @@ export const tumAdisyonlariFinansHavuzunaAktar = () => {
           gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
           kaynak: "ADISYON",
           referansId: adisyon.id || adisyon.adisyonNo,
-          masaId: adisyon.masaId || adisyon.masaNum || adisyon.masaNo || adisyon.masa
+          masaId: masaId
         });
         eklenenKayitSayisi++;
       }
@@ -228,7 +235,7 @@ export const tumAdisyonlariFinansHavuzunaAktar = () => {
           gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
           kaynak: "ADISYON",
           referansId: adisyon.id || adisyon.adisyonNo,
-          masaId: adisyon.masaId || adisyon.masaNum || adisyon.masaNo || adisyon.masa
+          masaId: masaId
         });
         eklenenKayitSayisi++;
       }
@@ -247,6 +254,9 @@ export const tumAdisyonlariFinansHavuzunaAktar = () => {
       );
       const toplamTutar = adisyon.toplamTutar || adisyon.tutar || 0;
       
+      // Bilardo masa numarası
+      const masaId = adisyon.masaId || adisyon.masaNumarasi;
+      
       if (odemeTuru !== "HESABA_YAZ") {
         finansKaydiEkle({
           id: `bilardo_gelir_${adisyon.id || Date.now()}`,
@@ -258,7 +268,7 @@ export const tumAdisyonlariFinansHavuzunaAktar = () => {
           gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
           kaynak: "BİLARDO",
           referansId: adisyon.id,
-          masaId: adisyon.masaId || adisyon.masaNumarasi
+          masaId: masaId
         });
         eklenenKayitSayisi++;
       }
@@ -468,6 +478,13 @@ export const adisyonKapandigindaKaydet = (adisyon) => {
   const toplamTutar = adisyon.toplamTutar || 0;
   const isBilardo = adisyon.tip === "BİLARDO";
   
+  // Masa numarasını doğru şekilde al
+  const masaId = adisyon.masaId || 
+                 adisyon.masaNum || 
+                 adisyon.masaNo || 
+                 adisyon.masa ||
+                 (adisyon.aciklama ? (adisyon.aciklama.match(/MASA\s+(\d+)/i) ? adisyon.aciklama.match(/MASA\s+(\d+)/i)[1] : null) : null);
+  
   let kayit;
   
   if (odemeTuru !== "HESABA_YAZ") {
@@ -482,7 +499,7 @@ export const adisyonKapandigindaKaydet = (adisyon) => {
       gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
       kaynak: isBilardo ? "BİLARDO" : "ADISYON",
       referansId: adisyon.id,
-      masaId: adisyon.masaId || adisyon.masaNum || adisyon.masaNo || adisyon.masa || adisyon.masaNumarasi
+      masaId: masaId
     });
   } else {
     // HESABA YAZ BORÇ KAYDI (BU KASAYA GİRMEZ!)
@@ -496,11 +513,11 @@ export const adisyonKapandigindaKaydet = (adisyon) => {
       gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
       kaynak: "ADISYON",
       referansId: adisyon.id,
-      masaId: adisyon.masaId || adisyon.masaNum || adisyon.masaNo || adisyon.masa
+      masaId: masaId
     });
   }
   
-  console.log(`✅ Adisyon kaydedildi: ${adisyon.id}, Ödeme Türü: ${odemeTuru}, Tutar: ${toplamTutar}`);
+  console.log(`✅ Adisyon kaydedildi: ${adisyon.id}, Ödeme Türü: ${odemeTuru}, Tutar: ${toplamTutar}, Masa ID: ${masaId}`);
   return kayit;
 };
 
@@ -542,6 +559,9 @@ export const bilardoAdisyonuKapandigindaKaydet = (bilardoAdisyonu) => {
   );
   const toplamTutar = bilardoAdisyonu.toplamTutar || bilardoAdisyonu.tutar || 0;
   
+  // Bilardo masa numarası
+  const masaId = bilardoAdisyonu.masaId || bilardoAdisyonu.masaNumarasi;
+  
   if (odemeTuru !== "HESABA_YAZ") {
     return finansKaydiEkle({
       id: `bilardo_gelir_${bilardoAdisyonu.id}_${Date.now()}`,
@@ -553,7 +573,7 @@ export const bilardoAdisyonuKapandigindaKaydet = (bilardoAdisyonu) => {
       gunId: bilardoAdisyonu.gunId || tarihiGunIdYap(bilardoAdisyonu.kapanisZamani) || tarihiGunIdYap(new Date()),
       kaynak: "BİLARDO",
       referansId: bilardoAdisyonu.id,
-      masaId: bilardoAdisyonu.masaId || bilardoAdisyonu.masaNumarasi
+      masaId: masaId
     });
   }
   
@@ -711,7 +731,9 @@ export const odemeTuruDebug = () => {
       odemeTipi: ad.odemeTipi,
       odemeler: ad.odemeler,
       toplamTutar: ad.toplamTutar,
-      masaNo: ad.masaNo
+      masaNo: ad.masaNo,
+      masaId: ad.masaId,
+      aciklama: ad.aciklama
     });
   });
   
@@ -725,7 +747,8 @@ export const odemeTuruDebug = () => {
       odemeTuru: ad.odemeTuru,
       odemeTipi: ad.odemeTipi,
       toplamTutar: ad.toplamTutar,
-      masaNumarasi: ad.masaNumarasi
+      masaNumarasi: ad.masaNumarasi,
+      masaId: ad.masaId
     });
   });
   

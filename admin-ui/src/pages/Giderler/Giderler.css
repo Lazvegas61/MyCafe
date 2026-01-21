@@ -1,7 +1,7 @@
 /* ============================================================
-   📄 DOSYA: Giderler.css (YENİ TASARIM)
+   📄 DOSYA: Giderler.css (TAM SAYFA - TABLO GÖRÜNÜMLÜ)
    📌 AMAÇ:
-   Resimdeki tasarıma göre CSS
+   Resimdeki tasarıma göre CSS + Tablo görünümü
 ============================================================ */
 
 .giderler-container {
@@ -156,7 +156,7 @@ input[type="number"]::-webkit-inner-spin-button {
   background: #bdbdbd;
 }
 
-/* SAĞ KOLON - YENİ TASARIM */
+/* SAĞ KOLON - TABLO GÖRÜNÜMÜ */
 .report-column {
   display: flex;
   flex-direction: column;
@@ -359,12 +359,12 @@ input[type="number"]::-webkit-inner-spin-button {
   border-radius: 20px;
 }
 
-/* GİDER LİSTESİ - BÜYÜK */
-.gider-list-container {
+/* GİDER TABLOSU STİLLERİ - YENİ */
+.gider-table-container {
   background: white;
   border-radius: 12px;
   border: 2px solid #e6d6c1;
-  padding: 16px;
+  padding: 0;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -372,96 +372,108 @@ input[type="number"]::-webkit-inner-spin-button {
   overflow: hidden;
 }
 
-.gider-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.gider-table-wrapper {
   overflow-y: auto;
   flex: 1;
-  padding-right: 8px;
+  max-height: 400px;
 }
 
-.gider-card {
+.gider-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.gider-table thead {
+  position: sticky;
+  top: 0;
   background: #f8f3e9;
-  border-radius: 10px;
-  border: 1px solid #e6d6c1;
-  padding: 16px;
-  transition: all 0.2s;
-  flex-shrink: 0;
+  z-index: 10;
 }
 
-.gider-card:hover {
-  border-color: #d2b295;
-  background: #f5e8d0;
-  transform: translateY(-2px);
+.gider-table th {
+  padding: 16px 12px;
+  text-align: left;
+  font-weight: 700;
+  color: #5a3921;
+  border-bottom: 2px solid #e6d6c1;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.gider-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+.gider-table th:nth-child(1) { width: 20%; } /* Kategori */
+.gider-table th:nth-child(2) { width: 40%; } /* Ürün/Hizmet */
+.gider-table th:nth-child(3) { width: 20%; } /* Tarih */
+.gider-table th:nth-child(4) { width: 20%; } /* Tutar */
+
+.gider-table-row {
+  border-bottom: 1px solid #f5e8d0;
+  transition: background-color 0.2s;
 }
 
-.gider-kategori {
+.gider-table-row:hover {
+  background-color: #fcf8f3;
+}
+
+.gider-table-row td {
+  padding: 16px 12px;
+  vertical-align: top;
+}
+
+.table-kategori {
   background: #e3f2fd;
   color: #1976d2;
-  padding: 4px 12px;
+  padding: 6px 12px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 700;
+  display: inline-block;
+  text-align: center;
+  min-width: 80px;
 }
 
-.gider-tarih {
+.table-urun {
+  font-weight: 700;
+  color: #5a3921;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.table-not {
+  font-size: 13px;
+  color: #8b7d70;
+  font-style: italic;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.table-detay {
+  font-size: 13px;
+  color: #8b7d70;
+  background: #f8f3e9;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.table-tarih {
+  font-weight: 600;
+  color: #5a3921;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.table-saat {
   font-size: 13px;
   color: #8b7d70;
 }
 
-.btn-delete {
-  background: none;
-  border: none;
-  color: #c62828;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-.btn-delete:hover {
-  background: #ffebee;
-}
-
-.gider-body {
-  margin-bottom: 12px;
-}
-
-.gider-urun {
-  font-weight: 700;
-  color: #5a3921;
-  font-size: 16px;
-  margin-bottom: 6px;
-}
-
-.gider-detay {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
-  color: #8b7d70;
-}
-
-.gider-not {
-  font-style: italic;
-}
-
-.gider-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.gider-tutar {
-  font-size: 20px;
+.table-tutar {
+  font-size: 18px;
   font-weight: 800;
   color: #8b4513;
+  text-align: right;
 }
 
 /* BOŞ LİSTE */
@@ -574,23 +586,17 @@ input[type="number"]::-webkit-inner-spin-button {
   color: #5a3921;
 }
 
-/* SCROLLBAR */
-.gider-list::-webkit-scrollbar,
-.gider-list-container::-webkit-scrollbar,
-.report-column::-webkit-scrollbar {
-  width: 6px;
+/* TABLO SCROLLBAR */
+.gider-table-wrapper::-webkit-scrollbar {
+  width: 8px;
 }
 
-.gider-list::-webkit-scrollbar-thumb,
-.gider-list-container::-webkit-scrollbar-thumb,
-.report-column::-webkit-scrollbar-thumb {
+.gider-table-wrapper::-webkit-scrollbar-thumb {
   background: #d2b295;
   border-radius: 4px;
 }
 
-.gider-list::-webkit-scrollbar-track,
-.gider-list-container::-webkit-scrollbar-track,
-.report-column::-webkit-scrollbar-track {
+.gider-table-wrapper::-webkit-scrollbar-track {
   background: #f5e8d0;
   border-radius: 4px;
 }
@@ -619,6 +625,11 @@ input[type="number"]::-webkit-inner-spin-button {
   .btn-pdf {
     width: 100%;
   }
+  
+  .gider-table th:nth-child(1) { width: 18%; }
+  .gider-table th:nth-child(2) { width: 42%; }
+  .gider-table th:nth-child(3) { width: 20%; }
+  .gider-table th:nth-child(4) { width: 20%; }
 }
 
 @media (max-width: 768px) {
@@ -634,14 +645,39 @@ input[type="number"]::-webkit-inner-spin-button {
     grid-template-columns: 1fr;
   }
   
-  .gider-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+  .gider-table-container {
+    overflow-x: auto;
   }
   
-  .gider-detay {
-    flex-direction: column;
-    gap: 4px;
+  .gider-table {
+    min-width: 600px;
   }
+  
+  .gider-table th,
+  .gider-table td {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+  
+  .table-tutar {
+    font-size: 16px;
+  }
+}
+
+/* GENEL SCROLLBAR */
+.report-column::-webkit-scrollbar,
+.gider-table-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.report-column::-webkit-scrollbar-thumb,
+.gider-table-wrapper::-webkit-scrollbar-thumb {
+  background: #d2b295;
+  border-radius: 4px;
+}
+
+.report-column::-webkit-scrollbar-track,
+.gider-table-wrapper::-webkit-scrollbar-track {
+  background: #f5e8d0;
+  border-radius: 4px;
 }
