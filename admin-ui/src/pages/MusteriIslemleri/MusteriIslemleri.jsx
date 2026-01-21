@@ -3,10 +3,12 @@
    📌 AMAÇ:
    MyCafe — Müşteri İşlemleri (4 Kolonlu Tasarım)
    - KDV hesaplamaları tamamen çıkarıldı
+   - Finans havuzu entegrasyonu eklendi
 ============================================================ */
 
 import React, { useState, useEffect } from "react";
 import "./MusteriIslemleri.css";
+import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 // LocalStorage key'leri
 const MUSTERI_KEY = "mc_musteriler";
@@ -420,7 +422,24 @@ export default function MusteriIslemleri() {
       }
     }
     
-    // 3. Müşteriyi güncelle
+    // 3. Finans Havuzuna Kayıt Ekle
+    try {
+      mcFinansHavuzu.finansKaydiEkle({
+        tur: "GELIR",
+        aciklama: `Müşteri Tahsilat - ${selectedCustomer.adSoyad}`,
+        tutar: tutar,
+        odemeTuru: tahsilatTipi,
+        kaynak: "TAHSILAT",
+        referansId: yeniTahsilat.id,
+        musteriId: selectedCustomer.id,
+        tarih: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Finans kaydı eklenirken hata:", error);
+      // Finans kaydı eklenemese bile işleme devam et
+    }
+    
+    // 4. Müşteriyi güncelle
     const updatedCustomers = customers.map(c => {
       if (c.id === selectedCustomer.id) {
         const yeniNetBorc = Math.max(0, c.netBorc - tutar);
@@ -588,7 +607,7 @@ export default function MusteriIslemleri() {
     const kaynakBorclar = borclar.filter(b => b.musteriId === selectedCustomer.id);
     
     if (kaynakBorclar.length > 0) {
-      const sonBorc = kaynakBorclar[kaynakBorclari.length - 1];
+      const sonBorc = kaynakBorclar[kaynakBorclar.length - 1];
       const borcIndex = borclar.findIndex(b => b.id === sonBorc.id);
       
       if (borcIndex !== -1) {

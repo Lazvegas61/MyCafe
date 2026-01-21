@@ -5,11 +5,13 @@
    - Özet panelinde bilardo ücreti ve ek ürünler gözüküyor
    - Tüm tutarlar doğru hesaplanıyor
    - GUNCELLENDI: Bilardo ücreti ve ek ürünler normal adisyonda gösteriliyor
+   - GUNCELLENDI: Finans havuzu entegrasyonu eklendi
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Bilardo.css";
+import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu"; // YENİ IMPORT EKLENDİ
 
 export default function BilardoAdisyon() {
   const navigate = useNavigate();
@@ -409,7 +411,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 7. ADISYON KAPATMA
+     📌 7. ADISYON KAPATMA - GUNCELLENDI (Finans Havuzu Entegrasyonu)
   ============================================================ */
   
   const adisyonuKapat = () => {
@@ -420,15 +422,26 @@ export default function BilardoAdisyon() {
     
     if (!window.confirm("Adisyonu kapatmak istediğinize emin misiniz?")) return;
     
+    // Toplam tutarı hesapla
+    const toplamTutar = hesaplananUcret + ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0);
+    
     // 1. Bilardo adisyonunu kapat
     const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
     const index = adisyonlar.findIndex(a => a.id === adisyonId);
+    let guncellenmisAdisyon = null;
+    
     if (index !== -1) {
-      adisyonlar[index].durum = "KAPANDI";
-      adisyonlar[index].kapanisZamani = Date.now();
-      adisyonlar[index].hesaplananUcret = hesaplananUcret;
-      adisyonlar[index].bilardoUcret = hesaplananUcret; // BİLARDO ÜCRETİ KAYDEDİLDİ
-      adisyonlar[index].gecenDakika = gecenSure;
+      guncellenmisAdisyon = {
+        ...adisyonlar[index],
+        durum: "KAPANDI",
+        kapanisZamani: Date.now(),
+        hesaplananUcret: hesaplananUcret,
+        bilardoUcret: hesaplananUcret,
+        gecenDakika: gecenSure,
+        toplamTutar: toplamTutar
+      };
+      
+      adisyonlar[index] = guncellenmisAdisyon;
       localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
     }
     
@@ -452,7 +465,6 @@ export default function BilardoAdisyon() {
     
     // 4. Kasa hareketi kaydet
     const kasalar = JSON.parse(localStorage.getItem("mc_kasalar") || "[]");
-    const toplamTutar = hesaplananUcret + ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0);
     const kasaHareketi = {
       id: Date.now(),
       tarih: new Date().toISOString(),
@@ -468,7 +480,36 @@ export default function BilardoAdisyon() {
     kasalar.push(kasaHareketi);
     localStorage.setItem("mc_kasalar", JSON.stringify(kasalar));
     
-    alert(`Bilardo adisyonu kapatıldı!\nToplam: ${toplamTutar.toFixed(2)}₺`);
+    // 5. Finans havuzuna kaydet - YENİ EKLENDİ
+    if (guncellenmisAdisyon) {
+      try {
+        // Finans havuzu verisini hazırla
+        const finansHavuzuData = {
+          adisyonId: adisyonId,
+          bilardoMasaNo: adisyon?.bilardoMasaNo || "BİLARDO",
+          sureTipi: adisyon?.sureTipi || "",
+          gecenSure: gecenSure,
+          bilardoUcret: hesaplananUcret,
+          ekUrunToplam: ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0),
+          toplamTutar: toplamTutar,
+          odemeTipi: odemeler.length > 0 ? odemeler.map(o => o.tip).join(', ') : "BELİRTİLMEDİ",
+          kapanisZamani: new Date().toISOString(),
+          personel: JSON.parse(localStorage.getItem("mc_user") || "{}").adSoyad || "Bilinmiyor",
+          ekUrunler: ekUrunler,
+          odemeler: odemeler
+        };
+        
+        // Finans havuzuna kaydet
+        mcFinansHavuzu.bilardoAdisyonuKapandigindaKaydet(finansHavuzuData);
+        
+        console.log("Bilardo adisyonu finans havuzuna kaydedildi:", finansHavuzuData);
+      } catch (error) {
+        console.error("Finans havuzuna kaydetme hatası:", error);
+        // Hata olsa bile işleme devam et
+      }
+    }
+    
+    alert(`Bilardo adisyonu kapatıldı!\nToplam: ${toplamTutar.toFixed(2)}₺\nFinans havuzuna kaydedildi.`);
     
     // Bilardo sayfasına dön
     setTimeout(() => navigate("/bilardo"), 1500);

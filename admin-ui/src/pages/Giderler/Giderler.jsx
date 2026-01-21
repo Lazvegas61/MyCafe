@@ -1,9 +1,10 @@
 /* ============================================================
-   📄 DOSYA: Giderler.jsx (DÜZELTİLMİŞ - YENİ TASARIM)
+   📄 DOSYA: Giderler.jsx (GÜNCEL - TAM SAYFA)
    📌 AMAÇ:
    MyCafe — Gider Takip Modülü
    - Yeni tasarım uygulandı
    - Resimdeki layout'a göre düzenlendi
+   - mcFinansHavuzu entegrasyonu eklendi
 ============================================================ */
 
 import React, { useState, useEffect } from "react";
@@ -11,6 +12,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import "./Giderler.css";
 import { kasaHareketiEkle } from "../../services/utils/kasaHareketleri";
+import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 export default function Giderler() {
   const [giderler, setGiderler] = useState([]);
@@ -51,7 +53,7 @@ export default function Giderler() {
   };
 
   // -----------------------------------------
-  //   GİDER EKLE (GÜNCELLENDİ - MODEL C)
+  //   GİDER EKLE (GÜNCELLENDİ - MODEL C + mcFinansHavuzu)
   // -----------------------------------------
   const ekle = () => {
     if (!urunAdi || !tutar || !miktar || !birim) {
@@ -98,7 +100,19 @@ export default function Giderler() {
       aciklama: `${urunAdi} - ${miktar} ${birim}`
     });
 
-    // 3. Global Uyarıcıları Tetikle (HATA ÇÖZÜMÜ)
+    // 3️⃣ mcFinansHavuzu'na Kayıt (YENİ)
+    mcFinansHavuzu.giderEklendigindeKaydet({
+      id: yeniGider.id,
+      urunAdi: yeniGider.urunAdi,
+      kategori: yeniGider.kategori,
+      tutar: yeniGider.toplamTutar,
+      miktar: yeniGider.miktar,
+      birim: yeniGider.birim,
+      not: yeniGider.not,
+      tarih: yeniGider.tarih
+    });
+
+    // 4. Global Uyarıcıları Tetikle (HATA ÇÖZÜMÜ)
     window.dispatchEvent(new StorageEvent("storage", { key: "mc_giderler" }));
     window.dispatchEvent(new CustomEvent("kasaGuncellendi"));
     window.dispatchEvent(new CustomEvent("giderEklendi", { detail: yeniGider }));
@@ -119,8 +133,19 @@ export default function Giderler() {
   const sil = (id) => {
     if (!window.confirm("Bu gideri silmek istediğinize emin misiniz?")) return;
     
+    const silinecekGider = giderler.find(g => g.id === id);
     const liste = giderler.filter(g => g.id !== id);
+    
+    // Finans havuzundan da sil
+    if (silinecekGider) {
+      mcFinansHavuzu.giderSilindigindeKaydet({
+        id: silinecekGider.id,
+        tutar: silinecekGider.toplamTutar
+      });
+    }
+    
     kaydet(liste);
+    alert("Gider silindi.");
   };
 
   // -----------------------------------------
@@ -236,6 +261,21 @@ export default function Giderler() {
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text(`Toplam Tutar: ${toplamTutar.toFixed(2)} ₺ | Toplam Kayıt: ${filtrelenmisGiderler.length}`, 105, finalY, { align: 'center' });
+
+    // Kategori analizi
+    if (Object.keys(kategoriAnaliz).length > 0) {
+      const kategoriY = finalY + 15;
+      doc.setFontSize(14);
+      doc.text("KATEGORİ ANALİZİ", 105, kategoriY, { align: 'center' });
+      
+      let yPos = kategoriY + 10;
+      Object.entries(kategoriAnaliz).forEach(([kategori, data]) => {
+        const yuzde = (data.toplam / toplamTutar * 100).toFixed(1);
+        doc.setFontSize(10);
+        doc.text(`${kategori}: ${data.adet} kayıt, ${data.toplam.toFixed(2)} ₺ (${yuzde}%)`, 14, yPos);
+        yPos += 7;
+      });
+    }
 
     doc.save("Giderler_Raporu.pdf");
   };

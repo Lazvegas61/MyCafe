@@ -32,6 +32,7 @@ function GunDurumuGuard({ children }) {
     "/login",
     "/raporlar",  // ✅ Tüm rapor sayfalarına izin ver
     "/raporlar/", // ✅ Alt raporlar için de izin ver
+    "/musteri-islemleri", // ✅ Müşteri işlemlerine izin ver
   ];
 
   const path = location.pathname;
@@ -131,6 +132,7 @@ import GiderRaporu from "./pages/Raporlar/GiderRaporu.jsx";
 import KategoriRaporu from "./pages/Raporlar/KategoriRaporu.jsx";
 import MasaRaporu from "./pages/Raporlar/MasaRaporu.jsx";
 import UrunRaporu from "./pages/Raporlar/UrunRaporu.jsx";
+import MusteriIslemleri from "./pages/MusteriIslemleri/MusteriIslemleri.jsx"; // ✅ Yeni sayfa
 
 /* ------------------------------------------------------------
    MAIN APP (GÜN GUARD İÇİNDE ÇALIŞIR)
@@ -233,6 +235,13 @@ function MainApp() {
         <Route path="/ayarlar" element={
           <ProtectedRoute requiredRole="ADMIN">
             <Layout><Ayarlar /></Layout>
+          </ProtectedRoute>
+        } />
+
+        {/* ✅ MÜŞTERİ İŞLEMLERİ SAYFASI */}
+        <Route path="/musteri-islemleri" element={
+          <ProtectedRoute>
+            <Layout><MusteriIslemleri /></Layout>
           </ProtectedRoute>
         } />
 

@@ -12,11 +12,11 @@ export const useGun = () => {
 
 // MODEL C storage key'leri
 const GUN_STORAGE_KEY = "mc_gun_durumlari"; // ✅ MODEL C standartı
-const GUNLUK_GECIS_KEY = "mc_gunluk_gecisler"; // Gün başı/sonu logları için ayrı storage
+const GUNLUK_GECIS_KEY = "mc_gunluk_gecisler";
 
 const defaultState = {
-  status: "CLOSED",        // OPEN | CLOSED
-  gunId: null,             // YYYY-MM-DD (sadece referans için)
+  status: "CLOSED",
+  gunId: null,
   baslangicZamani: null,
   durum: "KAPALI"
 };
@@ -25,7 +25,29 @@ export const GunProvider = ({ children }) => {
   const [gun, setGun] = useState(() => {
     try {
       const raw = localStorage.getItem(GUN_STORAGE_KEY);
-      if (raw) return { ...defaultState, ...JSON.parse(raw) };
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Son açık günü bul (array ise)
+        if (Array.isArray(parsed)) {
+          const acikGun = parsed.find(g => g.durum === "ACIK");
+          if (acikGun) {
+            return {
+              ...defaultState,
+              status: "OPEN",
+              gunId: acikGun.gunId,
+              baslangicZamani: acikGun.baslangicZamani || new Date().toISOString(),
+              durum: "ACIK"
+            };
+          }
+        } else if (parsed.durum === "ACIK") {
+          // Object ise direk kontrol
+          return {
+            ...defaultState,
+            ...parsed,
+            status: "OPEN"
+          };
+        }
+      }
       return defaultState;
     } catch {
       return defaultState;
@@ -39,16 +61,48 @@ export const GunProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading) {
-      localStorage.setItem(GUN_STORAGE_KEY, JSON.stringify(gun));
+    if (!loading && gun.gunId) {
+      try {
+        const gunDurumlari = JSON.parse(
+          localStorage.getItem(GUN_STORAGE_KEY) || "[]"
+        );
+        
+        let yeniDurumlar;
+        const gunDurumu = {
+          gunId: gun.gunId,
+          durum: gun.durum,
+          baslangicZamani: gun.baslangicZamani,
+          status: gun.status,
+          sonGuncelleme: new Date().toISOString()
+        };
+        
+        if (Array.isArray(gunDurumlari)) {
+          const mevcutIndex = gunDurumlari.findIndex(g => g.gunId === gun.gunId);
+          if (mevcutIndex >= 0) {
+            gunDurumlari[mevcutIndex] = gunDurumu;
+          } else {
+            gunDurumlari.push(gunDurumu);
+          }
+          yeniDurumlar = gunDurumlari;
+        } else {
+          yeniDurumlar = [gunDurumu];
+        }
+        
+        localStorage.setItem(GUN_STORAGE_KEY, JSON.stringify(yeniDurumlar));
+      } catch (error) {
+        console.error("❌ Gun durumu kaydetme hatası:", error);
+      }
     }
   }, [gun, loading]);
 
   /* =========================================
-     🚪 GÜN BAŞI (SADECE DURUM DEĞİŞİKLİĞİ)
+     🚪 GÜN BAŞI
   ========================================= */
   const gunBaslat = () => {
-    if (gun.status === "OPEN") return false;
+    if (gun.status === "OPEN") {
+      console.warn("⚠️ Zaten açık bir gün var");
+      return false;
+    }
 
     const now = new Date();
     const gunId = now.toISOString().split("T")[0];
@@ -62,7 +116,7 @@ export const GunProvider = ({ children }) => {
 
     setGun(yeniGun);
 
-    // ✅ Günlük geçiş logu (finans kaydı DEĞİL)
+    // ✅ Günlük geçiş logu
     const gecisLoglari = JSON.parse(
       localStorage.getItem(GUNLUK_GECIS_KEY) || "[]"
     );
@@ -75,28 +129,22 @@ export const GunProvider = ({ children }) => {
       createdAt: now.toISOString()
     });
 
-    localStorage.setItem(
-      GUNLUK_GECIS_KEY,
-      JSON.stringify(gecisLoglari)
-    );
+    localStorage.setItem(GUNLUK_GECIS_KEY, JSON.stringify(gecisLoglari));
 
+    console.log(`✅ Gün başlatıldı: ${gunId}`);
     return true;
   };
 
   /* =========================================
-     🚪 GÜN SONU (SADECE DURUM YAZAR)
-     ❌ Adisyon kontrolü YOK
-     ❌ Finans kaydı YOK
-     ❌ Operasyon engelleme YOK
+     🚪 GÜN KAPAT
   ========================================= */
   const gunKapat = () => {
     if (gun.status !== "OPEN") {
       throw new Error("Açık bir iş günü yok.");
     }
 
-    // ✅ Sadece durum güncellenir
     const now = new Date();
-    const gunId = gun.gunId || now.toISOString().split("T")[0];
+    const gunId = gun.gunId;
 
     const yeniGun = {
       status: "CLOSED",
@@ -107,7 +155,32 @@ export const GunProvider = ({ children }) => {
 
     setGun(yeniGun);
 
-    // ✅ Günlük geçiş logu (finans kaydı DEĞİL)
+    // ✅ Gün durumunu güncelle
+    try {
+      const gunDurumlari = JSON.parse(
+        localStorage.getItem(GUN_STORAGE_KEY) || "[]"
+      );
+      
+      const mevcutIndex = gunDurumlari.findIndex(g => g.gunId === gunId);
+      const kapaliGun = {
+        gunId,
+        durum: "KAPALI",
+        kapanisZamani: now.toISOString(),
+        status: "CLOSED"
+      };
+      
+      if (mevcutIndex >= 0) {
+        gunDurumlari[mevcutIndex] = kapaliGun;
+      } else {
+        gunDurumlari.push(kapaliGun);
+      }
+      
+      localStorage.setItem(GUN_STORAGE_KEY, JSON.stringify(gunDurumlari));
+    } catch (error) {
+      console.error("❌ Gün durumu güncelleme hatası:", error);
+    }
+
+    // ✅ Günlük geçiş logu
     const gecisLoglari = JSON.parse(
       localStorage.getItem(GUNLUK_GECIS_KEY) || "[]"
     );
@@ -120,11 +193,9 @@ export const GunProvider = ({ children }) => {
       createdAt: now.toISOString()
     });
 
-    localStorage.setItem(
-      GUNLUK_GECIS_KEY,
-      JSON.stringify(gecisLoglari)
-    );
+    localStorage.setItem(GUNLUK_GECIS_KEY, JSON.stringify(gecisLoglari));
 
+    console.log(`✅ Gün kapatıldı: ${gunId}`);
     return true;
   };
 
