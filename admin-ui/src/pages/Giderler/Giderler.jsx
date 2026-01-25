@@ -4,14 +4,13 @@
    MyCafe — Gider Takip Modülü
    - Tablo görünümü uygulandı
    - Silme işlemi kaldırıldı
-   - mcFinansHavuzu entegrasyonu korundu
+   - mcFinansHavuzu entegrasyonu tam olarak uygulandı
 ============================================================ */
 
 import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import "./Giderler.css";
-import { kasaHareketiEkle } from "../../services/utils/kasaHareketleri";
 import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 export default function Giderler() {
@@ -53,7 +52,7 @@ export default function Giderler() {
   };
 
   // -----------------------------------------
-  //   GİDER EKLE (GÜNCELLENDİ - MODEL C + mcFinansHavuzu)
+  //   GİDER EKLE (GÜNCELLENDİ - SADECE mcFinansHavuzu)
   // -----------------------------------------
   const ekle = () => {
     if (!urunAdi || !tutar || !miktar || !birim) {
@@ -70,7 +69,7 @@ export default function Giderler() {
       return;
     }
 
-    // 1️⃣ GİDER KAYDI (ESKİ YAPI – KORUNUYOR)
+    // Gider kaydı oluştur
     const yeniGider = {
       id: Date.now(),
       urunAdi,
@@ -85,22 +84,24 @@ export default function Giderler() {
       islemTipi: "CIKIS" // Kasadan para çıkışı olduğunu belirtir
     };
 
-    // 1. Kendi listesini güncelle
+    // 1️⃣ mcFinansHavuzu'na Kayıt (YENİ ve TEK KAYIT)
+    mcFinansHavuzu.kayitEkle({
+      id: `gider_${Date.now()}`,
+      tur: "GIDER",
+      tutar: -toplamTutar, // ❗ EKSİ DEĞER (çıkış)
+      aciklama: `${urunAdi} - ${miktar} ${birim}${not ? ` (${not})` : ''}`,
+      kaynak: "GIDER",
+      gunId: new Date().toISOString().split("T")[0],
+      tarih: yeniGider.tarih,
+      kullanici: "ADMIN"
+    });
+
+    // 2️⃣ Kendi listesini güncelle
     const yeniListe = [yeniGider, ...giderler];
     setGiderler(yeniListe);
     localStorage.setItem("mc_giderler", JSON.stringify(yeniListe));
 
-    // 2️⃣ KASA HAREKETİ (MODEL C – YENİ)
-    kasaHareketiEkle({
-      id: `kasa_gider_${Date.now()}`,
-      tip: "GIDER",
-      kaynak: "GIDER",
-      tutar: -toplamTutar, // ❗ EKSİ
-      tarih: yeniGider.tarih,
-      aciklama: `${urunAdi} - ${miktar} ${birim}`
-    });
-
-    // 3️⃣ mcFinansHavuzu'na Kayıt (YENİ)
+    // 3️⃣ mcFinansHavuzu gider kaydı (ek veri için)
     mcFinansHavuzu.giderEklendigindeKaydet({
       id: yeniGider.id,
       urunAdi: yeniGider.urunAdi,
@@ -124,7 +125,7 @@ export default function Giderler() {
     setBirim(""); 
     setNot(""); 
     setKategori("");
-    alert("Gider başarıyla kaydedildi ve kasaya işlendi.");
+    alert("Gider başarıyla kaydedildi ve finans havuzuna işlendi.");
   };
 
   // -----------------------------------------

@@ -105,7 +105,6 @@ export default function Sidebar() {
         color: RENK.yazi,
         display: "flex",
         flexDirection: "column",
-        padding: "20px 16px",
         position: "fixed",
         left: 0,
         top: 0,
@@ -115,71 +114,85 @@ export default function Sidebar() {
         transition: "transform 0.35s ease-out",
       }}
     >
-      {/* Gün Durumu */}
+      {/* Sabit Üst Bölüm - Kaydırılmaz */}
       <div
         style={{
-          marginBottom: 16,
-          padding: 12,
-          borderRadius: 12,
-          background: "rgba(0,0,0,0.25)",
-          textAlign: "center",
-          fontWeight: 700,
+          padding: "20px 16px",
+          background: RENK.arka,
         }}
       >
-        {isOpen ? "🟢 Gün Aktif" : "🔴 Gün Kapalı"}
+        {/* Gün Durumu */}
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 12,
+            background: "rgba(0,0,0,0.25)",
+            textAlign: "center",
+            fontWeight: 700,
+          }}
+        >
+          {isOpen ? "🟢 Gün Aktif" : "🔴 Gün Kapalı"}
 
-        {!isOpen && (
-          <button
-            onClick={onGunBasiClick}
-            style={{
-              marginTop: 8,
-              width: "100%",
-              padding: "10px",
-              borderRadius: 8,
-              border: "none",
-              background: "linear-gradient(135deg, #2ecc71, #27ae60)",
-              color: "#fff",
-              fontWeight: 800,
-              cursor: "pointer",
-              fontSize: 14,
-            }}
-          >
-            📅 GÜN BAŞI
-          </button>
-        )}
+          {!isOpen && (
+            <button
+              onClick={onGunBasiClick}
+              style={{
+                marginTop: 8,
+                width: "100%",
+                padding: "10px",
+                borderRadius: 8,
+                border: "none",
+                background: "linear-gradient(135deg, #2ecc71, #27ae60)",
+                color: "#fff",
+                fontWeight: 800,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              📅 GÜN BAŞI
+            </button>
+          )}
 
-        {isOpen && (
-          <button
-            onClick={onGunSonuClick}
-            style={{
-              marginTop: 8,
-              width: "100%",
-              padding: "10px",
-              borderRadius: 8,
-              border: "none",
-              background: "linear-gradient(135deg, #e74c3c, #c0392b)",
-              color: "#fff",
-              fontWeight: 800,
-              cursor: "pointer",
-              fontSize: 14,
-            }}
-          >
-            🔚 GÜN SONU
-          </button>
-        )}
+          {isOpen && (
+            <button
+              onClick={onGunSonuClick}
+              style={{
+                marginTop: 8,
+                width: "100%",
+                padding: "10px",
+                borderRadius: 8,
+                border: "none",
+                background: "linear-gradient(135deg, #e74c3c, #c0392b)",
+                color: "#fff",
+                fontWeight: 800,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              🔚 GÜN SONU
+            </button>
+          )}
+        </div>
+
+        {/* Logo */}
+        <div style={{ marginBottom: 20 }}>
+          <img
+            src={BilardoLogo}
+            alt="MyCafe"
+            style={{ width: "100%", borderRadius: 12 }}
+          />
+        </div>
       </div>
 
-      {/* Logo */}
-      <div style={{ marginBottom: 20 }}>
-        <img
-          src={BilardoLogo}
-          alt="MyCafe"
-          style={{ width: "100%", borderRadius: 12 }}
-        />
-      </div>
-
-      {/* Menü */}
-      <div style={{ flex: 1 }}>
+      {/* Kaydırılabilir Menü Bölümü */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "0 16px 20px 16px",
+        }}
+      >
         {menuItems.map((item) => {
           const active = isActive(item.path);
           const disabled =
@@ -226,37 +239,47 @@ export default function Sidebar() {
         })}
       </div>
 
-      {/* Kullanıcı Bilgisi */}
+      {/* Sabit Alt Bölüm - Kaydırılmaz */}
       <div
         style={{
-          marginTop: 20,
-          padding: 10,
-          background: "rgba(0,0,0,0.2)",
-          borderRadius: 8,
-          fontSize: 12,
-          textAlign: "center",
-          opacity: 0.8,
+          padding: "0 16px 20px 16px",
+          background: RENK.arka,
+          marginTop: "auto",
         }}
       >
-        👤 {user?.ad || user?.username || "Kullanıcı"}
-      </div>
+        {/* Kullanıcı Bilgisi */}
+        <div
+          style={{
+            marginTop: 20,
+            padding: 10,
+            background: "rgba(0,0,0,0.2)",
+            borderRadius: 8,
+            fontSize: 12,
+            textAlign: "center",
+            opacity: 0.8,
+          }}
+        >
+          👤 {user?.ad || user?.username || "Kullanıcı"}
+        </div>
 
-      {/* Çıkış */}
-      <button
-        onClick={handleLogout}
-        style={{
-          marginTop: 12,
-          padding: 14,
-          borderRadius: 14,
-          border: "none",
-          background: "linear-gradient(135deg,#e74c3c,#c0392b)",
-          color: "#fff",
-          fontWeight: 800,
-          cursor: "pointer",
-        }}
-      >
-        ⏻ Çıkış
-      </button>
+        {/* Çıkış */}
+        <button
+          onClick={handleLogout}
+          style={{
+            marginTop: 12,
+            padding: 14,
+            borderRadius: 14,
+            border: "none",
+            background: "linear-gradient(135deg,#e74c3c,#c0392b)",
+            color: "#fff",
+            fontWeight: 800,
+            cursor: "pointer",
+            width: "100%",
+          }}
+        >
+          ⏻ Çıkış
+        </button>
+      </div>
     </div>
   );
 }

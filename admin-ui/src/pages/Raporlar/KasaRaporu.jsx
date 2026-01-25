@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 /*
-  KASA RAPORU - MERKEZİ FİNANS HAVUZU İLE
-  -----------------------------------------
-  - mc_finans_havuzu'dan TEK KAYNAKTAN beslenir
-  - Tüm raporlar TUTARLI sonuç verir
-  - Ödeme türleri NET ayrılır
-  - Masa numaraları DOĞRU gösterilir
-  - TAM SAYFA GÖRÜNÜM
+  KASA RAPORU - FİNAL MİMARİ (TAM SAYFA)
+  ---------------------------------------
+  - TEK kaynak: mc_finans_havuzu (localStorage)
+  - SADECE okuma - HİÇBİR yazma/değiştirme YOK
+  - Hesaba Yaz: Bilgi amaçlı (kasaya girmez)
+  - İndirimler ayrı panelde gösterilir
+  - Açıklama sütunu kaldırıldı
 */
 
 const KasaRaporu = () => {
@@ -16,564 +15,325 @@ const KasaRaporu = () => {
   const [bitis, setBitis] = useState("");
   const [finansVerileri, setFinansVerileri] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
-  const [masalar, setMasalar] = useState([]);
-  const [giderler, setGiderler] = useState([]);
-  const [musteriTahsilatlari, setMusteriTahsilatlari] = useState([]);
-  const [debugMode, setDebugMode] = useState(false);
+  const [adisyonlar, setAdisyonlar] = useState([]);
 
-  /* ------------------ TÜM VERİLERİ OKU ------------------ */
+  /* ------------------ TEK KAYNAK: mc_finans_havuzu OKU ------------------ */
   useEffect(() => {
-    console.log("🔄 KasaRaporu: Veriler yükleniyor...");
+    console.log("💰 KasaRaporu: TEK KAYNAK okunuyor...");
     
-    // 1. Finans havuzunu kontrol et, boşsa otomatik doldur
-    const havuz = mcFinansHavuzu.getFinansHavuzu();
-    if (havuz.length === 0) {
-      console.log("💰 Finans havuzu boş, otomatik dolduruluyor...");
-      const aktarilan = mcFinansHavuzu.tumAdisyonlariFinansHavuzunaAktar();
-      console.log(`✅ ${aktarilan} kayıt finans havuzuna aktarıldı`);
-    }
+    // TEK KAYNAK - SADECE mc_finans_havuzu
+    const havuzData = localStorage.getItem("mc_finans_havuzu");
+    const finansVerileri = havuzData ? JSON.parse(havuzData) : [];
     
-    // 2. Güncel finans verilerini al
-    const guncelFinansVerileri = mcFinansHavuzu.getFinansHavuzu();
-    console.log(`📊 Finans havuzunda ${guncelFinansVerileri.length} kayıt var`);
+    // Masa numarası bulmak için adisyonlar (SADECE OKUMA)
+    const adisyonlarData = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
     
-    // 3. Masaları oku (masa adı için)
-    const masalarData = JSON.parse(localStorage.getItem("mc_masalar") || "[]");
-    
-    // 4. Giderleri oku (gider listesi için)
-    const giderlerData = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-    
-    // 5. Müşteri tahsilatlarını oku (yeni eklenen)
-    const tahsilatlarData = JSON.parse(localStorage.getItem("mc_musteri_tahsilatlar") || "[]");
-    
-    setFinansVerileri(guncelFinansVerileri);
-    setMasalar(masalarData);
-    setGiderler(giderlerData);
-    setMusteriTahsilatlari(tahsilatlarData);
+    setFinansVerileri(finansVerileri);
+    setAdisyonlar(adisyonlarData);
     setYukleniyor(false);
     
-    // Debug için istatistikleri göster
-    const istatistikler = mcFinansHavuzu.getFinansHavuzuIstatistikleri();
-    console.log("📈 Finans havuzu istatistikleri:", istatistikler);
+    console.log(`📊 Finans havuzu: ${finansVerileri.length} kayıt`);
+    console.log(`📋 Adisyonlar: ${adisyonlarData.length} kayıt (sadece masa bulma için)`);
     
   }, []);
 
-  /* ------------------ MASA NUMARASINI BUL ------------------ */
-  const getMasaNumarasi = (masaId, kaynak = "", aciklama = "") => {
-    console.log("🔍 getMasaNumarasi çağrıldı:", { masaId, kaynak, aciklama });
+  /* ------------------ PURE FİLTRELEME FONKSİYONLARI ------------------ */
+  const tariheGoreFiltrele = (veriler, baslangicTarih, bitisTarih) => {
+    if (!baslangicTarih && !bitisTarih) {
+      return veriler;
+    }
     
-    if (!masaId || masaId === "null" || masaId === "undefined") {
-      // Aciklama'dan masa numarası çıkarmaya çalış
-      if (aciklama) {
-        // Müşteri tahsilatı ise
-        if (aciklama.includes("Müşteri Tahsilat")) {
-          return "Müşteri Tahsilat";
-        }
-        
-        // Adisyon açıklamasından masa numarası çıkar
-        const masaMatch = aciklama.match(/MASA\s+(\d+)/i) || 
-                         aciklama.match(/Masa\s+(\d+)/i) ||
-                         aciklama.match(/#(\d+)/i);
-        
-        if (masaMatch) {
-          return `Masa ${masaMatch[1]}`;
-        }
-        
-        // Bilardo için
-        if (aciklama.includes("Bilardo") || kaynak === "BİLARDO") {
-          const bilardoMatch = aciklama.match(/Bilardo.*?(\d+)/i);
-          return bilardoMatch ? `Bilardo ${bilardoMatch[1]}` : "Bilardo";
-        }
-      }
+    return veriler.filter(kayit => {
+      const kayitTarihStr = kayit.tarih ? new Date(kayit.tarih).toISOString().split('T')[0] : "";
       
-      return "Masa Yok";
-    }
-    
-    // ID uzun bir timestamp ise (örnek: 1769026071728), bu bir masa ID'si değil
-    if (masaId.toString().length >= 10 && !isNaN(Number(masaId))) {
-      console.log("⚠️ Uzun sayısal ID, açıklamadan masa numarası çıkarılacak:", masaId);
-      if (aciklama) {
-        const masaMatch = aciklama.match(/MASA\s+(\d+)/i) || 
-                         aciklama.match(/Masa\s+(\d+)/i) ||
-                         aciklama.match(/#(\d+)/i);
-        
-        if (masaMatch) {
-          return `Masa ${masaMatch[1]}`;
-        }
-      }
-      return "Masa Yok";
-    }
-    
-    // Bilardo adisyonları için
-    if (kaynak === "BİLARDO" || aciklama?.includes("Bilardo")) {
-      if (masaId.includes("bilardo") || masaId.includes("BİLARDO") || !isNaN(Number(masaId))) {
-        return `Bilardo ${masaId}`;
-      }
-      return masaId;
-    }
-    
-    // Normal masalar için localStorage'daki masalar listesini kontrol et
-    if (masalar && masalar.length > 0) {
-      const masa = masalar.find(m => {
-        // Farklı eşleşme olasılıkları
-        return (
-          m.id === masaId ||
-          m.masaId === masaId ||
-          String(m.numara) === String(masaId) ||
-          (m.numara && String(m.numara) === masaId) ||
-          (m.masaNo && String(m.masaNo) === masaId)
-        );
-      });
+      if (baslangicTarih && kayitTarihStr < baslangicTarih) return false;
+      if (bitisTarih && kayitTarihStr > bitisTarih) return false;
       
-      if (masa) {
-        return `Masa ${masa.numara || masa.masaNo || masaId}`;
-      }
-    }
-    
-    // Eşleşme bulunamadıysa açıklamadan çıkarmaya çalış
-    if (aciklama) {
-      const masaMatch = aciklama.match(/MASA\s+(\d+)/i) || 
-                       aciklama.match(/Masa\s+(\d+)/i) ||
-                       aciklama.match(/#(\d+)/i) ||
-                       aciklama.match(/\(MASA\s+(\d+)\)/i);
-      
-      if (masaMatch) {
-        return `Masa ${masaMatch[1]}`;
-      }
-      
-      // Eğer "MASA 4" gibi bir ifade varsa
-      const masaPattern = /MASA\s*\d+/i;
-      if (masaPattern.test(aciklama)) {
-        const match = aciklama.match(/(MASA\s*\d+)/i);
-        return match[0];
-      }
-    }
-    
-    // Son çare: masaId'yi döndür
-    return `Masa ${masaId}`;
-  };
-
-  /* ------------------ ADİSYON AÇIKLAMASINI DÜZENLE ------------------ */
-  const formatAciklama = (aciklama, kaynak, masaId) => {
-    if (!aciklama) return "Açıklama Yok";
-    
-    // Müşteri tahsilatı ise
-    if (kaynak === "TAHSILAT" || aciklama.includes("Müşteri Tahsilat")) {
-      return aciklama;
-    }
-    
-    // ID'leri temizle (ad_1769026104164_fjc1f2hdc gibi)
-    let cleaned = aciklama
-      .replace(/ad_\d+_\w+/gi, '')  // ad_1769026104164_fjc1f2hdc türünde ID'leri kaldır
-      .replace(/\(MASA\s+\d+\)/gi, '')  // (MASA 4) parantez içindekileri kaldır
-      .replace(/Adisyon\s*#/gi, '')   // Adisyon # önekini kaldır
-      .trim();
-    
-    // Eğer temizlendikten sonra boşsa
-    if (!cleaned || cleaned.length < 3) {
-      if (kaynak === "BİLARDO") {
-        return "Bilardo Adisyonu";
-      } else {
-        return "Masa Adisyonu";
-      }
-    }
-    
-    // İlk harfi büyük yap
-    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-    
-    return cleaned;
-  };
-
-  /* ------------------ ÖDEME TÜRÜ NORMALİZASYONU ------------------ */
-  const normalizeOdemeTuru = (tip) => {
-    if (!tip) return "NAKIT";
-    
-    const tipUpper = tip.toUpperCase();
-    
-    // Nakit türleri
-    if (tipUpper.includes("NAKİT") || tipUpper.includes("NAKIT") || tipUpper.includes("CASH")) {
-      return "NAKIT";
-    }
-    
-    // Kart türleri
-    if (tipUpper.includes("KART") || tipUpper.includes("KREDİ") || tipUpper.includes("KREDI") || 
-        tipUpper.includes("CREDIT") || tipUpper.includes("DEBIT")) {
-      return "KART";
-    }
-    
-    // Havale türleri
-    if (tipUpper.includes("HAVALE") || tipUpper.includes("EFT") || tipUpper.includes("TRANSFER")) {
-      return "HAVALE";
-    }
-    
-    // Hesaba Yaz türleri
-    if (tipUpper.includes("HESABA") || tipUpper.includes("BORÇ") || tipUpper.includes("BORC") || 
-        tipUpper.includes("CARİ") || tipUpper.includes("CARI")) {
-      return "HESABA_YAZ";
-    }
-    
-    // Bilardo türleri
-    if (tipUpper.includes("BİLARDO") || tipUpper.includes("BILARDO") || tipUpper.includes("POOL")) {
-      return "BILARDO";
-    }
-    
-    return tipUpper;
-  };
-
-  /* ------------------ ÖDEME TÜRÜ BİLGİSİ ------------------ */
-  const getOdemeTuruBilgisi = (tip) => {
-    const normalizedTip = normalizeOdemeTuru(tip);
-    
-    const odemeTurleri = {
-      NAKIT: { etiket: "Nakit", renk: "#2ecc71", icon: "💵" },
-      KART: { etiket: "K.Kartı", renk: "#3498db", icon: "💳" },
-      HAVALE: { etiket: "Havale", renk: "#9b59b6", icon: "🏦" },
-      HESABA_YAZ: { etiket: "Hesaba Yaz", renk: "#e67e22", icon: "📝" },
-      BILARDO: { etiket: "Bilardo", renk: "#1abc9c", icon: "🎱" },
-    };
-    
-    return odemeTurleri[normalizedTip] || { etiket: normalizedTip, renk: "#95a5a6", icon: "💰" };
+      return true;
+    });
   };
 
   /* ------------------ FİLTRELENMİŞ VERİLER ------------------ */
   const filtrelenmisVeriler = useMemo(() => {
-    if (!baslangic && !bitis) {
-      return finansVerileri;
-    }
-    
-    return mcFinansHavuzu.tariheGoreFiltrele(baslangic, bitis);
+    return tariheGoreFiltrele(finansVerileri, baslangic, bitis);
   }, [finansVerileri, baslangic, bitis]);
 
-  /* ------------------ ÖDEME TÜRLERİ TOPLAMLARI ------------------ */
-  const odemeTuruGruplari = useMemo(() => {
-    console.log("=== 🔍 ODEME_TURU_GRUPLARI HESAPLANIYOR ===");
-    
-    const kayitlar = baslangic || bitis 
-      ? mcFinansHavuzu.tariheGoreFiltrele(baslangic, bitis)
-      : finansVerileri;
-    
-    console.log(`📊 Toplam kayıt: ${kayitlar.length}`);
-    console.log(`📊 finansVerileri uzunluğu: ${finansVerileri.length}`);
-    console.log(`📊 Filtre: başlangıç=${baslangic}, bitis=${bitis}`);
-    
-    const gruplar = {
-      NAKIT: { toplam: 0, sayi: 0, hareketler: [] },
-      KART: { toplam: 0, sayi: 0, hareketler: [] },
-      HAVALE: { toplam: 0, sayi: 0, hareketler: [] },
-      HESABA_YAZ: { toplam: 0, sayi: 0, hareketler: [] },
-      BILARDO: { toplam: 0, sayi: 0, hareketler: [] }
-    };
-    
-    // DEBUG: Tüm kayıtları göster
-    console.log("=== 📋 TÜM KAYITLAR ===");
-    kayitlar.forEach((kayit, i) => {
-      console.log(`${i+1}. ID: ${kayit.id}`);
-      console.log(`   Açıklama: ${kayit.aciklama}`);
-      console.log(`   Tür: ${kayit.tur}`);
-      console.log(`   Ödeme Türü (orijinal): ${kayit.odemeTuru}`);
-      console.log(`   Ödeme Türü (normalize): ${normalizeOdemeTuru(kayit.odemeTuru)}`);
-      console.log(`   Tutar: ${kayit.tutar}`);
-      console.log(`   Kaynak: ${kayit.kaynak}`);
-      console.log(`   Gün ID: ${kayit.gunId}`);
-      console.log("---");
-    });
-    
-    // Hesaplama
-    kayitlar.forEach(kayit => {
-      const odemeTuru = normalizeOdemeTuru(kayit.odemeTuru);
-      
-      if (gruplar[odemeTuru]) {
-        if (kayit.tur === "GELIR") {
-          gruplar[odemeTuru].toplam += Number(kayit.tutar || 0);
-          gruplar[odemeTuru].sayi += 1;
-          gruplar[odemeTuru].hareketler.push(kayit);
-          console.log(`💰 GELIR eklendi: ${odemeTuru} +${kayit.tutar}`);
-        } else if (kayit.tur === "HESABA_YAZ_BORC") {
-          gruplar.HESABA_YAZ.toplam += Number(kayit.tutar || 0);
-          gruplar.HESABA_YAZ.sayi += 1;
-          gruplar.HESABA_YAZ.hareketler.push(kayit);
-          console.log(`📝 HESABA_YAZ eklendi: +${kayit.tutar}`);
-        } else if (kayit.tur === "GIDER") {
-          console.log(`💸 GIDER atlandı: ${kayit.aciklama}`);
-        }
-      } else {
-        console.log(`⚠️ Geçersiz ödeme türü: ${odemeTuru} (kayıt: ${kayit.aciklama})`);
-      }
-    });
-    
-    // Sonuçları göster
-    console.log("=== 📈 SONUÇ GRUPLARI ===");
-    Object.entries(gruplar).forEach(([tur, grup]) => {
-      if (grup.toplam > 0 || grup.sayi > 0) {
-        console.log(`${tur}: ${grup.toplam} TL (${grup.sayi} adet)`);
-      }
-    });
-    
-    console.log("=== 🏁 HESAPLAMA TAMAMLANDI ===");
-    return gruplar;
-  }, [baslangic, bitis, finansVerileri]);
-
-  /* ------------------ TOPLAMLAR ------------------ */
+  /* ------------------ TEMEL HESAPLAMALAR ------------------ */
   const toplamGelir = useMemo(() => {
-    return mcFinansHavuzu.toplamGelirHesapla(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.odemeTuru !== "HESABA_YAZ")
+      .reduce((toplam, kayit) => toplam + (Number(kayit.tutar) || 0), 0);
+  }, [filtrelenmisVeriler]);
 
   const toplamGider = useMemo(() => {
-    return mcFinansHavuzu.toplamGiderHesapla(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GIDER")
+      .reduce((toplam, kayit) => toplam + (Number(kayit.tutar) || 0), 0);
+  }, [filtrelenmisVeriler]);
 
+  const toplamIndirim = useMemo(() => {
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "INDIRIM")
+      .reduce((toplam, kayit) => toplam + (Number(kayit.tutar) || 0), 0);
+  }, [filtrelenmisVeriler]);
+
+  /* ------------------ HESABA YAZ TOPLAMI (BİLGİ AMAÇLI - KASAYA GİRMEZ) ------------------ */
   const toplamHesabaYaz = useMemo(() => {
-    return mcFinansHavuzu.toplamHesabaYazHesapla(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.odemeTuru === "HESABA_YAZ")
+      .reduce((toplam, k) => toplam + (Number(k.tutar) || 0), 0);
+  }, [filtrelenmisVeriler]);
 
   const netKasa = toplamGelir - toplamGider;
+  const brutCiro = toplamGelir + toplamIndirim;
 
-  /* ------------------ FİLTRELENMİŞ GİDERLER ------------------ */
-  const filtrelenmisGiderler = useMemo(() => {
-    return giderler.filter(gider => {
-      const tarihStr = gider.tarih ? new Date(gider.tarih).toISOString().split('T')[0] : "";
+  /* ------------------ GÜNLÜK KASA TOPLAMLARI (ANA PANEL) ------------------ */
+  const gunlukKasaToplamlari = useMemo(() => {
+    const kayitlar = filtrelenmisVeriler;
+    
+    const gunlukGruplar = {};
+    
+    kayitlar.forEach(kayit => {
+      const gunId = kayit.gunId || (kayit.tarih ? new Date(kayit.tarih).toISOString().split('T')[0] : "");
+      if (!gunId) return;
       
-      if (baslangic && tarihStr < baslangic) return false;
-      if (bitis && tarihStr > bitis) return false;
-      
-      return true;
-    });
-  }, [giderler, baslangic, bitis]);
-
-  /* ------------------ ADİSYON HAREKETLERİ (Masa Numaraları) ------------------ */
-  const adisyonHareketleri = useMemo(() => {
-    return filtrelenmisVeriler
-      .filter(k => (k.kaynak === "ADISYON" || k.kaynak === "BİLARDO") && k.tur === "GELIR")
-      .map(hareket => ({
-        ...hareket,
-        formattedAciklama: formatAciklama(hareket.aciklama, hareket.kaynak, hareket.masaId),
-        masaNumarasi: getMasaNumarasi(hareket.masaId, hareket.kaynak, hareket.aciklama)
-      }))
-      .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
-  }, [filtrelenmisVeriler]);
-
-  /* ------------------ TÜM GELİR HAREKETLERİ (Adisyon + Müşteri Tahsilat) ------------------ */
-  const tumGelirHareketleri = useMemo(() => {
-    // 1. Finans havuzundaki GELİR hareketleri
-    const finansGelirleri = filtrelenmisVeriler
-      .filter(k => k.tur === "GELIR")
-      .map(hareket => ({
-        ...hareket,
-        formattedAciklama: formatAciklama(hareket.aciklama, hareket.kaynak, hareket.masaId),
-        masaNumarasi: getMasaNumarasi(hareket.masaId, hareket.kaynak, hareket.aciklama)
-      }));
-    
-    // 2. Müşteri tahsilatlarından GELİR hareketleri oluştur
-    const tahsilatGelirleri = musteriTahsilatlari
-      .filter(t => {
-        const tarihStr = t.tarih ? new Date(t.tarih).toISOString().split('T')[0] : "";
-        
-        if (baslangic && tarihStr < baslangic) return false;
-        if (bitis && tarihStr > bitis) return false;
-        
-        return true;
-      })
-      .map(t => ({
-        id: `tahsilat_${t.id || Date.now()}`,
-        tarih: t.tarih || new Date().toISOString(),
-        tur: "GELIR",
-        aciklama: `Müşteri Tahsilat - ${t.musteriAdi || 'Müşteri'}`,
-        formattedAciklama: `Müşteri Tahsilat - ${t.musteriAdi || 'Müşteri'}`,
-        tutar: Number(t.tutar || 0),
-        odemeTuru: normalizeOdemeTuru(t.odemeTuru || "NAKIT"),
-        gunId: t.tarih ? new Date(t.tarih).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        kaynak: "TAHSILAT",
-        referansId: t.id,
-        musteriId: t.musteriId,
-        masaId: null,
-        masaNumarasi: "Müşteri Tahsilat"
-      }));
-    
-    return [...finansGelirleri, ...tahsilatGelirleri]
-      .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
-  }, [filtrelenmisVeriler, musteriTahsilatlari, baslangic, bitis]);
-
-  /* ------------------ HESABA YAZ HAREKETLERİ ------------------ */
-  const hesabaYazHareketleri = useMemo(() => {
-    return filtrelenmisVeriler.filter(k => k.tur === "HESABA_YAZ_BORC");
-  }, [filtrelenmisVeriler]);
-
-  /* ------------------ MANUEL VERİ AKTARMA ------------------ */
-  const handleVeriAktar = () => {
-    if (window.confirm("Tüm eski adisyon ve giderler finans havuzuna aktarılacak. Bu işlem mevcut finans verilerini SİLMEZ, sadece ekler. Devam edilsin mi?")) {
-      const aktarilan = mcFinansHavuzu.tumAdisyonlariFinansHavuzunaAktar();
-      alert(`✅ ${aktarilan} kayıt finans havuzuna aktarıldı. Sayfa yenileniyor...`);
-      window.location.reload();
-    }
-  };
-
-  /* ------------------ FİNANS HAVUZUNU TEMİZLE ------------------ */
-  const handleHavuzuTemizle = () => {
-    if (window.confirm("DİKKAT: Tüm finans verileri silinecek. Bu işlem GERİ ALINAMAZ. Emin misiniz?")) {
-      const temizlendi = mcFinansHavuzu.finansHavuzunuTemizle();
-      if (temizlendi) {
-        alert("🗑️ Finans havuzu temizlendi. Sayfa yenileniyor...");
-        window.location.reload();
-      }
-    }
-  };
-
-  /* ------------------ DEBUG BİLGİSİ ------------------ */
-  const handleDebug = () => {
-    mcFinansHavuzu.debugFinansHavuzu();
-    const istatistikler = mcFinansHavuzu.getFinansHavuzuIstatistikleri();
-    
-    alert(`
-🔍 FİNANS HAVUZU DEBUG BİLGİSİ:
-
-Toplam Kayıt: ${istatistikler.toplamKayit}
-Gelir Kayıt: ${istatistikler.gelirKayit}
-Gider Kayıt: ${istatistikler.giderKayit}
-Hesaba Yaz: ${istatistikler.hesabaYazKayit}
-
-Toplam Gelir: ${istatistikler.toplamGelir.toLocaleString("tr-TR")} ₺
-Toplam Gider: ${istatistikler.toplamGider.toLocaleString("tr-TR")} ₺
-Toplam Hesaba Yaz: ${istatistikler.toplamHesabaYaz.toLocaleString("tr-TR")} ₺
-Net Kasa: ${istatistikler.netKasa.toLocaleString("tr-TR")} ₺
-
-Kaynaklar:
-- Adisyon: ${istatistikler.kaynaklar.ADISYON}
-- Bilardo: ${istatistikler.kaynaklar.BİLARDO}
-- Gider: ${istatistikler.kaynaklar.GİDER}
-- Manuel: ${istatistikler.kaynaklar.MANUEL}
-
-Detaylar için konsolu kontrol edin.
-    `);
-  };
-
-  /* ------------------ DEBUG FONKSİYONLARI ------------------ */
-  const handleTestKaydiEkle = () => {
-    try {
-      // Fonksiyon kontrolü
-      if (typeof mcFinansHavuzu.testKaydiEkle === 'function') {
-        const test = mcFinansHavuzu.testKaydiEkle();
-        alert(`Test kaydı eklendi: ${test ? "✅ BAŞARILI" : "❌ BAŞARISIZ"}`);
-      } else {
-        // Manuel test kaydı ekle
-        const testKayit = {
-          tarih: new Date().toISOString(),
-          tur: "GELIR",
-          aciklama: "DEBUG - Test Gelir Kaydı",
-          tutar: 100,
-          odemeTuru: "NAKIT",
-          kaynak: "DEBUG"
+      if (!gunlukGruplar[gunId]) {
+        gunlukGruplar[gunId] = {
+          tarih: gunId,
+          gunAdi: new Date(gunId).toLocaleDateString("tr-TR", { weekday: 'long' }),
+          toplamGelir: 0,
+          toplamGider: 0,
+          toplamIndirim: 0,
+          toplamHesabaYaz: 0,
+          adisyonSayisi: 0,
+          tahsilatSayisi: 0,
+          hesabaYazSayisi: 0,
+          hareketler: []
         };
-        
-        const sonuc = mcFinansHavuzu.finansKaydiEkle(testKayit);
-        alert(`Manuel test kaydı eklendi: ${sonuc ? "✅ BAŞARILI" : "❌ BAŞARISIZ"}`);
       }
-    } catch (error) {
-      alert(`❌ Test kaydı eklenirken hata: ${error.message}`);
-      console.error("Test kaydı hatası:", error);
-    }
-  };
-
-  const handleHavuzuKontrolEt = () => {
-    try {
-      if (typeof mcFinansHavuzu.finansHavuzuKontrol === 'function') {
-        const kontrol = mcFinansHavuzu.finansHavuzuKontrol();
-        alert(`Finans havuzu ${kontrol ? "✅ DOLU" : "⚠️ BOŞ"}`);
-      } else {
-        const havuz = mcFinansHavuzu.getFinansHavuzu();
-        alert(`Finans havuzu ${havuz.length > 0 ? "✅ DOLU (" + havuz.length + " kayıt)" : "⚠️ BOŞ"}`);
-      }
-    } catch (error) {
-      alert(`❌ Havuz kontrol hatası: ${error.message}`);
-    }
-  };
-
-  const handleVeriKaynaklariniKontrolEt = () => {
-    try {
-      if (typeof mcFinansHavuzu.veriKaynaklariniKontrol === 'function') {
-        const kaynaklar = mcFinansHavuzu.veriKaynaklariniKontrol();
-        console.log("Veri kaynakları:", kaynaklar);
-        
-        let mesaj = "📊 VERİ KAYNAKLARI:\n\n";
-        mesaj += `Normal Adisyonlar: ${kaynaklar.adisyonlar.length}\n`;
-        mesaj += `Bilardo Adisyonlar: ${kaynaklar.bilardoAdisyonlar.length}\n`;
-        mesaj += `Giderler: ${kaynaklar.giderler.length}\n`;
-        mesaj += `Müşteri Tahsilatları: ${kaynaklar.musteriTahsilatlari.length}\n\n`;
-        mesaj += "Detaylar için konsolu kontrol edin.";
-        
-        alert(mesaj);
-      } else {
-        // Manuel kontrol
-        const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-        const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-        const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-        const musteriTahsilatlari = JSON.parse(localStorage.getItem("mc_musteri_tahsilatlar") || "[]");
-        
-        console.log("Veri kaynakları (manuel):", {
-          adisyonlar,
-          bilardoAdisyonlar,
-          giderler,
-          musteriTahsilatlari
-        });
-        
-        let mesaj = "📊 VERİ KAYNAKLARI (manuel):\n\n";
-        mesaj += `Normal Adisyonlar: ${adisyonlar.length}\n`;
-        mesaj += `Bilardo Adisyonlar: ${bilardoAdisyonlar.length}\n`;
-        mesaj += `Giderler: ${giderler.length}\n`;
-        mesaj += `Müşteri Tahsilatları: ${musteriTahsilatlari.length}\n\n`;
-        mesaj += "Detaylar için konsolu kontrol edin.";
-        
-        alert(mesaj);
-      }
-    } catch (error) {
-      alert(`❌ Veri kaynakları kontrol hatası: ${error.message}`);
-      console.error("Veri kaynakları hatası:", error);
-    }
-  };
-
-  const handleTumVerileriAktar = () => {
-    try {
-      if (typeof mcFinansHavuzu.tumAdisyonlariFinansHavuzunaAktar === 'function') {
-        const aktarilan = mcFinansHavuzu.tumAdisyonlariFinansHavuzunaAktar();
-        alert(`${aktarilan} kayıt aktarıldı. Sayfa yenileniyor...`);
-        window.location.reload();
-      } else {
-        alert("❌ Veri aktarma fonksiyonu bulunamadı!");
-      }
-    } catch (error) {
-      alert(`❌ Veri aktarma hatası: ${error.message}`);
-      console.error("Veri aktarma hatası:", error);
-    }
-  };
-
-  const handleOdemeTuruDebug = () => {
-    try {
-      if (typeof mcFinansHavuzu.odemeTuruDebug === 'function') {
-        const sonuc = mcFinansHavuzu.odemeTuruDebug();
-        alert(`🔍 Ödeme türü debug tamamlandı. Console'u kontrol edin.\n\nNormal Adisyonlar: ${sonuc.normalAdisyonlar.length}\nBilardo Adisyonlar: ${sonuc.bilardoAdisyonlar.length}`);
-      } else {
-        alert("❌ Ödeme türü debug fonksiyonu bulunamadı!");
-      }
-    } catch (error) {
-      alert(`❌ Ödeme türü debug hatası: ${error.message}`);
-    }
-  };
-
-  const handleOdemeTurleriniDuzenle = () => {
-    if (window.confirm("Mevcut finans kayıtlarındaki ödeme türleri adisyon verilerine göre düzeltilecek. Devam edilsin mi?")) {
-      try {
-        if (typeof mcFinansHavuzu.mevcutOdemeTurleriniDuzenle === 'function') {
-          const guncellenen = mcFinansHavuzu.mevcutOdemeTurleriniDuzenle();
-          alert(`✅ ${guncellenen} kayıt güncellendi. Sayfa yenileniyor...`);
-          window.location.reload();
+      
+      gunlukGruplar[gunId].hareketler.push(kayit);
+      
+      if (kayit.tur === "GELIR") {
+        if (kayit.odemeTuru === "HESABA_YAZ") {
+          // Hesaba yaz - sadece bilgi amaçlı toplam
+          gunlukGruplar[gunId].toplamHesabaYaz += Number(kayit.tutar || 0);
+          gunlukGruplar[gunId].hesabaYazSayisi += 1;
         } else {
-          alert("❌ Düzenleme fonksiyonu bulunamadı!");
+          // Normal gelir (ciroya girer)
+          gunlukGruplar[gunId].toplamGelir += Number(kayit.tutar || 0);
+          if (kayit.kaynak === "ADISYON" || kayit.kaynak === "BİLARDO") {
+            gunlukGruplar[gunId].adisyonSayisi += 1;
+          } else if (kayit.kaynak === "TAHSILAT") {
+            gunlukGruplar[gunId].tahsilatSayisi += 1;
+          }
         }
-      } catch (error) {
-        alert(`❌ Düzenleme hatası: ${error.message}`);
+      } else if (kayit.tur === "GIDER") {
+        gunlukGruplar[gunId].toplamGider += Number(kayit.tutar || 0);
+      } else if (kayit.tur === "INDIRIM") {
+        gunlukGruplar[gunId].toplamIndirim += Number(kayit.tutar || 0);
       }
+    });
+    
+    return Object.values(gunlukGruplar).sort((a, b) => 
+      new Date(b.tarih) - new Date(a.tarih)
+    );
+  }, [filtrelenmisVeriler]);
+
+  /* ------------------ ÖDEME TÜRLERİ DAĞILIMI (HESABA_YAZ HARİÇ) ------------------ */
+  const odemeTuruDagilimi = useMemo(() => {
+    const dagilim = {};
+    
+    filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.odemeTuru && k.odemeTuru !== "HESABA_YAZ")
+      .forEach(kayit => {
+        const tur = kayit.odemeTuru.toUpperCase();
+        if (!dagilim[tur]) {
+          dagilim[tur] = { toplam: 0, sayi: 0 };
+        }
+        dagilim[tur].toplam += Number(kayit.tutar || 0);
+        dagilim[tur].sayi += 1;
+      });
+    
+    return dagilim;
+  }, [filtrelenmisVeriler]);
+
+  /* ------------------ ÖDEME TÜRÜ BİLGİSİ ------------------ */
+  const getOdemeTuruBilgisi = (tip) => {
+    if (!tip) return { etiket: "Nakit", renk: "#2ecc71", icon: "💵" };
+    
+    const tipUpper = tip.toUpperCase();
+    
+    if (tipUpper.includes("NAKİT") || tipUpper.includes("NAKIT")) {
+      return { etiket: "Nakit", renk: "#2ecc71", icon: "💵" };
     }
+    
+    if (tipUpper.includes("KART")) {
+      return { etiket: "Kart", renk: "#3498db", icon: "💳" };
+    }
+    
+    if (tipUpper.includes("HAVALE")) {
+      return { etiket: "Havale", renk: "#9b59b6", icon: "🏦" };
+    }
+    
+    if (tipUpper === "HESABA_YAZ") {
+      return { etiket: "Hesaba Yaz", renk: "#f39c12", icon: "📝" };
+    }
+    
+    return { etiket: tip, renk: "#95a5a6", icon: "💰" };
   };
 
+  /* ------------------ MASA NUMARASI BULMA (GÜNCELLENDİ) ------------------ */
+  const getMasaNumarasi = (hareket) => {
+    const { masaId, masaNo, aciklama, kaynak, odemeTuru, adisyonId, referansId } = hareket;
+    
+    // DEBUG: Hareket bilgilerini konsola yaz
+    console.log("🔍 Masa bulma için hareket:", {
+      id: hareket.id,
+      odemeTuru,
+      adisyonId,
+      referansId,
+      masaId,
+      masaNo,
+      aciklama
+    });
+    
+    // 1. Direkt masaId varsa
+    if (masaId && masaId !== "null" && masaId !== "undefined" && masaId !== "") {
+      console.log("✅ Direkt masaId bulundu:", masaId);
+      return `Masa ${masaId}`;
+    }
+    
+    // 2. masaNo varsa
+    if (masaNo && masaNo !== "null" && masaNo !== "undefined" && masaNo !== "") {
+      console.log("✅ masaNo bulundu:", masaNo);
+      return `Masa ${masaNo}`;
+    }
+    
+    // 3. HESABA_YAZ → adisyon üzerinden masa bul (ÖNEMLİ)
+    if (odemeTuru === "HESABA_YAZ") {
+      const targetAdisyonId = adisyonId || referansId;
+      if (targetAdisyonId) {
+        console.log("🔎 HESABA_YAZ için adisyon aranıyor:", targetAdisyonId);
+        const adisyon = adisyonlar.find(a => a.id === targetAdisyonId);
+        if (adisyon) {
+          console.log("✅ HESABA_YAZ adisyon bulundu:", adisyon);
+          if (adisyon.masaNo && adisyon.masaNo !== "null") {
+            return `Masa ${adisyon.masaNo}`;
+          }
+          if (adisyon.masaId && adisyon.masaId !== "null") {
+            return `Masa ${adisyon.masaId}`;
+          }
+          if (adisyon.masaNumarasi && adisyon.masaNumarasi !== "null") {
+            return `Masa ${adisyon.masaNumarasi}`;
+          }
+        } else {
+          console.warn("❌ HESABA_YAZ için adisyon bulunamadı:", targetAdisyonId);
+        }
+      } else {
+        console.warn("❌ HESABA_YAZ için adisyonId veya referansId yok");
+      }
+    }
+    
+    // 4. Kaynak Bilardo ise
+    if (kaynak === "BİLARDO") {
+      return `Bilardo ${masaId || ""}`;
+    }
+    
+    // 5. Açıklamadan regex ile arama
+    if (aciklama) {
+      console.log("🔎 Açıklamadan masa aranıyor:", aciklama);
+      const masaMatch = aciklama.match(/MASA\s+(\d+)/i) || 
+                       aciklama.match(/Masa\s+(\d+)/i) ||
+                       aciklama.match(/#(\d+)/i) ||
+                       aciklama.match(/masa(\d+)/i);
+      
+      if (masaMatch && masaMatch[1]) {
+        console.log("✅ Açıklamadan masa bulundu:", masaMatch[1]);
+        return `Masa ${masaMatch[1]}`;
+      }
+      
+      // Bilardo deseni
+      const bilardoMatch = aciklama.match(/Bilardo\s+(\d+)/i) ||
+                          aciklama.match(/BİLARDO\s+(\d+)/i);
+      if (bilardoMatch && bilardoMatch[1]) {
+        return `Bilardo ${bilardoMatch[1]}`;
+      }
+    }
+    
+    // 6. HESABA_YAZ ise özel etiket
+    if (odemeTuru === "HESABA_YAZ") {
+      console.log("ℹ️ HESABA_YAZ işlemi için varsayılan etiket");
+      return "Müşteri Borcu";
+    }
+    
+    // 7. Hiçbiri yoksa
+    console.warn("⚠️ Masa bulunamadı, varsayılan döndürülüyor");
+    return "Masa Yok";
+  };
+
+  /* ------------------ ADİSYON HAREKETLERİ (HESABA_YAZ DAHİL) ------------------ */
+  const adisyonlarIndirimli = useMemo(() => {
+    // TÜM GELİR kayıtları (ADİSYON, BİLARDO, HESABA_YAZ dahil)
+    const ilgiliKayitlar = filtrelenmisVeriler.filter(k =>
+      k.tur === "GELIR" && (
+        k.kaynak === "ADISYON" ||
+        k.kaynak === "BİLARDO" ||
+        k.odemeTuru === "HESABA_YAZ"
+      )
+    );
+    
+    // İndirim kayıtları (adisyonId ile eşleşen)
+    const indirimler = filtrelenmisVeriler
+      .filter(k => k.tur === "INDIRIM")
+      .reduce((acc, indirim) => {
+        const targetAdisyonId = indirim.adisyonId || indirim.referansId;
+        if (targetAdisyonId) {
+          acc[targetAdisyonId] = (acc[targetAdisyonId] || 0) + (Number(indirim.tutar) || 0);
+        }
+        return acc;
+      }, {});
+    
+    const sonuc = ilgiliKayitlar.map(hareket => {
+      const indirimTutari = indirimler[hareket.adisyonId] || indirimler[hareket.id] || 0;
+      const brutTutar = Number(hareket.tutar || 0) + indirimTutari;
+      const isHesabaYaz = hareket.odemeTuru === "HESABA_YAZ";
+      
+      // DEBUG: Her hareket için konsol çıktısı
+      console.log("📝 Adisyon hareketi işleniyor:", {
+        id: hareket.id,
+        odemeTuru: hareket.odemeTuru,
+        adisyonId: hareket.adisyonId,
+        referansId: hareket.referansId,
+        isHesabaYaz: isHesabaYaz,
+        indirim: indirimTutari
+      });
+      
+      return {
+        ...hareket,
+        masaNumarasi: getMasaNumarasi(hareket),
+        odemeTuru: hareket.odemeTuru,
+        kaynak: hareket.kaynak,
+        indirim: indirimTutari,
+        brutTutar: brutTutar,
+        netTutar: Number(hareket.tutar || 0),
+        isHesabaYaz: isHesabaYaz,
+        isBilardo: hareket.kaynak === "BİLARDO"
+      };
+    })
+    .sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+    
+    console.log("📊 Adisyon hareketleri sonuç:", sonuc.map(s => ({
+      id: s.id,
+      masaNumarasi: s.masaNumarasi,
+      odemeTuru: s.odemeTuru,
+      isHesabaYaz: s.isHesabaYaz
+    })));
+    
+    return sonuc;
+  }, [filtrelenmisVeriler, adisyonlar]);
+
+  /* ------------------ YÜKLENİYOR DURUMU ------------------ */
   if (yukleniyor) {
     return (
       <div style={{ 
@@ -594,10 +354,10 @@ Detaylar için konsolu kontrol edin.
           padding: 40
         }}>
           <div style={{ fontSize: 24, marginBottom: 20, fontWeight: "bold", color: "#7a3e06" }}>
-            💰 Kasa Raporu Hazırlanıyor...
+            💰 KASA RAPORU HAZIRLANIYOR
           </div>
           <div style={{ fontSize: 16, marginBottom: 30 }}>
-            Finans havuzu verileri okunuyor.
+            TEK KAYNAK: mc_finans_havuzu okunuyor
           </div>
           <div style={{
             width: 200,
@@ -614,12 +374,6 @@ Detaylar için konsolu kontrol edin.
               animation: "loading 1.5s infinite ease-in-out"
             }}></div>
           </div>
-          <style>{`
-            @keyframes loading {
-              0% { transform: translateX(-100%); }
-              100% { transform: translateX(200%); }
-            }
-          `}</style>
         </div>
       </div>
     );
@@ -650,7 +404,7 @@ Detaylar için konsolu kontrol edin.
               fontSize: "2.4rem",
               fontWeight: "bold"
             }}>
-              💰 KASA RAPORU - FİNANS HAVUZU
+              💰 KASA RAPORU - FİNAL MİMARİ
             </h2>
             <p style={{ 
               marginTop: 10, 
@@ -658,7 +412,7 @@ Detaylar için konsolu kontrol edin.
               fontSize: 17,
               lineHeight: 1.5
             }}>
-              mc_finans_havuzu'ndan gelen merkezi veriler | 
+              TEK KAYNAK: mc_finans_havuzu | 
               <span style={{ 
                 background: "#2ecc71", 
                 color: "white",
@@ -695,349 +449,7 @@ Detaylar için konsolu kontrol edin.
             </div>
           </div>
         </div>
-        
-        {/* YÖNETİM BUTONLARI */}
-        <div style={{ 
-          display: "flex", 
-          gap: 12, 
-          marginTop: 16, 
-          flexWrap: "wrap",
-          alignItems: "center"
-        }}>
-          <button
-            onClick={handleVeriAktar}
-            style={{
-              padding: "12px 20px",
-              background: "#3498db",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 15,
-              fontWeight: "bold",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 3px 6px rgba(52, 152, 219, 0.3)",
-              transition: "all 0.3s"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 5px 10px rgba(52, 152, 219, 0.4)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 3px 6px rgba(52, 152, 219, 0.3)";
-            }}
-            title="Eski adisyon ve giderleri finans havuzuna ekler"
-          >
-            🔄 Veri Aktar
-          </button>
-          
-          <button
-            onClick={handleDebug}
-            style={{
-              padding: "12px 20px",
-              background: "#9b59b6",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 15,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 3px 6px rgba(155, 89, 182, 0.3)",
-              transition: "all 0.3s"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 5px 10px rgba(155, 89, 182, 0.4)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 3px 6px rgba(155, 89, 182, 0.3)";
-            }}
-            title="Finans havuzu istatistiklerini göster"
-          >
-            🔍 Debug
-          </button>
-          
-          <button
-            onClick={handleHavuzuTemizle}
-            style={{
-              padding: "12px 20px",
-              background: "#e74c3c",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 15,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 3px 6px rgba(231, 76, 60, 0.3)",
-              transition: "all 0.3s"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 5px 10px rgba(231, 76, 60, 0.4)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 3px 6px rgba(231, 76, 60, 0.3)";
-            }}
-            title="Tüm finans verilerini siler (DİKKAT!)"
-          >
-            🗑️ Temizle
-          </button>
-          
-          <button
-            onClick={() => setDebugMode(!debugMode)}
-            style={{
-              padding: "12px 20px",
-              background: debugMode ? "#34495e" : "#7f8c8d",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 15,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: debugMode ? "0 3px 6px rgba(52, 73, 94, 0.3)" : "0 3px 6px rgba(127, 140, 141, 0.3)",
-              transition: "all 0.3s"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = debugMode 
-                ? "0 5px 10px rgba(52, 73, 94, 0.4)" 
-                : "0 5px 10px rgba(127, 140, 141, 0.4)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = debugMode 
-                ? "0 3px 6px rgba(52, 73, 94, 0.3)" 
-                : "0 3px 6px rgba(127, 140, 141, 0.3)";
-            }}
-            title="Debug panelini aç/kapat"
-          >
-            {debugMode ? "🔴 Debug Kapat" : "🟢 Debug Aç"}
-          </button>
-        </div>
       </div>
-
-      {/* DEBUG PANELİ */}
-      {debugMode && (
-        <div style={{
-          background: "#2c3e50",
-          color: "#ecf0f1",
-          padding: 24,
-          borderRadius: 12,
-          marginBottom: 32,
-          fontSize: 14,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
-        }}>
-          <div style={{ 
-            display: "flex", 
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16
-          }}>
-            <h4 style={{ 
-              margin: 0, 
-              color: "#3498db",
-              fontSize: "1.2rem",
-              fontWeight: "bold"
-            }}>
-              🐛 DEBUG PANELİ
-            </h4>
-            <div style={{ fontSize: 12, color: "#bdc3c7" }}>
-              Detaylı yönetim araçları
-            </div>
-          </div>
-          
-          <div style={{ 
-            display: "grid", 
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", 
-            gap: 12, 
-            marginBottom: 20 
-          }}>
-            <button
-              onClick={handleTestKaydiEkle}
-              style={{ 
-                padding: "10px 16px", 
-                background: "#27ae60", 
-                border: "none", 
-                borderRadius: 6, 
-                color: "white",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              ➕ Test Kaydı Ekle
-            </button>
-            
-            <button
-              onClick={handleHavuzuKontrolEt}
-              style={{ 
-                padding: "10px 16px", 
-                background: "#3498db", 
-                border: "none", 
-                borderRadius: 6, 
-                color: "white",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              🔍 Havuzu Kontrol Et
-            </button>
-            
-            <button
-              onClick={handleVeriKaynaklariniKontrolEt}
-              style={{ 
-                padding: "10px 16px", 
-                background: "#9b59b6", 
-                border: "none", 
-                borderRadius: 6, 
-                color: "white",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              📊 Veri Kaynaklarını Kontrol Et
-            </button>
-            
-            <button
-              onClick={handleTumVerileriAktar}
-              style={{ 
-                padding: "10px 16px", 
-                background: "#e67e22", 
-                border: "none", 
-                borderRadius: 6, 
-                color: "white",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              🔄 Tüm Verileri Aktar
-            </button>
-            
-            <button
-              onClick={handleOdemeTuruDebug}
-              style={{ 
-                padding: "10px 16px", 
-                background: "#16a085", 
-                border: "none", 
-                borderRadius: 6, 
-                color: "white",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              🔍 Ödeme Türü Debug
-            </button>
-            
-            <button
-              onClick={handleOdemeTurleriniDuzenle}
-              style={{ 
-                padding: "10px 16px", 
-                background: "#8e44ad", 
-                border: "none", 
-                borderRadius: 6, 
-                color: "white",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              🔄 Ödeme Türlerini Düzelt
-            </button>
-          </div>
-          
-          <div style={{ 
-            background: "rgba(0,0,0,0.2)", 
-            padding: 16, 
-            borderRadius: 8,
-            marginTop: 16
-          }}>
-            <div style={{ 
-              display: "grid", 
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", 
-              gap: 16 
-            }}>
-              <div>
-                <strong>📈 ANLIK DURUM:</strong><br />
-                - Finans Havuzu: {finansVerileri.length} kayıt<br />
-                - Giderler: {giderler.length} kayıt<br />
-                - Müşteri Tahsilatları: {musteriTahsilatlari.length} kayıt
-              </div>
-              <div>
-                <strong>💰 ÖZET:</strong><br />
-                - Toplam Gelir: {toplamGelir.toLocaleString("tr-TR")} ₺<br />
-                - Toplam Gider: {toplamGider.toLocaleString("tr-TR")} ₺<br />
-                - Net Kasa: {netKasa.toLocaleString("tr-TR")} ₺
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ 
-            marginTop: 16, 
-            fontSize: 13, 
-            color: "#bdc3c7",
-            padding: 12,
-            background: "rgba(0,0,0,0.1)",
-            borderRadius: 6,
-            borderLeft: "3px solid #3498db"
-          }}>
-            <strong>💡 İPUCU:</strong> Eğer ödeme türleri gözükmüyorsa:<br />
-            1. "Ödeme Türü Debug" ile mevcut adisyonları kontrol edin<br />
-            2. "Ödeme Türlerini Düzelt" ile finans kayıtlarını güncelleyin<br />
-            3. Yeni adisyonlar kapatın ve farklı ödeme türleri seçin
-          </div>
-        </div>
-      )}
 
       {/* FİLTRE */}
       <div style={{
@@ -1138,210 +550,76 @@ Detaylar için konsolu kontrol edin.
         </div>
       </div>
 
-      {/* TOPLAM ÖZET (Resimdeki Panel) */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-        gap: 24,
-        marginBottom: 40
-      }}>
+      {/* TARİH BİLGİSİ */}
+      <div
+        style={{
+          background: "#f5e7d0",
+          padding: 16,
+          borderRadius: 10,
+          marginBottom: 32,
+          textAlign: "center",
+          fontSize: 16,
+          fontWeight: 500
+        }}
+      >
+        <strong>{baslangic && bitis ? `${baslangic} - ${bitis}` : "Tüm zamanlar"}</strong> tarih aralığına ait veriler görüntülenmektedir.
+        {baslangic || bitis ? ` (${filtrelenmisVeriler.length} kayıt)` : ""}
+      </div>
+
+      {/* TEMEL METRİKLER - HESABA YAZ DAHİL */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 24,
+          marginBottom: 40
+        }}
+      >
         <OzetKart
-          baslik="Kasa Girişleri"
-          deger={toplamGelir.toLocaleString("tr-TR") + " ₺"}
+          baslik="Toplam Gelir"
+          deger={toplamGelir}
           renk="#2ecc71"
-          altBilgi={`${tumGelirHareketleri.length} adet gelir hareketi`}
           icon="💰"
+          aciklama={`${filtrelenmisVeriler.filter(k => k.tur === "GELIR" && k.odemeTuru !== "HESABA_YAZ").length} gelir kaydı`}
         />
-        
-        <OzetKart
-          baslik="Hesaba Yaz"
-          deger={toplamHesabaYaz.toLocaleString("tr-TR") + " ₺"}
-          renk="#e67e22"
-          altBilgi={`${hesabaYazHareketleri.length} adet borç (kasaya girmez)`}
-          icon="📝"
-        />
-        
-        <OzetKart
-          baslik="Toplam Gider"
-          deger={toplamGider.toLocaleString("tr-TR") + " ₺"}
-          renk="#e74c3c"
-          altBilgi={`${filtrelenmisGiderler.length} adet gider hareketi`}
-          icon="💸"
-        />
-        
         <OzetKart
           baslik="Net Kasa"
-          deger={netKasa.toLocaleString("tr-TR") + " ₺"}
+          deger={netKasa}
           renk={netKasa >= 0 ? "#3498db" : "#e74c3c"}
-          altBilgi={netKasa >= 0 ? "✅ Pozitif bakiye" : "❌ Negatif bakiye"}
           icon={netKasa >= 0 ? "📈" : "📉"}
+          aciklama={`Gelir: ${toplamGelir.toLocaleString("tr-TR")} ₺ - Gider: ${toplamGider.toLocaleString("tr-TR")} ₺`}
+        />
+        <OzetKart
+          baslik="Toplam Gider"
+          deger={toplamGider}
+          renk="#e74c3c"
+          icon="💸"
+          aciklama={`${filtrelenmisVeriler.filter(k => k.tur === "GIDER").length} gider kaydı`}
+        />
+        <OzetKart
+          baslik="Toplam İndirim"
+          deger={toplamIndirim}
+          renk="#9b59b6"
+          icon="🎁"
+          aciklama={`${filtrelenmisVeriler.filter(k => k.tur === "INDIRIM").length} indirim kaydı`}
+        />
+        <OzetKart
+          baslik="Brüt Ciro"
+          deger={brutCiro}
+          renk="#1abc9c"
+          icon="📊"
+          aciklama={`Gelir + İndirim`}
+        />
+        <OzetKart
+          baslik="Hesaba Yaz Toplamı"
+          deger={toplamHesabaYaz}
+          renk="#f39c12"
+          icon="📝"
+          aciklama="Kasaya girmeyen borç işlemleri"
         />
       </div>
 
-      {/* ÖDEME TÜRLERİ DAĞILIMI */}
-      <div style={{
-        background: "#fff",
-        padding: 28,
-        borderRadius: 14,
-        boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-        marginBottom: 40
-      }}>
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 28
-        }}>
-          <h3 style={{ 
-            margin: 0, 
-            color: "#7a3e06",
-            fontSize: "1.8rem",
-            fontWeight: "bold"
-          }}>
-            💳 ÖDEME TÜRLERİ DAĞILIMI
-          </h3>
-          <span style={{ 
-            fontSize: 14, 
-            color: "#666", 
-            background: "#f8f9fa",
-            padding: "6px 12px",
-            borderRadius: 20,
-            fontWeight: "500"
-          }}>
-            Toplam {Object.values(odemeTuruGruplari).reduce((sum, g) => sum + g.sayi, 0)} adet işlem
-          </span>
-        </div>
-        
-        {Object.values(odemeTuruGruplari).some(grup => grup.toplam > 0) ? (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 20
-          }}>
-            {Object.entries(odemeTuruGruplari)
-              .filter(([tur, grup]) => grup.toplam > 0)
-              .map(([tur, grup]) => {
-                const odemeInfo = getOdemeTuruBilgisi(tur);
-                const yuzde = toplamGelir > 0 ? ((grup.toplam / toplamGelir) * 100).toFixed(1) : 0;
-                
-                return (
-                  <div key={tur} style={{
-                    padding: 24,
-                    background: "linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)",
-                    borderRadius: 12,
-                    borderLeft: `6px solid ${odemeInfo.renk}`,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    transition: "all 0.3s",
-                    cursor: "pointer"
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.15)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
-                  }}>
-                    <div style={{ 
-                      fontSize: 16, 
-                      color: "#555", 
-                      marginBottom: 10,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontWeight: "600"
-                    }}>
-                      <span style={{ fontSize: 24 }}>{odemeInfo.icon}</span>
-                      {odemeInfo.etiket}
-                      <div style={{
-                        marginLeft: "auto",
-                        fontSize: 14,
-                        background: odemeInfo.renk + "20",
-                        color: odemeInfo.renk,
-                        padding: "4px 10px",
-                        borderRadius: 20,
-                        fontWeight: "bold"
-                      }}>
-                        {grup.sayi} adet
-                      </div>
-                    </div>
-                    <div style={{ 
-                      fontSize: 28, 
-                      fontWeight: "bold", 
-                      color: odemeInfo.renk,
-                      marginBottom: 8
-                    }}>
-                      {grup.toplam.toLocaleString("tr-TR")} ₺
-                    </div>
-                    <div style={{ 
-                      display: "flex", 
-                      alignItems: "center",
-                      gap: 10,
-                      marginBottom: 12
-                    }}>
-                      <div style={{
-                        flex: 1,
-                        height: 6,
-                        background: "#e0e0e0",
-                        borderRadius: 3,
-                        overflow: "hidden"
-                      }}>
-                        <div style={{
-                          width: `${yuzde}%`,
-                          height: "100%",
-                          background: odemeInfo.renk,
-                          borderRadius: 3
-                        }}></div>
-                      </div>
-                      <div style={{ 
-                        fontSize: 14, 
-                        color: "#777",
-                        fontWeight: "600"
-                      }}>
-                        %{yuzde}
-                      </div>
-                    </div>
-                    {grup.hareketler.length > 0 && (
-                      <div style={{ 
-                        fontSize: 13, 
-                        color: "#777", 
-                        marginTop: 12,
-                        paddingTop: 12,
-                        borderTop: "1px solid #eee"
-                      }}>
-                        <strong>Son işlemler:</strong> {grup.hareketler.slice(0, 2).map(h => 
-                          `${h.aciklama.substring(0, 25)}...`
-                        ).join(", ")}
-                        {grup.hareketler.length > 2 && ` +${grup.hareketler.length - 2} adet`}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        ) : (
-          <div style={{ 
-            padding: 50, 
-            textAlign: "center", 
-            color: "#999", 
-            fontStyle: "italic",
-            background: "#f9f9f9",
-            borderRadius: 12,
-            marginTop: 20
-          }}>
-            <div style={{ fontSize: 22, marginBottom: 16 }}>
-              💡 Ödeme türleri dağılımı bulunamadı
-            </div>
-            <div style={{ fontSize: 15, color: "#666", lineHeight: 1.6 }}>
-              Toplam {finansVerileri.length} kayıt var. <br />
-              Verileri aktarmak için "Veri Aktar" butonunu kullanın veya<br />
-              yeni adisyonlar kapatıp farklı ödeme türleri seçin.
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ADİSYON HAREKETLERİ (Masa Numaraları) */}
+      {/* SIRA 1: ADİSYON HAREKETLERİ (HESABA_YAZ DAHİL) */}
       <div style={{
         background: "#fff",
         borderRadius: 14,
@@ -1365,7 +643,7 @@ Detaylar için konsolu kontrol edin.
               fontSize: "1.6rem",
               fontWeight: "bold"
             }}>
-              🪑 ADİSYON HAREKETLERİ
+              1️⃣ ADİSYON HAREKETLERİ (HESABA_YAZ DAHİL)
             </h3>
             <div style={{ 
               fontSize: 16, 
@@ -1375,15 +653,15 @@ Detaylar için konsolu kontrol edin.
               borderRadius: 20,
               fontWeight: "600"
             }}>
-              {adisyonHareketleri.length} adet
+              {adisyonlarIndirimli.length} adet
             </div>
           </div>
           <div style={{ fontSize: 14, color: "#666", marginTop: 8 }}>
-            Kapanan Masa ve Bilardo Numaraları
+            Normal Adisyonlar + Bilardo + Hesaba Yaz İşlemleri | Turuncu: Hesaba Yaz
           </div>
         </div>
         
-        {adisyonHareketleri.length === 0 ? (
+        {adisyonlarIndirimli.length === 0 ? (
           <div style={{ 
             padding: 60, 
             textAlign: "center", 
@@ -1394,7 +672,7 @@ Detaylar için konsolu kontrol edin.
               📭 Seçilen tarih aralığında adisyon hareketi bulunamadı
             </div>
             <div style={{ fontSize: 16, color: "#999" }}>
-              Tarih filtresini değiştirin veya "Veri Aktar" butonunu kullanın.
+              Tarih filtresini değiştirin veya yeni adisyonlar kapatın.
             </div>
           </div>
         ) : (
@@ -1406,74 +684,88 @@ Detaylar için konsolu kontrol edin.
             }}>
               <thead style={{ background: "#f9f5ec" }}>
                 <tr>
-                  <Th style={{ width: "15%" }}>Masa No</Th>
-                  <Th style={{ width: "30%" }}>Açıklama</Th>
-                  <Th style={{ width: "15%" }}>Tarih</Th>
+                  <Th style={{ width: "18%" }}>Masa No</Th>
+                  <Th style={{ width: "18%" }}>Tarih</Th>
                   <Th style={{ width: "20%" }}>Ödeme Türü</Th>
-                  <Th style={{ width: "20%" }} align="right">Tutar</Th>
+                  <Th style={{ width: "14%" }} align="right">Brüt Tutar</Th>
+                  <Th style={{ width: "14%" }} align="right">İndirim</Th>
+                  <Th style={{ width: "16%" }} align="right">Net Tutar</Th>
                 </tr>
               </thead>
               
               <tbody>
-                {adisyonHareketleri.map((hareket, i) => {
+                {adisyonlarIndirimli.map((hareket, i) => {
                   const tarih = hareket.tarih ? new Date(hareket.tarih) : new Date();
                   const odemeInfo = getOdemeTuruBilgisi(hareket.odemeTuru);
-                  const isBilardo = hareket.kaynak === "BİLARDO";
+                  const hasIndirim = hareket.indirim > 0;
+                  const isHesabaYaz = hareket.isHesabaYaz;
+                  const isBilardo = hareket.isBilardo;
                   
                   return (
                     <tr key={hareket.id} style={{
-                      background: i % 2 === 0 ? "#fff" : "#faf5ea",
+                      background: isHesabaYaz ? "#fff9e6" : 
+                                 hasIndirim ? "#fff5f5" : 
+                                 (i % 2 === 0 ? "#fff" : "#faf5ea"),
                       borderBottom: "1px solid #eee",
+                      borderLeft: isHesabaYaz ? "4px solid #f39c12" : 
+                                 hasIndirim ? "4px solid #e74c3c" : "none",
                       transition: "all 0.2s"
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = "#fef8e8";
+                      e.currentTarget.style.background = isHesabaYaz ? "#fff4d1" : 
+                                         hasIndirim ? "#ffeaea" : "#fef8e8";
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#faf5ea";
+                      e.currentTarget.style.background = isHesabaYaz ? "#fff9e6" : 
+                                         hasIndirim ? "#fff5f5" : 
+                                         (i % 2 === 0 ? "#fff" : "#faf5ea");
                     }}>
                       <Td>
                         <div style={{ 
                           fontWeight: "bold", 
                           fontSize: 16,
-                          color: "#7a3e06"
+                          color: isHesabaYaz ? "#f39c12" : 
+                                 hasIndirim ? "#e74c3c" : "#7a3e06"
                         }}>
                           {hareket.masaNumarasi}
-                          {isBilardo && (
-                            <div style={{ 
-                              fontSize: 12, 
-                              color: "#3498db",
-                              fontWeight: "600",
-                              marginTop: 4
-                            }}>
-                              🎱 Bilardo
-                            </div>
-                          )}
-                        </div>
-                        {hareket.masaId && hareket.masaId.toString().length < 10 && (
-                          <div style={{ 
-                            fontSize: 12, 
-                            color: "#666",
-                            marginTop: 4
-                          }}>
-                            ID: {hareket.masaId}
+                          <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                            {isHesabaYaz && (
+                              <span style={{
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                fontSize: 12,
+                                background: "#f39c12",
+                                color: "white",
+                                fontWeight: "bold"
+                              }}>
+                                HESABA YAZ
+                              </span>
+                            )}
+                            {isBilardo && (
+                              <span style={{
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                fontSize: 12,
+                                background: "#3498db",
+                                color: "white",
+                                fontWeight: "bold"
+                              }}>
+                                🎱 BİLARDO
+                              </span>
+                            )}
+                            {hasIndirim && !isHesabaYaz && (
+                              <span style={{
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                fontSize: 12,
+                                background: "#e74c3c",
+                                color: "white",
+                                fontWeight: "bold"
+                              }}>
+                                İNDİRİMLİ
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </Td>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600", 
-                          fontSize: 15,
-                          marginBottom: 6
-                        }}>
-                          {hareket.formattedAciklama}
-                        </div>
-                        <div style={{ 
-                          fontSize: 12, 
-                          color: "#666",
-                          fontStyle: "italic"
-                        }}>
-                          {hareket.kaynak === "ADISYON" ? "Masa Adisyonu" : "Bilardo Adisyonu"}
                         </div>
                       </Td>
                       <Td>
@@ -1515,10 +807,81 @@ Detaylar için konsolu kontrol edin.
                       </Td>
                       <Td align="right" style={{ 
                         fontWeight: "bold", 
-                        fontSize: 18,
-                        color: "#2ecc71"
+                        fontSize: 16,
+                        color: isHesabaYaz ? "#f39c12" : "#666",
+                        textDecoration: hasIndirim ? "line-through" : "none"
                       }}>
-                        {Number(hareket.tutar || 0).toLocaleString("tr-TR")} ₺
+                        {hasIndirim && !isHesabaYaz ? (
+                          <>
+                            {hareket.brutTutar.toLocaleString("tr-TR")} ₺
+                            <div style={{ 
+                              fontSize: 11, 
+                              color: "#999",
+                              marginTop: 2
+                            }}>
+                              indirim öncesi
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {hareket.netTutar.toLocaleString("tr-TR")} ₺
+                            {isHesabaYaz && (
+                              <div style={{ 
+                                fontSize: 11, 
+                                color: "#f39c12",
+                                marginTop: 2
+                              }}>
+                                borç kaydı
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: hasIndirim ? "#9b59b6" : "#999"
+                      }}>
+                        {hasIndirim && !isHesabaYaz ? (
+                          <>
+                            -{hareket.indirim.toLocaleString("tr-TR")} ₺
+                            <div style={{ 
+                              fontSize: 12, 
+                              color: "#9b59b6",
+                              marginTop: 4
+                            }}>
+                              %{((hareket.indirim / hareket.brutTutar) * 100).toFixed(1)}
+                            </div>
+                          </>
+                        ) : (
+                          "0 ₺"
+                        )}
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 18,
+                        color: isHesabaYaz ? "#f39c12" : 
+                               hasIndirim ? "#e74c3c" : "#2ecc71"
+                      }}>
+                        {hareket.netTutar.toLocaleString("tr-TR")} ₺
+                        {isHesabaYaz && (
+                          <div style={{ 
+                            fontSize: 12, 
+                            color: "#f39c12",
+                            marginTop: 4
+                          }}>
+                            kasaya girmez
+                          </div>
+                        )}
+                        {hasIndirim && !isHesabaYaz && (
+                          <div style={{ 
+                            fontSize: 12, 
+                            color: "#e74c3c",
+                            marginTop: 4
+                          }}>
+                            indirimli
+                          </div>
+                        )}
                       </Td>
                     </tr>
                   );
@@ -1529,585 +892,386 @@ Detaylar için konsolu kontrol edin.
         )}
       </div>
 
-      {/* TÜM GELİR HAREKETLERİ (Adisyon + Müşteri Tahsilat) */}
-      {tumGelirHareketleri.length > 0 && (
-        <div style={{
-          background: "#fff",
-          borderRadius: 14,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-          overflow: "hidden",
-          marginBottom: 40
-        }}>
-          <div style={{
-            background: "linear-gradient(90deg, #e8f8f1 0%, #d4f1e4 100%)",
-            padding: 22,
-            borderBottom: "1px solid #ddd"
-          }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: "#27ae60",
-                fontSize: "1.6rem",
-                fontWeight: "bold"
-              }}>
-                💰 GELİR HAREKETLERİ
-              </h3>
-              <div style={{ 
-                fontSize: 16, 
-                color: "#27ae60", 
-                background: "rgba(255,255,255,0.8)",
-                padding: "8px 16px",
-                borderRadius: 20,
-                fontWeight: "600"
-              }}>
-                {tumGelirHareketleri.length} adet
-              </div>
-            </div>
-            <div style={{ fontSize: 14, color: "#666", marginTop: 8 }}>
-              Tüm kasa girişleri (Adisyon + Müşteri Tahsilat)
-            </div>
-          </div>
-          
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ 
-              width: "100%", 
-              borderCollapse: "collapse", 
-              minWidth: 1000 
-            }}>
-              <thead style={{ background: "#f0f9f5" }}>
-                <tr>
-                  <Th style={{ width: "15%" }}>Tarih</Th>
-                  <Th style={{ width: "30%" }}>Açıklama</Th>
-                  <Th style={{ width: "15%" }}>Masa/Müşteri</Th>
-                  <Th style={{ width: "20%" }}>Ödeme Türü</Th>
-                  <Th style={{ width: "20%" }} align="right">Tutar</Th>
-                </tr>
-              </thead>
-              
-              <tbody>
-                {tumGelirHareketleri.map((hareket, i) => {
-                  const tarih = hareket.tarih ? new Date(hareket.tarih) : new Date();
-                  const odemeInfo = getOdemeTuruBilgisi(hareket.odemeTuru);
-                  const isTahsilat = hareket.kaynak === "TAHSILAT";
-                  const isBilardo = hareket.kaynak === "BİLARDO";
-                  
-                  return (
-                    <tr key={hareket.id} style={{
-                      background: i % 2 === 0 ? "#fff" : "#f8f9fa",
-                      borderBottom: "1px solid #eee",
-                      transition: "all 0.2s"
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "#f0f9f5";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#f8f9fa";
-                    }}>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600",
-                          fontSize: 15
-                        }}>
-                          {tarih.toLocaleDateString("tr-TR")}
-                        </div>
-                        <div style={{ 
-                          fontSize: 13, 
-                          color: "#666",
-                          marginTop: 4
-                        }}>
-                          {tarih.toLocaleTimeString("tr-TR")}
-                        </div>
-                      </Td>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600", 
-                          fontSize: 15,
-                          marginBottom: 8
-                        }}>
-                          {hareket.formattedAciklama}
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          {isBilardo && (
-                            <span style={{ 
-                              padding: "4px 10px",
-                              borderRadius: 4,
-                              fontSize: 12,
-                              background: "#e8f4f8",
-                              color: "#3498db",
-                              fontWeight: "600"
-                            }}>
-                              🎱 BİLARDO
-                            </span>
-                          )}
-                          {isTahsilat && (
-                            <span style={{ 
-                              padding: "4px 10px",
-                              borderRadius: 4,
-                              fontSize: 12,
-                              background: "#f4e8f8",
-                              color: "#9b59b6",
-                              fontWeight: "600"
-                            }}>
-                              👤 MÜŞTERİ TAHSİLATI
-                            </span>
-                          )}
-                        </div>
-                      </Td>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600",
-                          fontSize: 15,
-                          color: "#7a3e06"
-                        }}>
-                          {hareket.masaNumarasi || "Masa Yok"}
-                        </div>
-                        {!isTahsilat && hareket.masaId && hareket.masaId.toString().length < 10 && (
-                          <div style={{ 
-                            fontSize: 12, 
-                            color: "#666",
-                            marginTop: 4
-                          }}>
-                            Masa ID: {hareket.masaId}
-                          </div>
-                        )}
-                        {isTahsilat && hareket.musteriId && (
-                          <div style={{ 
-                            fontSize: 12, 
-                            color: "#666",
-                            marginTop: 4
-                          }}>
-                            Müşteri ID: {hareket.musteriId}
-                          </div>
-                        )}
-                      </Td>
-                      <Td>
-                        <div style={{
-                          padding: "10px 16px",
-                          borderRadius: 8,
-                          fontSize: 14,
-                          background: odemeInfo.renk + "15",
-                          color: odemeInfo.renk,
-                          border: `1px solid ${odemeInfo.renk}30`,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                          minWidth: 120,
-                          justifyContent: "center"
-                        }}>
-                          <span style={{ fontSize: 18 }}>{odemeInfo.icon}</span>
-                          {odemeInfo.etiket}
-                        </div>
-                      </Td>
-                      <Td align="right" style={{ 
-                        fontWeight: "bold", 
-                        fontSize: 18,
-                        color: "#2ecc71"
-                      }}>
-                        {Number(hareket.tutar || 0).toLocaleString("tr-TR")} ₺
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* HESABA YAZ HAREKETLERİ */}
-      {hesabaYazHareketleri.length > 0 && (
-        <div style={{
-          background: "#fff",
-          borderRadius: 14,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-          overflow: "hidden",
-          marginBottom: 40
-        }}>
-          <div style={{
-            background: "linear-gradient(90deg, #fff3cd 0%, #ffeaa7 100%)",
-            padding: 22,
-            borderBottom: "1px solid #ddd"
-          }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: "#e67e22",
-                fontSize: "1.6rem",
-                fontWeight: "bold"
-              }}>
-                📝 HESABA YAZ BORÇLARI
-              </h3>
-              <div style={{ 
-                fontSize: 16, 
-                color: "#e67e22", 
-                background: "rgba(255,255,255,0.8)",
-                padding: "8px 16px",
-                borderRadius: 20,
-                fontWeight: "600"
-              }}>
-                {hesabaYazHareketleri.length} adet
-              </div>
-            </div>
-            <div style={{ fontSize: 14, color: "#666", marginTop: 8 }}>
-              Borç yazılan tutarlar (kasaya girmez)
-            </div>
-          </div>
-          
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ 
-              width: "100%", 
-              borderCollapse: "collapse", 
-              minWidth: 1000 
-            }}>
-              <thead style={{ background: "#fff8e1" }}>
-                <tr>
-                  <Th style={{ width: "20%" }}>Tarih</Th>
-                  <Th style={{ width: "40%" }}>Açıklama</Th>
-                  <Th style={{ width: "20%" }}>Masa</Th>
-                  <Th style={{ width: "20%" }} align="right">Borç Tutarı</Th>
-                </tr>
-              </thead>
-              
-              <tbody>
-                {hesabaYazHareketleri.map((hareket, i) => {
-                  const tarih = hareket.tarih ? new Date(hareket.tarih) : new Date();
-                  const masaNumarasi = getMasaNumarasi(hareket.masaId, hareket.kaynak, hareket.aciklama);
-                  
-                  return (
-                    <tr key={hareket.id} style={{
-                      background: i % 2 === 0 ? "#fff" : "#fffaf0",
-                      borderBottom: "1px solid #eee",
-                      transition: "all 0.2s"
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "#fff8e1";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fffaf0";
-                    }}>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600",
-                          fontSize: 15
-                        }}>
-                          {tarih.toLocaleDateString("tr-TR")}
-                        </div>
-                        <div style={{ 
-                          fontSize: 13, 
-                          color: "#666",
-                          marginTop: 4
-                        }}>
-                          {tarih.toLocaleTimeString("tr-TR")}
-                        </div>
-                      </Td>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600", 
-                          fontSize: 15,
-                          marginBottom: 8
-                        }}>
-                          {hareket.aciklama}
-                        </div>
-                        <div style={{ 
-                          fontSize: 13, 
-                          color: "#e67e22",
-                          fontWeight: "600",
-                          padding: "4px 10px",
-                          background: "#fff3cd",
-                          borderRadius: 4,
-                          display: "inline-block"
-                        }}>
-                          ⚠️ Borç Kaydı (Kasaya girmez)
-                        </div>
-                      </Td>
-                      <Td>
-                        <div style={{ 
-                          fontWeight: "600",
-                          fontSize: 15,
-                          color: "#7a3e06"
-                        }}>
-                          {masaNumarasi}
-                        </div>
-                      </Td>
-                      <Td align="right" style={{ 
-                        fontWeight: "bold", 
-                        fontSize: 18,
-                        color: "#e67e22"
-                      }}>
-                        {Number(hareket.tutar || 0).toLocaleString("tr-TR")} ₺
-                      </Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* GİDER LİSTESİ */}
-      {filtrelenmisGiderler.length > 0 && (
-        <div style={{
-          background: "#fff",
-          borderRadius: 14,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-          overflow: "hidden",
-          marginBottom: 40
-        }}>
-          <div style={{
-            background: "linear-gradient(90deg, #f1e2c6 0%, #e6d0b5 100%)",
-            padding: 22,
-            borderBottom: "1px solid #ddd"
-          }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between",
-              alignItems: "center"
-            }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: "#7a3e06",
-                fontSize: "1.6rem",
-                fontWeight: "bold"
-              }}>
-                📝 GİDERLER
-              </h3>
-              <div style={{ 
-                fontSize: 16, 
-                color: "#e74c3c", 
-                background: "rgba(255,255,255,0.8)",
-                padding: "8px 16px",
-                borderRadius: 20,
-                fontWeight: "600"
-              }}>
-                {filtrelenmisGiderler.length} adet
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ 
-              width: "100%", 
-              borderCollapse: "collapse", 
-              minWidth: 1000 
-            }}>
-              <thead style={{ background: "#f9f5ec" }}>
-                <tr>
-                  <Th style={{ width: "15%" }}>Tarih</Th>
-                  <Th style={{ width: "25%" }}>Açıklama</Th>
-                  <Th style={{ width: "15%" }}>Kategori</Th>
-                  <Th style={{ width: "15%" }} align="right">Tutar</Th>
-                  <Th style={{ width: "30%" }}>Not</Th>
-                </tr>
-              </thead>
-              
-              <tbody>
-                {filtrelenmisGiderler.map((gider, i) => (
-                  <tr key={gider.id || i} style={{
-                    background: i % 2 === 0 ? "#fff" : "#faf5ea",
-                    borderBottom: "1px solid #eee",
-                    transition: "all 0.2s"
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = "#fef8e8";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#faf5ea";
-                  }}>
-                    <Td>
-                      <div style={{ 
-                        fontWeight: "600",
-                        fontSize: 15
-                      }}>
-                        {gider.tarih ? new Date(gider.tarih).toLocaleDateString("tr-TR") : "Belirtilmemiş"}
-                      </div>
-                      {gider.tarih && (
-                        <div style={{ 
-                          fontSize: 13, 
-                          color: "#666",
-                          marginTop: 4
-                        }}>
-                          {new Date(gider.tarih).toLocaleTimeString("tr-TR", {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      )}
-                    </Td>
-                    <Td>
-                      <div style={{ 
-                        fontWeight: "600", 
-                        fontSize: 15
-                      }}>
-                        {gider.aciklama || "Gider"}
-                      </div>
-                    </Td>
-                    <Td>
-                      <span style={{
-                        padding: "8px 14px",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        background: "#fdecea",
-                        color: "#e74c3c",
-                        fontWeight: "bold",
-                        display: "inline-block"
-                      }}>
-                        {gider.kategori || "Genel"}
-                      </span>
-                    </Td>
-                    <Td align="right" style={{ 
-                      fontWeight: "bold", 
-                      fontSize: 17,
-                      color: "#e74c3c"
-                    }}>
-                      {Number(gider.tutar || 0).toLocaleString("tr-TR")} ₺
-                    </Td>
-                    <Td style={{ 
-                      fontSize: 14, 
-                      color: "#666",
-                      lineHeight: 1.5
-                    }}>
-                      {gider.not || "-"}
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ALT BİLGİ */}
-      <div style={{ 
-        marginTop: 48, 
-        paddingTop: 32, 
-        borderTop: "2px solid #eee",
-        fontSize: 15, 
-        color: "#555",
+      {/* SIRA 2: GÜNLÜK KASA TOPLAMLARI */}
+      <div style={{
         background: "#fff",
-        padding: 32,
-        borderRadius: 12,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
+        padding: 28,
+        borderRadius: 14,
+        boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+        marginBottom: 40
       }}>
         <div style={{ 
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          gap: 32
+          display: "flex", 
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 28
         }}>
-          <div>
-            <div style={{ 
-              fontSize: 18, 
-              fontWeight: "bold",
-              color: "#7a3e06",
-              marginBottom: 16,
-              paddingBottom: 8,
-              borderBottom: "2px solid #e6d0b5"
-            }}>
-              🎯 KASA RAPORU MANTIĞI
-            </div>
-            <div style={{ lineHeight: 1.8 }}>
-              1️⃣ Tüm veriler <strong style={{ color: "#3498db" }}>mc_finans_havuzu</strong>'ndan okunur<br />
-              2️⃣ Ödeme türleri adisyon kapanışında belirlenir<br />
-              3️⃣ <strong style={{ color: "#e67e22" }}>Hesaba Yaz</strong> → borçtur, kasaya girmez<br />
-              4️⃣ Tüm raporlar aynı veriden beslenir → <strong>tutarlılık</strong><br />
-              5️⃣ Eski verileri "Veri Aktar" ile havuzuna ekleyin
-            </div>
-          </div>
-          
-          <div>
-            <div style={{ 
-              fontSize: 18, 
-              fontWeight: "bold",
-              color: "#7a3e06",
-              marginBottom: 16,
-              paddingBottom: 8,
-              borderBottom: "2px solid #e6d0b5"
-            }}>
-              📊 KASA ÖZETİ
-            </div>
-            <div style={{ lineHeight: 1.8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Gelir:</span>
-                <span style={{ 
-                  color: "#2ecc71", 
-                  fontWeight: "bold",
-                  fontSize: 16
-                }}>
-                  {toplamGelir.toLocaleString("tr-TR")} ₺
-                </span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>Gider:</span>
-                <span style={{ 
-                  color: "#e74c3c", 
-                  fontWeight: "bold",
-                  fontSize: 16
-                }}>
-                  {toplamGider.toLocaleString("tr-TR")} ₺
-                </span>
-              </div>
-              <div style={{ 
-                display: "flex", 
-                justifyContent: "space-between",
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: "1px solid #eee"
-              }}>
-                <span style={{ fontWeight: "bold" }}>Net Kasa:</span>
-                <span style={{ 
-                  color: netKasa >= 0 ? "#2ecc71" : "#e74c3c",
-                  fontWeight: "bold",
-                  fontSize: 18
-                }}>
-                  {netKasa.toLocaleString("tr-TR")} ₺
-                  {netKasa >= 0 ? " ✅" : " ❌"}
-                </span>
-              </div>
-            </div>
-          </div>
+          <h3 style={{ 
+            margin: 0, 
+            color: "#7a3e06",
+            fontSize: "1.8rem",
+            fontWeight: "bold"
+          }}>
+            2️⃣ GÜNLÜK KASA TOPLAMLARI
+          </h3>
+          <span style={{ 
+            fontSize: 14, 
+            color: "#666", 
+            background: "#f8f9fa",
+            padding: "6px 12px",
+            borderRadius: 20,
+            fontWeight: "500"
+          }}>
+            {gunlukKasaToplamlari.length} gün
+          </span>
         </div>
         
-        <div style={{ 
-          marginTop: 32,
-          padding: 20,
-          background: "#f8f9fa",
-          borderRadius: 8,
-          fontSize: 14,
-          color: "#666",
-          borderLeft: "4px solid #3498db"
+        {gunlukKasaToplamlari.length === 0 ? (
+          <div style={{ 
+            padding: 50, 
+            textAlign: "center", 
+            color: "#999", 
+            fontStyle: "italic",
+            background: "#f9f9f9",
+            borderRadius: 12,
+            marginTop: 20
+          }}>
+            <div style={{ fontSize: 22, marginBottom: 16 }}>
+              📭 Seçilen tarih aralığında günlük veri bulunamadı
+            </div>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ 
+              width: "100%", 
+              borderCollapse: "collapse", 
+              minWidth: 1100 
+            }}>
+              <thead style={{ background: "#e8f4f8" }}>
+                <tr>
+                  <Th style={{ width: "12%" }}>Tarih</Th>
+                  <Th style={{ width: "8%" }}>Gün</Th>
+                  <Th style={{ width: "14%" }} align="right">Gelir</Th>
+                  <Th style={{ width: "12%" }} align="right">Gider</Th>
+                  <Th style={{ width: "12%" }} align="right">İndirim</Th>
+                  <Th style={{ width: "12%" }} align="right">Hesaba Yaz</Th>
+                  <Th style={{ width: "12%" }} align="right">Adisyon/Tahsilat</Th>
+                  <Th style={{ width: "12%" }} align="right">Net Kasa</Th>
+                </tr>
+              </thead>
+              
+              <tbody>
+                {gunlukKasaToplamlari.map((gun, index) => {
+                  const netKasaGun = gun.toplamGelir - gun.toplamGider;
+                  
+                  return (
+                    <tr key={gun.tarih} style={{
+                      background: index % 2 === 0 ? "#fff" : "#f8f9fa",
+                      borderBottom: "1px solid #eee",
+                      transition: "all 0.2s"
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "#f0f9ff";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = index % 2 === 0 ? "#fff" : "#f8f9fa";
+                    }}>
+                      <Td>
+                        <div style={{ 
+                          fontWeight: "600",
+                          fontSize: 15
+                        }}>
+                          {new Date(gun.tarih).toLocaleDateString("tr-TR", {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </div>
+                      </Td>
+                      <Td>
+                        <span style={{
+                          padding: "8px 12px",
+                          borderRadius: 20,
+                          fontSize: 13,
+                          background: "#e8f4f8",
+                          color: "#3498db",
+                          fontWeight: "bold",
+                          display: "inline-block",
+                          textTransform: "capitalize"
+                        }}>
+                          {gun.gunAdi}
+                        </span>
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: "#2ecc71"
+                      }}>
+                        {gun.toplamGelir.toLocaleString("tr-TR")} ₺
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: "#e74c3c"
+                      }}>
+                        {gun.toplamGider.toLocaleString("tr-TR")} ₺
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: "#9b59b6"
+                      }}>
+                        {gun.toplamIndirim.toLocaleString("tr-TR")} ₺
+                        <div style={{ 
+                          fontSize: 12, 
+                          color: "#999",
+                          marginTop: 4
+                        }}>
+                          {gun.toplamIndirim > 0 ? "İndirimli" : "-"}
+                        </div>
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: "#f39c12"
+                      }}>
+                        {gun.toplamHesabaYaz.toLocaleString("tr-TR")} ₺
+                        <div style={{ 
+                          fontSize: 12, 
+                          color: "#f39c12",
+                          marginTop: 4
+                        }}>
+                          {gun.hesabaYazSayisi} adet
+                        </div>
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: "#e67e22"
+                      }}>
+                        <div>{gun.adisyonSayisi} adisyon</div>
+                        <div style={{ 
+                          fontSize: 12, 
+                          color: "#3498db",
+                          marginTop: 4
+                        }}>
+                          {gun.tahsilatSayisi} tahsilat
+                        </div>
+                      </Td>
+                      <Td align="right" style={{ 
+                        fontWeight: "bold", 
+                        fontSize: 16,
+                        color: netKasaGun >= 0 ? "#3498db" : "#e74c3c"
+                      }}>
+                        {netKasaGun.toLocaleString("tr-TR")} ₺
+                        <div style={{ 
+                          fontSize: 12, 
+                          color: netKasaGun >= 0 ? "#2ecc71" : "#e74c3c",
+                          fontWeight: "600",
+                          marginTop: 4
+                        }}>
+                          {netKasaGun >= 0 ? "✅ Pozitif" : "❌ Negatif"}
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })}
+                
+                <tr style={{ 
+                  background: "#f8f5e8", 
+                  borderTop: "2px solid #7a3e06",
+                  fontWeight: "bold"
+                }}>
+                  <Td colSpan="2" style={{ fontSize: 16, color: "#7a3e06" }}>
+                    📊 TOPLAM
+                  </Td>
+                  <Td align="right" style={{ fontSize: 16, color: "#2ecc71" }}>
+                    {gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.toplamGelir, 0).toLocaleString("tr-TR")} ₺
+                  </Td>
+                  <Td align="right" style={{ fontSize: 16, color: "#e74c3c" }}>
+                    {gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.toplamGider, 0).toLocaleString("tr-TR")} ₺
+                  </Td>
+                  <Td align="right" style={{ fontSize: 16, color: "#9b59b6" }}>
+                    {gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.toplamIndirim, 0).toLocaleString("tr-TR")} ₺
+                  </Td>
+                  <Td align="right" style={{ fontSize: 16, color: "#f39c12" }}>
+                    {gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.toplamHesabaYaz, 0).toLocaleString("tr-TR")} ₺
+                    <div style={{ fontSize: 12, color: "#f39c12" }}>
+                      {gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.hesabaYazSayisi, 0)} adet
+                    </div>
+                  </Td>
+                  <Td align="right" style={{ fontSize: 16, color: "#e67e22" }}>
+                    <div>{gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.adisyonSayisi, 0)} adisyon</div>
+                    <div style={{ fontSize: 12, color: "#3498db" }}>
+                      {gunlukKasaToplamlari.reduce((sum, gun) => sum + gun.tahsilatSayisi, 0)} tahsilat
+                    </div>
+                  </Td>
+                  <Td align="right" style={{ fontSize: 18, color: "#7a3e06" }}>
+                    {gunlukKasaToplamlari.reduce((sum, gun) => sum + (gun.toplamGelir - gun.toplamGider), 0).toLocaleString("tr-TR")} ₺
+                  </Td>
+                </tr>
+              </tbody>
+            </table>
+            
+            {/* HESABA YAZ AÇIKLAMASI */}
+            <div style={{
+              marginTop: 24,
+              padding: 16,
+              background: "#fff9e6",
+              borderRadius: 8,
+              fontSize: 14,
+              color: "#f39c12",
+              borderLeft: "4px solid #f39c12"
+            }}>
+              <strong>📝 Hesaba Yaz Bilgilendirmesi:</strong> 
+              "Hesaba Yaz" işlemleri artık <strong>Adisyon Hareketleri</strong> tablosunda görüntülenmektedir. 
+              Bu tutarlar kasaya girmez ve ciro hesaplamalarına dahil edilmez. 
+              Sadece gün içinde oluşturulan borç işlemlerini gösterir.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SIRA 3: ÖDEME TÜRLERİ DAĞILIMI (HESABA_YAZ HARİÇ) */}
+      {Object.keys(odemeTuruDagilimi).length > 0 && (
+        <div style={{
+          background: "#fff",
+          padding: 28,
+          borderRadius: 14,
+          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+          marginBottom: 40
         }}>
           <div style={{ 
             display: "flex", 
-            alignItems: "center", 
-            gap: 12,
-            marginBottom: 8
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 28
           }}>
-            <span style={{ fontSize: 20 }}>📅</span>
-            <strong style={{ color: "#7a3e06" }}>Son güncelleme:</strong>
-            {new Date().toLocaleString("tr-TR", {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit'
+            <h3 style={{ 
+              margin: 0, 
+              color: "#7a3e06",
+              fontSize: "1.8rem",
+              fontWeight: "bold"
+            }}>
+              3️⃣ ÖDEME TÜRLERİ DAĞILIMI
+            </h3>
+            <span style={{ 
+              fontSize: 14, 
+              color: "#666", 
+              background: "#f8f9fa",
+              padding: "6px 12px",
+              borderRadius: 20,
+              fontWeight: "500"
+            }}>
+              {Object.values(odemeTuruDagilimi).reduce((sum, g) => sum + g.sayi, 0)} gelir işlemi
+            </span>
+          </div>
+          
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 20
+          }}>
+            {Object.entries(odemeTuruDagilimi).map(([tur, veri]) => {
+              const odemeInfo = getOdemeTuruBilgisi(tur);
+              const yuzde = toplamGelir > 0 ? ((veri.toplam / toplamGelir) * 100).toFixed(1) : 0;
+              
+              return (
+                <div key={tur} style={{
+                  padding: 24,
+                  background: "linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)",
+                  borderRadius: 12,
+                  borderLeft: `6px solid ${odemeInfo.renk}`,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                  transition: "all 0.3s"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.15)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+                }}>
+                  <div style={{ 
+                    fontSize: 16, 
+                    color: "#555", 
+                    marginBottom: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    fontWeight: "600"
+                  }}>
+                    <span style={{ fontSize: 24 }}>{odemeInfo.icon}</span>
+                    {odemeInfo.etiket}
+                    <div style={{
+                      marginLeft: "auto",
+                      fontSize: 14,
+                      background: odemeInfo.renk + "20",
+                      color: odemeInfo.renk,
+                      padding: "4px 10px",
+                      borderRadius: 20,
+                      fontWeight: "bold"
+                    }}>
+                      {veri.sayi} adet
+                    </div>
+                  </div>
+                  <div style={{ 
+                    fontSize: 28, 
+                    fontWeight: "bold", 
+                    color: odemeInfo.renk,
+                    marginBottom: 8
+                  }}>
+                    {veri.toplam.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div style={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 12
+                  }}>
+                    <div style={{
+                      flex: 1,
+                      height: 6,
+                      background: "#e0e0e0",
+                      borderRadius: 3,
+                      overflow: "hidden"
+                    }}>
+                      <div style={{
+                        width: `${yuzde}%`,
+                        height: "100%",
+                        background: odemeInfo.renk,
+                        borderRadius: 3
+                      }}></div>
+                    </div>
+                    <div style={{ 
+                      fontSize: 14, 
+                      color: "#777",
+                      fontWeight: "600"
+                    }}>
+                      %{yuzde}
+                    </div>
+                  </div>
+                </div>
+              );
             })}
           </div>
-          <div style={{ color: "#777", fontSize: 13 }}>
-            Rapor her yüklendiğinde güncel finans verilerini gösterir.
-            Eski verileri görmek için "Veri Aktar" butonunu kullanın.
+          
+          {/* HESABA YAZ AYRICA BİLGİLENDİRME */}
+          <div style={{
+            marginTop: 24,
+            padding: 16,
+            background: "#f8f9fa",
+            borderRadius: 8,
+            fontSize: 14,
+            color: "#666",
+            borderLeft: "4px solid #f39c12"
+          }}>
+            <strong>ℹ️ Not:</strong> "Hesaba Yaz" ödeme türü kasaya girmediği için bu dağılımda gösterilmez. 
+            Yalnızca üst panelde toplamı ve Adisyon Hareketleri tablosunda detayları görüntülenir.
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -2116,70 +1280,84 @@ export default KasaRaporu;
 
 /* ------------------ YARDIMCI BİLEŞENLER ------------------ */
 
-const OzetKart = ({ baslik, deger, renk, altBilgi, icon }) => (
-  <div style={{
-    background: "#fff",
-    padding: 28,
-    borderRadius: 14,
-    boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-    borderLeft: `6px solid ${renk}`,
-    transition: "all 0.3s",
-    position: "relative",
-    overflow: "hidden"
-  }}
-  onMouseEnter={e => {
-    e.currentTarget.style.transform = "translateY(-6px)";
-    e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.15)";
-  }}
-  onMouseLeave={e => {
-    e.currentTarget.style.transform = "translateY(0)";
-    e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.1)";
-  }}>
-    {icon && (
-      <div style={{
-        position: "absolute",
-        top: 20,
-        right: 20,
-        fontSize: 36,
-        opacity: 0.1,
-        color: renk
-      }}>
-        {icon}
-      </div>
-    )}
-    <div style={{ 
-      fontSize: 16, 
-      color: "#555", 
-      marginBottom: 12,
-      fontWeight: "600",
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }}>
-      {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
-      {baslik}
-    </div>
-    <div style={{ 
-      fontSize: 32, 
-      fontWeight: "bold", 
-      color: renk,
-      marginBottom: 8
-    }}>
-      {deger}
-    </div>
-    {altBilgi && (
+const OzetKart = ({ baslik, deger, renk, aciklama, icon }) => {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 14,
+        padding: 24,
+        boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+        borderLeft: `6px solid ${renk}`,
+        transition: "all 0.3s",
+        position: "relative",
+        overflow: "hidden",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center"
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = "translateY(-6px)";
+        e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.15)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.1)";
+      }}
+    >
+      {icon && (
+        <div style={{
+          position: "absolute",
+          top: 20,
+          right: 20,
+          fontSize: 36,
+          opacity: 0.1,
+          color: renk
+        }}>
+          {icon}
+        </div>
+      )}
+      
       <div style={{ 
-        fontSize: 13, 
-        color: "#777", 
-        marginTop: 8,
-        paddingTop: 12,
-        borderTop: "1px solid #eee"
+        fontSize: 16, 
+        color: "#555", 
+        marginBottom: 12,
+        fontWeight: "600",
+        display: "flex",
+        alignItems: "center",
+        gap: 8
       }}>
-        {altBilgi}
+        {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
+        {baslik}
       </div>
-    )}
-  </div>
-);
+      
+      <div
+        style={{
+          fontSize: 28,
+          fontWeight: "bold",
+          color: renk,
+          marginBottom: aciklama ? 6 : 0
+        }}
+      >
+        {typeof deger === "number"
+          ? deger.toLocaleString("tr-TR") + " ₺"
+          : deger}
+      </div>
+      
+      {aciklama && (
+        <div style={{ 
+          fontSize: 13, 
+          color: "#777",
+          fontWeight: "500",
+          marginTop: 4
+        }}>
+          {aciklama}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Th = ({ children, align, style }) => (
   <th style={{

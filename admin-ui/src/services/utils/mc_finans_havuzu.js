@@ -1,886 +1,725 @@
-/*
-  mc_finans_havuzu.js - MERKEZİ FİNANSAL VERİ DEPOSU
-  ----------------------------------------------------
-  MyCafe sistemindeki TÜM parasal hareketleri localStorage'da toplar.
-  Tüm raporlar için TEK DOĞRULUK KAYNAĞI (Single Source of Truth).
-  
-  KULLANIM:
-  localStorage'da "mc_finans_havuzu" key'i altında veri tutar.
-  Tüm raporlar bu dosyadaki fonksiyonlarla bu veriyi okur/yazar.
-*/
+// mc_finans_havuzu.js
+// ⚠️ TEK GEÇERLİ FİNANS YOLU - TEK DOĞRULUK KAYNAĞI
+// Bu modül sadece NORMALİZE EDİLMİŞ finans kayıtları alır
 
-// 🔧 LOCALSTORAGE KEY
-const FİNANS_HAVUZU_KEY = "mc_finans_havuzu";
-
-/* ---------------------------------------------------------
-   YARDIMCI FONKSİYONLAR
---------------------------------------------------------- */
-
-// 📅 Tarihi YYYY-MM-DD formatına çevir
-const tarihiGunIdYap = (tarihString) => {
-  if (!tarihString) return null;
-  try {
-    const tarih = new Date(tarihString);
-    if (isNaN(tarih.getTime())) return null;
+// 📌 FİNANS HAVUZU DOĞRULAMA KURALLARI
+const FINANS_KURALLARI = {
+    // Kabul edilen kayıt türleri
+    KABUL_EDILEN_TURLER: ["GELIR", "GIDER", "INDIRIM", "ZAYIAT", "ODEME"],
     
-    const yil = tarih.getFullYear();
-    const ay = String(tarih.getMonth() + 1).padStart(2, '0');
-    const gun = String(tarih.getDate()).padStart(2, '0');
+    // Kabul edilen ödeme türleri (HESABA_YAZ eklendi - borç takibi için)
+    KABUL_EDILEN_ODEME_TURLERI: ["NAKIT", "KART", "HAVALE", "INDIRIM", "HESABA_YAZ"],
     
-    return `${yil}-${ay}-${gun}`;
-  } catch {
-    return null;
-  }
+    // Reddedilen ödeme türleri (finans havuzuna GELİR olarak girilmez)
+    REDDEDILEN_ODEME_TURLERI: ["BORC", "VERESIYE"], // HESABA_YAZ çıkarıldı
+    
+    // Zorunlu alanlar
+    ZORUNLU_ALANLAR: ["tur", "odemeTuru", "tutar", "kaynak", "tarih", "gunId"]
 };
 
-// 💳 Ödeme türünü normalize et
-const normalizeOdemeTuru = (tip) => {
-  if (!tip) return "NAKIT";
-  
-  const tipUpper = tip.toUpperCase();
-  
-  const eslestirme = {
-    // Nakit
-    "NAKIT": "NAKIT",
-    "NAKİT": "NAKIT",
-    "CASH": "NAKIT",
-    
-    // Kart
-    "KART": "KART",
-    "KREDI": "KART",
-    "KREDİ": "KART",
-    "KREDI_KARTI": "KART",
-    "KREDİ_KARTI": "KART",
-    "CREDIT": "KART",
-    "CREDIT_CARD": "KART",
-    "DEBIT": "KART",
-    "DEBIT_CARD": "KART",
-    
-    // Havale
-    "HAVALE": "HAVALE",
-    "EFT": "HAVALE",
-    "TRANSFER": "HAVALE",
-    "BANK_TRANSFER": "HAVALE",
-    
-    // Hesaba Yaz
-    "HESABA_YAZ": "HESABA_YAZ",
-    "HESABAYAZ": "HESABA_YAZ",
-    "BORC": "HESABA_YAZ",
-    "BORÇ": "HESABA_YAZ",
-    "CARİ": "HESABA_YAZ",
-    "CARİ HESAP": "HESABA_YAZ",
-    "CREDIT_ACCOUNT": "HESABA_YAZ",
-    
-    // Bilardo
-    "BILARDO": "BILARDO",
-    "BİLARDO": "BILARDO",
-    "POOL": "BILARDO",
-    "BILLIARD": "BILARDO",
-  };
-  
-  return eslestirme[tipUpper] || "NAKIT";
-};
+// 📌 LOCALSTORAGE KEY'LERİ
+const FINANS_HAVUZU_KEY = "mc_finans_havuzu";
+const AKTIF_GUN_KEY = "mc_aktif_gun";
 
-/* ---------------------------------------------------------
-   TEMEL VERİ İŞLEME FONKSİYONLARI
---------------------------------------------------------- */
+// ============================================================
+// YARDIMCI FONKSİYONLAR
+// ============================================================
 
 /**
- * 🔍 Finans havuzundaki tüm kayıtları getir
- * @returns {Array} Finans kayıtları dizisi
+ * Tarihten gunId alır (YYYY-MM-DD formatında)
+ * @param {string|Date} tarih - Tarih
+ * @returns {string} gunId (YYYY-MM-DD)
  */
-export const getFinansHavuzu = () => {
-  try {
-    const havuz = localStorage.getItem(FİNANS_HAVUZU_KEY);
-    return havuz ? JSON.parse(havuz) : [];
-  } catch (error) {
-    console.error("❌ Finans havuzu okuma hatası:", error);
-    return [];
-  }
+const gunIdAl = (tarih) => {
+    try {
+        const dateObj = new Date(tarih);
+        if (isNaN(dateObj.getTime())) {
+            throw new Error('Geçersiz tarih');
+        }
+        
+        const yil = dateObj.getFullYear();
+        const ay = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const gun = String(dateObj.getDate()).padStart(2, '0');
+        
+        return `${yil}-${ay}-${gun}`;
+    } catch (error) {
+        console.error('❌ gunId alınamadı:', error);
+        // Bugünün tarihini döndür
+        const bugun = new Date();
+        const yil = bugun.getFullYear();
+        const ay = String(bugun.getMonth() + 1).padStart(2, '0');
+        const gun = String(bugun.getDate()).padStart(2, '0');
+        return `${yil}-${ay}-${gun}`;
+    }
 };
 
 /**
- * 💾 Finans havuzuna yeni kayıt ekle
- * @param {Object} kayit - Eklenecek finans kaydı
- * @returns {Object} Eklenen kayıt
+ * Finans kaydını doğrular
+ * @param {Object} kayit - Doğrulanacak finans kaydı
+ * @returns {Object} { isValid: boolean, errors: Array }
  */
-export const finansKaydiEkle = (kayit) => {
-  try {
-    const havuz = getFinansHavuzu();
-    
-    // Normalize et
-    const normalizasyon = {
-      id: kayit.id || `finans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      tarih: kayit.tarih || new Date().toISOString(),
-      tur: kayit.tur || "GIDER", // GELIR, GIDER, HESABA_YAZ_BORC
-      aciklama: kayit.aciklama || "Finans Hareketi",
-      tutar: Number(kayit.tutar) || 0,
-      odemeTuru: normalizeOdemeTuru(kayit.odemeTuru || kayit.odemeTipi),
-      gunId: kayit.gunId || tarihiGunIdYap(kayit.tarih) || tarihiGunIdYap(new Date()),
-      kaynak: kayit.kaynak || "MANUEL", // ADISYON, BILARDO, GIDER, TAHSILAT
-      referansId: kayit.referansId || kayit.adisyonId || null,
-      masaId: kayit.masaId || kayit.masa || null,
-      olusturulmaTarihi: new Date().toISOString(),
-      normalizeEdildi: true
+const finansKaydiDogrula = (kayit) => {
+    const errors = [];
+
+    // 1. Zorunlu alan kontrolü
+    FINANS_KURALLARI.ZORUNLU_ALANLAR.forEach(alan => {
+        if (!kayit[alan]) {
+            errors.push(`Zorunlu alan eksik: ${alan}`);
+        }
+    });
+
+    // 2. Tür kontrolü
+    if (!FINANS_KURALLARI.KABUL_EDILEN_TURLER.includes(kayit.tur)) {
+        errors.push(`Geçersiz tür: ${kayit.tur}. Kabul edilen türler: ${FINANS_KURALLARI.KABUL_EDILEN_TURLER.join(', ')}`);
+    }
+
+    // 3. Ödeme türü kontrolü - TÜR'e göre özel kurallar
+    if (kayit.tur === "GELIR") {
+        // GELİR için: BORC, VERESIYE reddedilir, HESABA_YAZ kabul edilir (borç takibi için)
+        if (["BORC", "VERESIYE"].includes(kayit.odemeTuru)) {
+            errors.push(`Reddedilen ödeme türü: ${kayit.odemeTuru}. Bu tür finans havuzuna GELİR olarak kaydedilmez.`);
+        }
+        
+        if (kayit.odemeTuru === "INDIRIM") {
+            errors.push("GELIR kaydı INDIRIM ödeme türü ile oluşturulamaz.");
+        }
+        
+        // HESABA_YAZ artık kabul ediliyor, diğer geçerli türler
+        if (!["NAKIT", "KART", "HAVALE", "HESABA_YAZ"].includes(kayit.odemeTuru)) {
+            errors.push(`Geçersiz GELIR ödeme türü: ${kayit.odemeTuru}. Kabul edilen türler: NAKIT, KART, HAVALE, HESABA_YAZ`);
+        }
+    } else if (kayit.tur === "INDIRIM") {
+        // İNDİRİM için: ödeme türü sadece INDIRIM olabilir
+        if (kayit.odemeTuru !== "INDIRIM") {
+            errors.push(`INDIRIM kaydının ödeme türü sadece "INDIRIM" olabilir. Verilen: ${kayit.odemeTuru}`);
+        }
+    } else if (kayit.tur === "GIDER") {
+        // GİDER için: tüm ödeme türleri geçerli (NAKIT, KART, HAVALE)
+        if (!["NAKIT", "KART", "HAVALE", "INDIRIM"].includes(kayit.odemeTuru)) {
+            errors.push(`Geçersiz GIDER ödeme türü: ${kayit.odemeTuru}`);
+        }
+    }
+
+    // 4. Tutar kontrolü
+    if (typeof kayit.tutar !== 'number' || kayit.tutar < 0) {
+        errors.push(`Geçersiz tutar: ${kayit.tutar}. Tutar pozitif bir sayı olmalıdır.`);
+    }
+
+    // 5. Tarih kontrolü
+    if (!kayit.tarih || !Date.parse(kayit.tarih)) {
+        errors.push(`Geçersiz tarih: ${kayit.tarih}`);
+    }
+
+    // 6. gunId kontrolü ve tarih-gunId tutarlılığı
+    if (!kayit.gunId || !/^\d{4}-\d{2}-\d{2}$/.test(kayit.gunId)) {
+        errors.push(`Geçersiz gunId formatı: ${kayit.gunId}. Format: YYYY-MM-DD olmalıdır.`);
+    } else {
+        // Tarih ile gunId tutarlılık kontrolü
+        try {
+            const tarihGunId = gunIdAl(kayit.tarih);
+            if (kayit.gunId !== tarihGunId) {
+                errors.push(`gunId (${kayit.gunId}) tarih (${tarihGunId}) ile uyumsuz. Tarihe göre gunId: ${tarihGunId}`);
+            }
+        } catch (e) {
+            errors.push(`Tarih-gunId karşılaştırması yapılamadı: ${e.message}`);
+        }
+    }
+
+    // 7. HESABA_YAZ için özel kontroller
+    if (kayit.odemeTuru === "HESABA_YAZ") {
+        if (!kayit.adisyonId && !kayit.referansId) {
+            errors.push("HESABA_YAZ kaydı için adisyonId veya referansId gereklidir.");
+        }
+    }
+
+    return {
+        isValid: errors.length === 0,
+        errors
     };
-    
-    // Aynı kayıt var mı kontrol et
-    const ayniKayitVar = havuz.some(h => 
-      h.id === normalizasyon.id || 
-      (h.referansId && h.referansId === normalizasyon.referansId && h.tur === normalizasyon.tur)
-    );
-    
-    if (!ayniKayitVar) {
-      havuz.push(normalizasyon);
-      localStorage.setItem(FİNANS_HAVUZU_KEY, JSON.stringify(havuz));
-      console.log("✅ Finans havuzuna kayıt eklendi:", normalizasyon);
-      return normalizasyon;
+};
+
+/**
+ * Finans kaydını normalize eder
+ * @param {Object} kayit - Normalize edilecek kayıt
+ * @returns {Object} Normalize edilmiş kayıt
+ */
+const finansKaydiNormalizeEt = (kayit) => {
+    const normalized = { ...kayit };
+
+    // 1. ID kontrolü
+    if (!normalized.id) {
+        normalized.id = `finans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // 2. Tarih normalizasyonu
+    if (!normalized.tarih) {
+        normalized.tarih = new Date().toISOString();
+    }
+
+    // 3. gunId normalizasyonu (tarihe göre otomatik)
+    if (!normalized.gunId) {
+        try {
+            normalized.gunId = gunIdAl(normalized.tarih);
+        } catch (error) {
+            console.warn('⚠️ gunId alınamadı, bugünün tarihi kullanılıyor:', error);
+            normalized.gunId = gunIdAl(new Date());
+        }
+    } else {
+        // Mevcut gunId ile tarih tutarlılığını sağla
+        try {
+            const tarihGunId = gunIdAl(normalized.tarih);
+            if (normalized.gunId !== tarihGunId) {
+                console.warn(`⚠️ gunId (${normalized.gunId}) tarih (${tarihGunId}) ile uyumsuz, gunId tarihe göre güncelleniyor`);
+                normalized.gunId = tarihGunId;
+            }
+        } catch (e) {
+            // Hata durumunda pas geç
+        }
+    }
+
+    // 4. Kullanıcı normalizasyonu
+    if (!normalized.kullanici) {
+        const aktifKullanici = localStorage.getItem('mc_aktif_kullanici') || 'ADMIN';
+        normalized.kullanici = aktifKullanici;
+    }
+
+    // 5. Tutar normalizasyonu
+    if (typeof normalized.tutar === 'string') {
+        normalized.tutar = Number.parseFloat(normalized.tutar) || 0;
+    }
+
+    // 6. Decimal kontrolü (2 ondalık basamak)
+    normalized.tutar = Math.round(normalized.tutar * 100) / 100;
+
+    // 7. Kaynak normalizasyonu (HESABA_YAZ için özel)
+    if (!normalized.kaynak) {
+        if (normalized.odemeTuru === "HESABA_YAZ") {
+            normalized.kaynak = "HESABA_YAZ";
+        } else {
+            normalized.kaynak = "SISTEM";
+        }
     }
     
-    console.log("ℹ️ Aynı kayıt zaten var, eklenmedi");
-    return null;
-    
-  } catch (error) {
-    console.error("❌ Finans kaydı ekleme hatası:", error);
-    return null;
-  }
+    // 8. Ödeme türüne göre özel alanlar (HESABA_YAZ için)
+    if (normalized.odemeTuru === "HESABA_YAZ") {
+        // HESABA_YAZ kayıtları için adisyonId kontrolü
+        if (!normalized.adisyonId && normalized.referansId) {
+            normalized.adisyonId = normalized.referansId;
+        }
+        
+        // Borç işlemi olduğunu belirt
+        normalized.borcIslemi = true;
+        
+        // Hesaba yaz işlemleri için özel açıklama
+        if (!normalized.aciklama) {
+            normalized.aciklama = "Müşteri hesabına yazıldı";
+        }
+    }
+
+    // 9. Oluşturma zamanı
+    if (!normalized.created_at) {
+        normalized.created_at = new Date().toISOString();
+    }
+
+    // 10. Güncelleme zamanı
+    normalized.updated_at = new Date().toISOString();
+
+    return normalized;
 };
 
 /**
- * 🔄 Finans havuzunu temizle (SADECE GELİŞTİRME!)
- * DİKKAT: Bu fonksiyon tüm finans verilerini siler
+ * Aktif günü kontrol eder ve gerekirse oluşturur
+ * @returns {string} Aktif gunId
  */
-export const finansHavuzunuTemizle = () => {
-  if (window.confirm("TÜM finans verileri silinecek. Emin misiniz?")) {
-    localStorage.removeItem(FİNANS_HAVUZU_KEY);
-    console.log("🗑️ Finans havuzu temizlendi");
-    return true;
-  }
-  return false;
+const aktifGunuKontrolEt = () => {
+    try {
+        const aktifGun = JSON.parse(localStorage.getItem(AKTIF_GUN_KEY)) || {};
+        
+        if (!aktifGun.aktifGunId) {
+            const bugun = gunIdAl(new Date());
+            const yeniAktifGun = {
+                aktifGunId: bugun,
+                baslangic: new Date().toISOString(),
+                kullanici: localStorage.getItem('mc_aktif_kullanici') || 'ADMIN',
+                durum: "ACIK"
+            };
+            
+            localStorage.setItem(AKTIF_GUN_KEY, JSON.stringify(yeniAktifGun));
+            console.log('✅ Yeni aktif gün oluşturuldu:', bugun);
+            return bugun;
+        }
+        
+        return aktifGun.aktifGunId;
+    } catch (error) {
+        console.error('❌ Aktif gün kontrolünde hata:', error);
+        return gunIdAl(new Date());
+    }
 };
 
-/* ---------------------------------------------------------
-   OTOMATİK VERİ AKTARMA FONKSİYONLARI
---------------------------------------------------------- */
-
 /**
- * 🔄 Tüm kapalı adisyonları finans havuzuna aktar (GÜNCELLENMİŞ)
- * @returns {number} Aktarılan kayıt sayısı
+ * Finans kaydına otomatik alanlar ekler
+ * @param {Object} kayit - Temel finans kaydı
+ * @returns {Object} Tamamlanmış finans kaydı
  */
-export const tumAdisyonlariFinansHavuzunaAktar = () => {
-  try {
-    console.log("🔄 Tüm adisyonlar finans havuzuna aktarılıyor...");
-    
-    // 1. Tüm veri kaynaklarını oku
-    const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-    const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-    const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-    
-    let eklenenKayitSayisi = 0;
-    
-    // 2. KAPALI NORMAL ADİSYONLARI AKTAR
-    const kapaliNormalAdisyonlar = adisyonlar.filter(a => a.kapali === true);
-    console.log(`📋 ${kapaliNormalAdisyonlar.length} kapalı normal adisyon bulundu`);
-    
-    kapaliNormalAdisyonlar.forEach(adisyon => {
-      // GÜNCELLEME: Ödeme türünü farklı kaynaklardan al
-      const odemeTuru = normalizeOdemeTuru(
-        adisyon.kapatmaOdemeTuru ||
-        adisyon.odemeTuru ||
-        adisyon.odemeTipi ||
-        (adisyon.odemeler && adisyon.odemeler.length > 0 ? 
-          adisyon.odemeler[0].odemeTuru : null) ||
-        "NAKIT"
-      );
-      
-      const toplamTutar = adisyon.toplamTutar || 
-        (adisyon.kalemler ? adisyon.kalemler.reduce((sum, kalem) => 
-          sum + (Number(kalem.birimFiyat || 0) * Number(kalem.adet || 1)), 0) : 0);
-      
-      // Masa numarasını doğru şekilde al
-      const masaId = adisyon.masaId || 
-                     adisyon.masaNum || 
-                     adisyon.masaNo || 
-                     adisyon.masa ||
-                     (adisyon.aciklama ? (adisyon.aciklama.match(/MASA\s+(\d+)/i) ? adisyon.aciklama.match(/MASA\s+(\d+)/i)[1] : null) : null);
-      
-      console.log(`📝 Adisyon ${adisyon.id}: Ödeme Türü = ${odemeTuru}, Tutar = ${toplamTutar}, Masa ID = ${masaId}`);
-      
-      // GELİR kaydı oluştur (HESABA_YAZ hariç)
-      if (odemeTuru !== "HESABA_YAZ") {
-        finansKaydiEkle({
-          id: `gelir_${adisyon.id || adisyon.adisyonNo || Date.now()}`,
-          tarih: adisyon.kapanisZamani || adisyon.tarih || new Date().toISOString(),
-          tur: "GELIR",
-          aciklama: `Adisyon #${adisyon.id || adisyon.adisyonNo} (${adisyon.masaNo || adisyon.masaAdi || 'Masa'})`,
-          tutar: toplamTutar,
-          odemeTuru: odemeTuru,
-          gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
-          kaynak: "ADISYON",
-          referansId: adisyon.id || adisyon.adisyonNo,
-          masaId: masaId
-        });
-        eklenenKayitSayisi++;
-      }
-      
-      // HESABA_YAZ için borç kaydı (BU KASAYA GİRMEZ!)
-      if (odemeTuru === "HESABA_YAZ") {
-        finansKaydiEkle({
-          id: `hesaba_yaz_borc_${adisyon.id || Date.now()}`,
-          tarih: adisyon.kapanisZamani || new Date().toISOString(),
-          tur: "HESABA_YAZ_BORC",
-          aciklama: `Hesaba Yaz - ${adisyon.masaNo || adisyon.masaAdi || 'Masa'} #${adisyon.id}`,
-          tutar: toplamTutar,
-          odemeTuru: "HESABA_YAZ",
-          gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
-          kaynak: "ADISYON",
-          referansId: adisyon.id || adisyon.adisyonNo,
-          masaId: masaId
-        });
-        eklenenKayitSayisi++;
-      }
-    });
-    
-    // 3. KAPALI BİLARDO ADİSYONLARI AKTAR
-    const kapaliBilardoAdisyonlar = bilardoAdisyonlar.filter(a => a.kapali === true);
-    console.log(`🎱 ${kapaliBilardoAdisyonlar.length} kapalı bilardo adisyon bulundu`);
-    
-    kapaliBilardoAdisyonlar.forEach(adisyon => {
-      const odemeTuru = normalizeOdemeTuru(
-        adisyon.kapatmaOdemeTuru ||
-        adisyon.odemeTuru ||
-        adisyon.odemeTipi ||
-        "NAKIT"
-      );
-      const toplamTutar = adisyon.toplamTutar || adisyon.tutar || 0;
-      
-      // Bilardo masa numarası
-      const masaId = adisyon.masaId || adisyon.masaNumarasi;
-      
-      if (odemeTuru !== "HESABA_YAZ") {
-        finansKaydiEkle({
-          id: `bilardo_gelir_${adisyon.id || Date.now()}`,
-          tarih: adisyon.kapanisZamani || adisyon.tarih || new Date().toISOString(),
-          tur: "GELIR",
-          aciklama: `Bilardo Adisyon #${adisyon.id} (${adisyon.masaNumarasi || 'Bilardo Masa'})`,
-          tutar: toplamTutar,
-          odemeTuru: odemeTuru,
-          gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
-          kaynak: "BİLARDO",
-          referansId: adisyon.id,
-          masaId: masaId
-        });
-        eklenenKayitSayisi++;
-      }
-    });
-    
-    // 4. GİDERLERİ AKTAR
-    giderler.forEach(gider => {
-      finansKaydiEkle({
-        id: `gider_${gider.id || Date.now()}`,
-        tarih: gider.tarih || new Date().toISOString(),
-        tur: "GIDER",
-        aciklama: gider.aciklama || "Gider",
-        tutar: Number(gider.tutar || 0),
-        odemeTuru: "NAKIT",
-        gunId: gider.gunId || tarihiGunIdYap(gider.tarih) || tarihiGunIdYap(new Date()),
-        kaynak: "GIDER",
-        referansId: gider.id,
-        kategori: gider.kategori || "GENEL"
-      });
-      eklenenKayitSayisi++;
-    });
-    
-    console.log(`✅ Finans havuzuna ${eklenenKayitSayisi} kayıt aktarıldı.`);
-    return eklenenKayitSayisi;
-    
-  } catch (error) {
-    console.error("❌ Adisyon aktarma hatası:", error);
-    return 0;
-  }
+const finansKaydiniTamamla = (kayit) => {
+    const tamamlanmis = { ...kayit };
+
+    // Aktif gunId ekle (tarihe göre otomatik)
+    if (!tamamlanmis.gunId) {
+        tamamlanmis.gunId = aktifGunuKontrolEt();
+    }
+
+    // Benzersiz ID ekle
+    if (!tamamlanmis.id) {
+        tamamlanmis.id = `finans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // Oluşturma zamanı
+    if (!tamamlanmis.created_at) {
+        tamamlanmis.created_at = new Date().toISOString();
+    }
+
+    // Güncelleme zamanı
+    tamamlanmis.updated_at = new Date().toISOString();
+
+    // Varsayılan kullanıcı
+    if (!tamamlanmis.kullanici) {
+        tamamlanmis.kullanici = localStorage.getItem('mc_aktif_kullanici') || 'ADMIN';
+    }
+
+    return tamamlanmis;
 };
 
-/* ---------------------------------------------------------
-   FİLTRELEME VE SORGULAMA FONKSİYONLARI
---------------------------------------------------------- */
+// ============================================================
+// ANA FONKSİYONLAR
+// ============================================================
 
 /**
- * 📅 Tarihe göre filtrele
+ * TEK DOĞRU FİNANS YOLU - Finans kayıtlarını ekler
+ * @param {Array|Object} kayitlar - Normalize edilmiş finans kayıtları (dizi veya tek kayıt)
+ * @returns {Object} { success: boolean, eklenen: number, hatalar: Array, kayitIds: Array }
+ */
+const finansKayitlariEkle = (kayitlar) => {
+    console.log('💰 [FINANS-HAVUZU] finansKayitlariEkle çağrıldı');
+
+    try {
+        // Giriş normalizasyonu
+        const kayitListesi = Array.isArray(kayitlar) ? kayitlar : [kayitlar];
+        
+        if (kayitListesi.length === 0) {
+            console.warn('⚠️ [FINANS-HAVUZU] Boş kayıt listesi gönderildi');
+            return {
+                success: false,
+                eklenen: 0,
+                hatalar: ['Boş kayıt listesi gönderildi'],
+                kayitIds: []
+            };
+        }
+
+        console.log(`💰 [FINANS-HAVUZU] ${kayitListesi.length} adet finans kaydı işleniyor...`);
+
+        // Mevcut finans havuzunu al
+        const mevcutHavuz = JSON.parse(localStorage.getItem(FINANS_HAVUZU_KEY) || "[]");
+        const hatalar = [];
+        const basariliKayitlar = [];
+        const eklenenKayitIds = [];
+
+        // Her kaydı işle
+        kayitListesi.forEach((kayit, index) => {
+            try {
+                console.log(`📝 [FINANS-HAVUZU] Kayıt ${index + 1}/${kayitListesi.length} işleniyor:`, {
+                    tur: kayit.tur,
+                    odemeTuru: kayit.odemeTuru,
+                    tutar: kayit.tutar
+                });
+
+                // 1. NORMALİZE ET
+                const normalizedKayit = finansKaydiNormalizeEt(kayit);
+
+                // 2. DOĞRULA
+                const dogrulama = finansKaydiDogrula(normalizedKayit);
+                
+                if (!dogrulama.isValid) {
+                    hatalar.push({
+                        kayitIndex: index,
+                        kayitId: normalizedKayit.id,
+                        hatalar: dogrulama.errors,
+                        orijinal: kayit
+                    });
+                    console.error(`❌ [FINANS-HAVUZU] Kayıt ${index + 1} doğrulama başarısız:`, dogrulama.errors);
+                    return; // Bu kaydı atla
+                }
+
+                // 3. TAMAMLA
+                const tamamlanmisKayit = finansKaydiniTamamla(normalizedKayit);
+
+                // 4. TEKRAR KONTROLÜ (ID çakışması)
+                const mevcutKayit = mevcutHavuz.find(k => k.id === tamamlanmisKayit.id);
+                if (mevcutKayit) {
+                    console.warn(`⚠️ [FINANS-HAVUZU] Kayıt ID çakışması: ${tamamlanmisKayit.id}, yeni ID oluşturuluyor...`);
+                    tamamlanmisKayit.id = `finans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                }
+
+                // 5. EKLE
+                mevcutHavuz.push(tamamlanmisKayit);
+                basariliKayitlar.push(tamamlanmisKayit);
+                eklenenKayitIds.push(tamamlanmisKayit.id);
+
+                console.log(`✅ [FINANS-HAVUZU] Kayıt ${index + 1} başarıyla eklendi:`, {
+                    id: tamamlanmisKayit.id,
+                    tur: tamamlanmisKayit.tur,
+                    odemeTuru: tamamlanmisKayit.odemeTuru,
+                    tutar: tamamlanmisKayit.tutar.toFixed(2),
+                    gunId: tamamlanmisKayit.gunId
+                });
+
+            } catch (kayitHatasi) {
+                console.error(`❌ [FINANS-HAVUZU] Kayıt ${index + 1} işlenirken hata:`, kayitHatasi);
+                hatalar.push({
+                    kayitIndex: index,
+                    hata: kayitHatasi.message,
+                    orijinal: kayit
+                });
+            }
+        });
+
+        // 6. HAVUZU KAYDET
+        if (basariliKayitlar.length > 0) {
+            localStorage.setItem(FINANS_HAVUZU_KEY, JSON.stringify(mevcutHavuz));
+            
+            // Storage event'ini tetikle
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: FINANS_HAVUZU_KEY,
+                newValue: JSON.stringify(mevcutHavuz)
+            }));
+
+            console.log(`💰 [FINANS-HAVUZU] ${basariliKayitlar.length} adet finans kaydı başarıyla eklendi. Yeni toplam: ${mevcutHavuz.length}`);
+        }
+
+        // 7. RAPOR OLUŞTUR
+        const toplamGelir = basariliKayitlar
+            .filter(k => k.tur === "GELIR" && k.odemeTuru !== "HESABA_YAZ")
+            .reduce((sum, k) => sum + k.tutar, 0);
+        
+        const toplamIndirim = basariliKayitlar
+            .filter(k => k.tur === "INDIRIM")
+            .reduce((sum, k) => sum + k.tutar, 0);
+
+        console.log('📊 [FINANS-HAVUZU] İşlem raporu:', {
+            toplamIslenen: kayitListesi.length,
+            basarili: basariliKayitlar.length,
+            basarisiz: hatalar.length,
+            toplamGelir: toplamGelir.toFixed(2),
+            toplamIndirim: toplamIndirim.toFixed(2),
+            eklenenKayitIds: eklenenKayitIds
+        });
+
+        return {
+            success: basariliKayitlar.length > 0,
+            eklenen: basariliKayitlar.length,
+            hatalar: hatalar,
+            kayitIds: eklenenKayitIds,
+            rapor: {
+                toplamGelir,
+                toplamIndirim,
+                gunId: aktifGunuKontrolEt()
+            }
+        };
+
+    } catch (error) {
+        console.error('❌ [FINANS-HAVUZU] finansKayitlariEkle fonksiyonunda beklenmeyen hata:', error);
+        
+        return {
+            success: false,
+            eklenen: 0,
+            hatalar: [{
+                hata: error.message,
+                stack: error.stack
+            }],
+            kayitIds: [],
+            rapor: null
+        };
+    }
+};
+
+/**
+ * Tek bir finans kaydı ekler (finansKayitlariEkle wrapper'ı)
+ * @param {Object} kayit - Normalize edilmiş finans kaydı
+ * @returns {Object} { success: boolean, kayitId: string, hatalar: Array }
+ */
+const kayitEkle = (kayit) => {
+    console.log('💰 [FINANS-HAVUZU] kayitEkle çağrıldı (tek kayıt)');
+    
+    const sonuc = finansKayitlariEkle(kayit);
+    
+    return {
+        success: sonuc.success,
+        kayitId: sonuc.kayitIds.length > 0 ? sonuc.kayitIds[0] : null,
+        hatalar: sonuc.hatalar
+    };
+};
+
+// ============================================================
+// RAPORLAMA FONKSİYONLARI
+// ============================================================
+
+/**
+ * Belirli bir gün için finans raporu oluşturur
+ * @param {string} gunId - Rapor alınacak gün ID (YYYY-MM-DD)
+ * @returns {Object} Günlük finans raporu
+ */
+const gunlukFinansRaporuAl = (gunId = null) => {
+    try {
+        const hedefGunId = gunId || aktifGunuKontrolEt();
+        const havuz = JSON.parse(localStorage.getItem(FINANS_HAVUZU_KEY) || "[]");
+        
+        const gunKayitlari = havuz.filter(k => k.gunId === hedefGunId);
+        
+        // Gelirleri ödeme türüne göre grupla
+        const gelirGruplari = {};
+        const gelirler = gunKayitlari.filter(k => k.tur === "GELIR");
+        
+        gelirler.forEach(gelir => {
+            const tip = gelir.odemeTuru || "DIGER";
+            if (!gelirGruplari[tip]) {
+                gelirGruplari[tip] = {
+                    toplam: 0,
+                    kayitlar: []
+                };
+            }
+            gelirGruplari[tip].toplam += gelir.tutar;
+            gelirGruplari[tip].kayitlar.push(gelir);
+        });
+        
+        // Diğer türleri grupla
+        const digerTurler = {};
+        gunKayitlari
+            .filter(k => k.tur !== "GELIR")
+            .forEach(kayit => {
+                const tur = kayit.tur;
+                if (!digerTurler[tur]) {
+                    digerTurler[tur] = {
+                        toplam: 0,
+                        kayitlar: []
+                    };
+                }
+                digerTurler[tur].toplam += kayit.tutar;
+                digerTurler[tur].kayitlar.push(kayit);
+            });
+        
+        // Toplamlar
+        const toplamGelir = gelirler.reduce((sum, g) => sum + g.tutar, 0);
+        const toplamIndirim = gunKayitlari
+            .filter(k => k.tur === "INDIRIM")
+            .reduce((sum, k) => sum + k.tutar, 0);
+        
+        const netGelir = toplamGelir - toplamIndirim;
+        
+        const rapor = {
+            gunId: hedefGunId,
+            toplamKayit: gunKayitlari.length,
+            toplamGelir,
+            toplamIndirim,
+            netGelir,
+            gelirGruplari,
+            digerTurler,
+            kayitlar: gunKayitlari,
+            olusturulmaZamani: new Date().toISOString()
+        };
+        
+        console.log(`📊 [FINANS-HAVUZU] ${hedefGunId} günlük rapor oluşturuldu:`, {
+            toplamKayit: rapor.toplamKayit,
+            toplamGelir: rapor.toplamGelir.toFixed(2),
+            toplamIndirim: rapor.toplamIndirim.toFixed(2),
+            netGelir: rapor.netGelir.toFixed(2)
+        });
+        
+        return rapor;
+        
+    } catch (error) {
+        console.error('❌ [FINANS-HAVUZU] Günlük finans raporu alınırken hata:', error);
+        return null;
+    }
+};
+
+/**
+ * Tarih aralığı için finans raporu oluşturur
  * @param {string} baslangicTarihi - Başlangıç tarihi (YYYY-MM-DD)
  * @param {string} bitisTarihi - Bitiş tarihi (YYYY-MM-DD)
- * @returns {Array} Filtrelenmiş kayıtlar
+ * @returns {Object} Tarih aralığı finans raporu
  */
-export const tariheGoreFiltrele = (baslangicTarihi, bitisTarihi) => {
-  const tumKayitlar = getFinansHavuzu();
-  
-  if (!baslangicTarihi && !bitisTarihi) {
-    return tumKayitlar;
-  }
-  
-  return tumKayitlar.filter(kayit => {
-    const kayitTarihi = kayit.gunId || tarihiGunIdYap(kayit.tarih);
-    if (!kayitTarihi) return false;
-    
-    if (baslangicTarihi && kayitTarihi < baslangicTarihi) return false;
-    if (bitisTarihi && kayitTarihi > bitisTarihi) return false;
-    
-    return true;
-  });
-};
-
-/**
- * 💰 Türüne göre filtrele
- * @param {string} tur - "GELIR", "GIDER", "HESABA_YAZ_BORC"
- * @returns {Array} Filtrelenmiş kayıtlar
- */
-export const tureGoreFiltrele = (tur) => {
-  const tumKayitlar = getFinansHavuzu();
-  
-  if (!tur) return tumKayitlar;
-  
-  return tumKayitlar.filter(kayit => kayit.tur === tur);
-};
-
-/**
- * 💳 Ödeme türüne göre filtrele
- * @param {string} odemeTuru - "NAKIT", "KART", "HAVALE", "HESABA_YAZ", "BILARDO"
- * @returns {Array} Filtrelenmiş kayıtlar
- */
-export const odemeTuruGoreFiltrele = (odemeTuru) => {
-  const tumKayitlar = getFinansHavuzu();
-  
-  if (!odemeTuru) return tumKayitlar;
-  
-  return tumKayitlar.filter(kayit => kayit.odemeTuru === odemeTuru);
-};
-
-/**
- * 📊 Ödeme türlerine göre toplamları hesapla
- * @param {string} baslangicTarihi - Başlangıç tarihi (opsiyonel)
- * @param {string} bitisTarihi - Bitiş tarihi (opsiyonel)
- * @returns {Object} Ödeme türü bazlı toplamlar
- */
-export const odemeTuruBazliToplamlar = (baslangicTarihi, bitisTarihi) => {
-  const kayitlar = baslangicTarihi || bitisTarihi 
-    ? tariheGoreFiltrele(baslangicTarihi, bitisTarihi)
-    : getFinansHavuzu();
-  
-  const gruplar = {
-    NAKIT: { toplam: 0, sayi: 0, hareketler: [] },
-    KART: { toplam: 0, sayi: 0, hareketler: [] },
-    HAVALE: { toplam: 0, sayi: 0, hareketler: [] },
-    HESABA_YAZ: { toplam: 0, sayi: 0, hareketler: [] },
-    BILARDO: { toplam: 0, sayi: 0, hareketler: [] }
-  };
-  
-  kayitlar.forEach(kayit => {
-    const odemeTuru = kayit.odemeTuru || "NAKIT";
-    
-    if (gruplar[odemeTuru]) {
-      if (kayit.tur === "GELIR") {
-        gruplar[odemeTuru].toplam += Number(kayit.tutar || 0);
-        gruplar[odemeTuru].sayi += 1;
-        gruplar[odemeTuru].hareketler.push(kayit);
-      } else if (kayit.tur === "HESABA_YAZ_BORC") {
-        gruplar.HESABA_YAZ.toplam += Number(kayit.tutar || 0);
-        gruplar.HESABA_YAZ.sayi += 1;
-        gruplar.HESABA_YAZ.hareketler.push(kayit);
-      }
-    }
-  });
-  
-  return gruplar;
-};
-
-/**
- * 📈 Toplam geliri hesapla
- * @param {string} baslangicTarihi - Başlangıç tarihi (opsiyonel)
- * @param {string} bitisTarihi - Bitiş tarihi (opsiyonel)
- * @returns {number} Toplam gelir
- */
-export const toplamGelirHesapla = (baslangicTarihi, bitisTarihi) => {
-  const kayitlar = baslangicTarihi || bitisTarihi 
-    ? tariheGoreFiltrele(baslangicTarihi, bitisTarihi)
-    : getFinansHavuzu();
-  
-  return kayitlar
-    .filter(kayit => kayit.tur === "GELIR")
-    .reduce((toplam, kayit) => toplam + Number(kayit.tutar || 0), 0);
-};
-
-/**
- * 📉 Toplam gideri hesapla
- * @param {string} baslangicTarihi - Başlangıç tarihi (opsiyonel)
- * @param {string} bitisTarihi - Bitiş tarihi (opsiyonel)
- * @returns {number} Toplam gider
- */
-export const toplamGiderHesapla = (baslangicTarihi, bitisTarihi) => {
-  const kayitlar = baslangicTarihi || bitisTarihi 
-    ? tariheGoreFiltrele(baslangicTarihi, bitisTarihi)
-    : getFinansHavuzu();
-  
-  return kayitlar
-    .filter(kayit => kayit.tur === "GIDER")
-    .reduce((toplam, kayit) => toplam + Number(kayit.tutar || 0), 0);
-};
-
-/**
- * 🧾 Hesaba yaz toplamını hesapla
- * @param {string} baslangicTarihi - Başlangıç tarihi (opsiyonel)
- * @param {string} bitisTarihi - Bitiş tarihi (opsiyonel)
- * @returns {number} Hesaba yaz toplamı (BU KASAYA GİRMEZ!)
- */
-export const toplamHesabaYazHesapla = (baslangicTarihi, bitisTarihi) => {
-  const kayitlar = baslangicTarihi || bitisTarihi 
-    ? tariheGoreFiltrele(baslangicTarihi, bitisTarihi)
-    : getFinansHavuzu();
-  
-  return kayitlar
-    .filter(kayit => kayit.tur === "HESABA_YAZ_BORC")
-    .reduce((toplam, kayit) => toplam + Number(kayit.tutar || 0), 0);
-};
-
-/**
- * 🏦 Net kasa bakiyesini hesapla
- * @param {string} baslangicTarihi - Başlangıç tarihi (opsiyonel)
- * @param {string} bitisTarihi - Bitiş tarihi (opsiyonel)
- * @returns {number} Net kasa (gelir - gider)
- */
-export const netKasaHesapla = (baslangicTarihi, bitisTarihi) => {
-  const gelir = toplamGelirHesapla(baslangicTarihi, bitisTarihi);
-  const gider = toplamGiderHesapla(baslangicTarihi, bitisTarihi);
-  
-  return gelir - gider;
-};
-
-/* ---------------------------------------------------------
-   OTOMATİK KAYIT FONKSİYONLARI (GÜNCELLENMİŞ)
---------------------------------------------------------- */
-
-/**
- * 🪑 Adisyon kapandığında otomatik kaydet (GÜNCELLENMİŞ)
- * @param {Object} adisyon - Kapanan adisyon
- * @returns {Object|null} Eklenen kayıt
- */
-export const adisyonKapandigindaKaydet = (adisyon) => {
-  if (!adisyon || !adisyon.kapali) return null;
-  
-  // GÜNCELLEME: Ödeme türünü farklı kaynaklardan al
-  const odemeTuru = normalizeOdemeTuru(
-    adisyon.kapatmaOdemeTuru ||    // 1. Öncelik: kapatmaOdemeTuru
-    adisyon.odemeTuru ||            // 2. odemeTuru
-    adisyon.odemeTipi ||            // 3. odemeTipi
-    (adisyon.odemeler && adisyon.odemeler.length > 0 ? 
-      adisyon.odemeler[0].odemeTuru : null) ||  // 4. odemeler array'inden
-    "NAKIT"                         // 5. Fallback
-  );
-  
-  const toplamTutar = adisyon.toplamTutar || 0;
-  const isBilardo = adisyon.tip === "BİLARDO";
-  
-  // Masa numarasını doğru şekilde al
-  const masaId = adisyon.masaId || 
-                 adisyon.masaNum || 
-                 adisyon.masaNo || 
-                 adisyon.masa ||
-                 (adisyon.aciklama ? (adisyon.aciklama.match(/MASA\s+(\d+)/i) ? adisyon.aciklama.match(/MASA\s+(\d+)/i)[1] : null) : null);
-  
-  let kayit;
-  
-  if (odemeTuru !== "HESABA_YAZ") {
-    // NORMAL GELİR KAYDI
-    kayit = finansKaydiEkle({
-      id: `${isBilardo ? 'bilardo_' : ''}gelir_${adisyon.id}_${Date.now()}`,
-      tarih: adisyon.kapanisZamani || new Date().toISOString(),
-      tur: "GELIR",
-      aciklama: `${isBilardo ? 'Bilardo ' : ''}Adisyon #${adisyon.id} (${adisyon.masaNo || adisyon.masaAdi || adisyon.masaNumarasi || 'Masa'})`,
-      tutar: toplamTutar,
-      odemeTuru: odemeTuru,
-      gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
-      kaynak: isBilardo ? "BİLARDO" : "ADISYON",
-      referansId: adisyon.id,
-      masaId: masaId
-    });
-  } else {
-    // HESABA YAZ BORÇ KAYDI (BU KASAYA GİRMEZ!)
-    kayit = finansKaydiEkle({
-      id: `hesaba_yaz_borc_${adisyon.id}_${Date.now()}`,
-      tarih: adisyon.kapanisZamani || new Date().toISOString(),
-      tur: "HESABA_YAZ_BORC",
-      aciklama: `Hesaba Yaz - ${adisyon.masaNo || adisyon.masaAdi || 'Masa'} #${adisyon.id}`,
-      tutar: toplamTutar,
-      odemeTuru: "HESABA_YAZ",
-      gunId: adisyon.gunId || tarihiGunIdYap(adisyon.kapanisZamani) || tarihiGunIdYap(new Date()),
-      kaynak: "ADISYON",
-      referansId: adisyon.id,
-      masaId: masaId
-    });
-  }
-  
-  console.log(`✅ Adisyon kaydedildi: ${adisyon.id}, Ödeme Türü: ${odemeTuru}, Tutar: ${toplamTutar}, Masa ID: ${masaId}`);
-  return kayit;
-};
-
-/**
- * 📝 Gider eklendiğinde otomatik kaydet
- * @param {Object} gider - Eklene gider
- * @returns {Object|null} Eklenen kayıt
- */
-export const giderEklendigindeKaydet = (gider) => {
-  if (!gider) return null;
-  
-  return finansKaydiEkle({
-    id: `gider_${gider.id}_${Date.now()}`,
-    tarih: gider.tarih || new Date().toISOString(),
-    tur: "GIDER",
-    aciklama: gider.aciklama || "Gider",
-    tutar: Number(gider.tutar || 0),
-    odemeTuru: "NAKIT",
-    gunId: gider.gunId || tarihiGunIdYap(gider.tarih) || tarihiGunIdYap(new Date()),
-    kaynak: "GIDER",
-    referansId: gider.id,
-    kategori: gider.kategori || "GENEL"
-  });
-};
-
-/**
- * 🎱 Bilardo adisyonu kapandığında otomatik kaydet
- * @param {Object} bilardoAdisyonu - Kapanan bilardo adisyonu
- * @returns {Object|null} Eklenen kayıt
- */
-export const bilardoAdisyonuKapandigindaKaydet = (bilardoAdisyonu) => {
-  if (!bilardoAdisyonu || !bilardoAdisyonu.kapali) return null;
-  
-  const odemeTuru = normalizeOdemeTuru(
-    bilardoAdisyonu.kapatmaOdemeTuru ||
-    bilardoAdisyonu.odemeTuru ||
-    bilardoAdisyonu.odemeTipi ||
-    "NAKIT"
-  );
-  const toplamTutar = bilardoAdisyonu.toplamTutar || bilardoAdisyonu.tutar || 0;
-  
-  // Bilardo masa numarası
-  const masaId = bilardoAdisyonu.masaId || bilardoAdisyonu.masaNumarasi;
-  
-  if (odemeTuru !== "HESABA_YAZ") {
-    return finansKaydiEkle({
-      id: `bilardo_gelir_${bilardoAdisyonu.id}_${Date.now()}`,
-      tarih: bilardoAdisyonu.kapanisZamani || bilardoAdisyonu.tarih || new Date().toISOString(),
-      tur: "GELIR",
-      aciklama: `Bilardo Adisyon #${bilardoAdisyonu.id} (${bilardoAdisyonu.masaNumarasi || 'Bilardo Masa'})`,
-      tutar: toplamTutar,
-      odemeTuru: odemeTuru,
-      gunId: bilardoAdisyonu.gunId || tarihiGunIdYap(bilardoAdisyonu.kapanisZamani) || tarihiGunIdYap(new Date()),
-      kaynak: "BİLARDO",
-      referansId: bilardoAdisyonu.id,
-      masaId: masaId
-    });
-  }
-  
-  return null;
-};
-
-/* ---------------------------------------------------------
-   DEBUG VE KONTROL FONKSİYONLARI
---------------------------------------------------------- */
-
-/**
- * 📋 Finans havuzunda veri var mı kontrol et
- */
-export const finansHavuzuKontrol = () => {
-  const havuz = getFinansHavuzu();
-  console.group("🔍 FİNANS HAVUZU KONTROL");
-  console.log("Havuzda kayıt sayısı:", havuz.length);
-  console.log("Havuz verisi:", havuz);
-  console.groupEnd();
-  
-  return havuz.length > 0;
-};
-
-/**
- * 📝 Manuel olarak test kaydı ekle
- */
-export const testKaydiEkle = () => {
-  const testKayit = {
-    tarih: new Date().toISOString(),
-    tur: "GELIR",
-    aciklama: "TEST - Finans Havuzu Çalışıyor",
-    tutar: 100,
-    odemeTuru: "NAKIT",
-    kaynak: "TEST"
-  };
-  
-  const sonuc = finansKaydiEkle(testKayit);
-  console.log("✅ Test kaydı eklendi:", sonuc);
-  return sonuc;
-};
-
-/**
- * 🔄 Tüm veri kaynaklarını kontrol et
- */
-export const veriKaynaklariniKontrol = () => {
-  const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-  const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-  const giderler = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-  const musteriTahsilatlari = JSON.parse(localStorage.getItem("mc_musteri_tahsilatlar") || "[]");
-  
-  console.group("📊 VERİ KAYNAKLARI KONTROL");
-  console.log("Normal Adisyonlar:", adisyonlar.length);
-  console.log("Bilardo Adisyonlar:", bilardoAdisyonlar.length);
-  console.log("Giderler:", giderler.length);
-  console.log("Müşteri Tahsilatları:", musteriTahsilatlari.length);
-  
-  // Detaylı bilgi
-  console.log("Normal Adisyonlar (kapalı olanlar):", 
-    adisyonlar.filter(a => a.kapali === true).length
-  );
-  console.log("Bilardo Adisyonlar (kapalı olanlar):", 
-    bilardoAdisyonlar.filter(a => a.kapali === true).length
-  );
-  console.groupEnd();
-  
-  return { adisyonlar, bilardoAdisyonlar, giderler, musteriTahsilatlari };
-};
-
-/**
- * 🔄 Mevcut finans kayıtlarındaki ödeme türlerini düzelt
- */
-export const mevcutOdemeTurleriniDuzenle = () => {
-  try {
-    console.log("🔄 Mevcut finans kayıtlarındaki ödeme türleri düzeltiliyor...");
-    
-    const havuz = getFinansHavuzu();
-    const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-    const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-    
-    let guncellenenKayitSayisi = 0;
-    
-    havuz.forEach((kayit, index) => {
-      if ((kayit.kaynak === "ADISYON" || kayit.kaynak === "BİLARDO") && kayit.tur === "GELIR") {
-        // İlgili adisyonu bul
-        let adisyon = null;
+const tarihAraligiFinansRaporuAl = (baslangicTarihi, bitisTarihi) => {
+    try {
+        const havuz = JSON.parse(localStorage.getItem(FINANS_HAVUZU_KEY) || "[]");
         
-        if (kayit.kaynak === "ADISYON") {
-          adisyon = adisyonlar.find(a => a.id === kayit.referansId);
-        } else if (kayit.kaynak === "BİLARDO") {
-          adisyon = bilardoAdisyonlar.find(a => a.id === kayit.referansId);
-        }
+        const baslangic = new Date(baslangicTarihi);
+        const bitis = new Date(bitisTarihi);
         
-        if (adisyon && adisyon.kapali === true) {
-          // Ödeme türünü güncelle
-          let yeniOdemeTuru = "NAKIT";
-          
-          if (kayit.kaynak === "ADISYON") {
-            yeniOdemeTuru = normalizeOdemeTuru(
-              adisyon.kapatmaOdemeTuru ||
-              adisyon.odemeTuru ||
-              adisyon.odemeTipi ||
-              (adisyon.odemeler && adisyon.odemeler.length > 0 ? 
-                adisyon.odemeler[0].odemeTuru : null) ||
-              "NAKIT"
-            );
-          } else if (kayit.kaynak === "BİLARDO") {
-            yeniOdemeTuru = normalizeOdemeTuru(
-              adisyon.kapatmaOdemeTuru ||
-              adisyon.odemeTuru ||
-              adisyon.odemeTipi ||
-              "NAKIT"
-            );
-          }
-          
-          if (yeniOdemeTuru !== kayit.odemeTuru) {
-            havuz[index].odemeTuru = yeniOdemeTuru;
-            console.log(`📝 Kayıt ${kayit.id}: ${kayit.odemeTuru} → ${yeniOdemeTuru}`);
-            guncellenenKayitSayisi++;
-          }
-        }
-      }
-    });
-    
-    if (guncellenenKayitSayisi > 0) {
-      localStorage.setItem(FİNANS_HAVUZU_KEY, JSON.stringify(havuz));
-      console.log(`✅ ${guncellenenKayitSayisi} kayıt güncellendi`);
-    } else {
-      console.log("ℹ️ Güncellenecek kayıt bulunamadı");
+        const aralikKayitlari = havuz.filter(k => {
+            const kayitTarihi = new Date(k.gunId);
+            return kayitTarihi >= baslangic && kayitTarihi <= bitis;
+        });
+        
+        // Günlere göre grupla
+        const gunlukRaporlar = {};
+        aralikKayitlari.forEach(kayit => {
+            if (!gunlukRaporlar[kayit.gunId]) {
+                gunlukRaporlar[kayit.gunId] = {
+                    toplamGelir: 0,
+                    toplamIndirim: 0,
+                    kayitlar: []
+                };
+            }
+            
+            if (kayit.tur === "GELIR") {
+                gunlukRaporlar[kayit.gunId].toplamGelir += kayit.tutar;
+            } else if (kayit.tur === "INDIRIM") {
+                gunlukRaporlar[kayit.gunId].toplamIndirim += kayit.tutar;
+            }
+            
+            gunlukRaporlar[kayit.gunId].kayitlar.push(kayit);
+        });
+        
+        // Toplamlar
+        const toplamGelir = aralikKayitlari
+            .filter(k => k.tur === "GELIR")
+            .reduce((sum, k) => sum + k.tutar, 0);
+        
+        const toplamIndirim = aralikKayitlari
+            .filter(k => k.tur === "INDIRIM")
+            .reduce((sum, k) => sum + k.tutar, 0);
+        
+        const netGelir = toplamGelir - toplamIndirim;
+        
+        const rapor = {
+            baslangicTarihi,
+            bitisTarihi,
+            toplamKayit: aralikKayitlari.length,
+            toplamGelir,
+            toplamIndirim,
+            netGelir,
+            gunlukRaporlar,
+            kayitlar: aralikKayitlari,
+            olusturulmaZamani: new Date().toISOString()
+        };
+        
+        console.log(`📊 [FINANS-HAVUZU] ${baslangicTarihi} - ${bitisTarihi} aralığı raporu:`, {
+            toplamKayit: rapor.toplamKayit,
+            toplamGelir: rapor.toplamGelir.toFixed(2),
+            toplamIndirim: rapor.toplamIndirim.toFixed(2),
+            netGelir: rapor.netGelir.toFixed(2),
+            gunSayisi: Object.keys(rapor.gunlukRaporlar).length
+        });
+        
+        return rapor;
+        
+    } catch (error) {
+        console.error('❌ [FINANS-HAVUZU] Tarih aralığı finans raporu alınırken hata:', error);
+        return null;
     }
-    
-    return guncellenenKayitSayisi;
-  } catch (error) {
-    console.error("❌ Ödeme türü düzenleme hatası:", error);
-    return 0;
-  }
+};
+
+// ============================================================
+// YARDIMCI FONKSİYONLAR
+// ============================================================
+
+/**
+ * Finans havuzunu temizler (PRODUCTION'DA KAPALI)
+ * @returns {boolean} Başarı durumu (her zaman false - production'da kapalı)
+ */
+const finansHavuzunuTemizle = () => {
+    console.error('❌ [FINANS-HAVUZU] Finans havuzu temizleme production ve demo ortamlarında KAPALIDIR');
+    console.error('❌ Temizlik gerekiyorsa manuel script kullanın veya yöneticiye başvurun.');
+    return false;
 };
 
 /**
- * 🔍 Adisyon verilerindeki ödeme türlerini kontrol et
+ * Finans havuzu durumunu kontrol eder
+ * @returns {Object} Havuz durumu
  */
-export const odemeTuruDebug = () => {
-  const adisyonlar = JSON.parse(localStorage.getItem("mc_adisyonlar") || "[]");
-  const bilardoAdisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
-  
-  console.group("🔍 ÖDEME TÜRÜ DEBUG");
-  
-  // Normal adisyonlardaki ödeme türleri
-  console.log("📋 NORMAL ADİSYON ÖDEME TÜRLERİ:");
-  const kapaliNormalAdisyonlar = adisyonlar.filter(a => a.kapali === true);
-  kapaliNormalAdisyonlar.forEach((ad, index) => {
-    console.log(`Adisyon ${index + 1}:`, {
-      id: ad.id,
-      kapatmaOdemeTuru: ad.kapatmaOdemeTuru,
-      odemeTuru: ad.odemeTuru,
-      odemeTipi: ad.odemeTipi,
-      odemeler: ad.odemeler,
-      toplamTutar: ad.toplamTutar,
-      masaNo: ad.masaNo,
-      masaId: ad.masaId,
-      aciklama: ad.aciklama
-    });
-  });
-  
-  // Bilardo adisyonlarındaki ödeme türleri
-  console.log("🎱 BİLARDO ADİSYON ÖDEME TÜRLERİ:");
-  const kapaliBilardoAdisyonlar = bilardoAdisyonlar.filter(a => a.kapali === true);
-  kapaliBilardoAdisyonlar.forEach((ad, index) => {
-    console.log(`Bilardo Adisyon ${index + 1}:`, {
-      id: ad.id,
-      kapatmaOdemeTuru: ad.kapatmaOdemeTuru,
-      odemeTuru: ad.odemeTuru,
-      odemeTipi: ad.odemeTipi,
-      toplamTutar: ad.toplamTutar,
-      masaNumarasi: ad.masaNumarasi,
-      masaId: ad.masaId
-    });
-  });
-  
-  console.groupEnd();
-  
-  return {
-    normalAdisyonlar: kapaliNormalAdisyonlar,
-    bilardoAdisyonlar: kapaliBilardoAdisyonlar
-  };
-};
-
-/**
- * 📊 Finans havuzu istatistiklerini getir
- * @returns {Object} Havuz istatistikleri
- */
-export const getFinansHavuzuIstatistikleri = () => {
-  const tumKayitlar = getFinansHavuzu();
-  
-  return {
-    toplamKayit: tumKayitlar.length,
-    gelirKayit: tumKayitlar.filter(k => k.tur === "GELIR").length,
-    giderKayit: tumKayitlar.filter(k => k.tur === "GIDER").length,
-    hesabaYazKayit: tumKayitlar.filter(k => k.tur === "HESABA_YAZ_BORC").length,
-    toplamGelir: toplamGelirHesapla(),
-    toplamGider: toplamGiderHesapla(),
-    toplamHesabaYaz: toplamHesabaYazHesapla(),
-    netKasa: netKasaHesapla(),
-    kaynaklar: {
-      ADISYON: tumKayitlar.filter(k => k.kaynak === "ADISYON").length,
-      BİLARDO: tumKayitlar.filter(k => k.kaynak === "BİLARDO").length,
-      GİDER: tumKayitlar.filter(k => k.kaynak === "GİDER").length,
-      MANUEL: tumKayitlar.filter(k => k.kaynak === "MANUEL").length,
-      TAHSILAT: tumKayitlar.filter(k => k.kaynak === "TAHSILAT").length
+const finansHavuzuDurumu = () => {
+    try {
+        const havuz = JSON.parse(localStorage.getItem(FINANS_HAVUZU_KEY) || "[]");
+        const aktifGunId = aktifGunuKontrolEt();
+        
+        const gunKayitlari = havuz.filter(k => k.gunId === aktifGunId);
+        const toplamGelir = gunKayitlari
+            .filter(k => k.tur === "GELIR" && k.odemeTuru !== "HESABA_YAZ")
+            .reduce((sum, k) => sum + k.tutar, 0);
+        
+        return {
+            aktifGunId,
+            toplamKayit: havuz.length,
+            bugunkuKayit: gunKayitlari.length,
+            bugunkuGelir: toplamGelir,
+            sonGuncelleme: havuz.length > 0 ? havuz[havuz.length - 1].updated_at : null,
+            durum: "AKTIF"
+        };
+    } catch (error) {
+        console.error('❌ [FINANS-HAVUZU] Havuz durumu alınırken hata:', error);
+        return {
+            durum: "HATA",
+            hata: error.message
+        };
     }
-  };
+};
+
+// ============================================================
+// ESKİ FONKSİYONLAR - KULLANIMDAN KALDIRILDI
+// ============================================================
+
+/**
+ * @deprecated KULLANIMDAN KALDIRILDI - Ham adisyon almayacak
+ * Yerine: finansKayitlariEkle kullanın
+ */
+const adisyonKapandigindaKaydet = () => {
+    console.error('❌ [FINANS-HAVUZU] adisyonKapandigindaKaydet KULLANIMDAN KALDIRILDI!');
+    console.error('❌ Yerine finansKayitlariEkle kullanın.');
+    throw new Error('adisyonKapandigindaKaydet kullanımdan kaldırıldı. finansKayitlariEkle kullanın.');
 };
 
 /**
- * 🐛 Finans havuzunu debug et (console'a yazdır)
+ * @deprecated KULLANIMDAN KALDIRILDI - Ham veri almayacak
+ * Yerine: finansKayitlariEkle kullanın
  */
-export const debugFinansHavuzu = () => {
-  const istatistikler = getFinansHavuzuIstatistikleri();
-  const son5Kayit = getFinansHavuzu().slice(-5);
-  
-  console.group("🔍 FİNANS HAVUZU DEBUG");
-  console.log("📊 İstatistikler:", istatistikler);
-  console.log("📝 Son 5 kayıt:", son5Kayit);
-  
-  // LocalStorage'da mc_finans_havuzu key'i var mı kontrol et
-  const havuzData = localStorage.getItem(FİNANS_HAVUZU_KEY);
-  console.log("🗝️ LocalStorage Key:", FİNANS_HAVUZU_KEY);
-  console.log("💾 Raw LocalStorage Data:", havuzData);
-  console.groupEnd();
+const finansHavuzunaEkle = () => {
+    console.error('❌ [FINANS-HAVUZU] finansHavuzunaEkle KULLANIMDAN KALDIRILDI!');
+    console.error('❌ Yerine finansKayitlariEkle kullanın.');
+    throw new Error('finansHavuzunaEkle kullanımdan kaldırıldı. finansKayitlariEkle kullanın.');
 };
 
-/**
- * 🔍 Finans havuzunu manuel olarak kontrol et (UI için)
- */
-export const manuelFinansHavuzuKontrol = () => {
-  const havuz = getFinansHavuzu();
-  const istatistikler = getFinansHavuzuIstatistikleri();
-  
-  const mesaj = `
-🔍 FİNANS HAVUZU MANUEL KONTROL:
+// ============================================================
+// MODÜL İHRACI
+// ============================================================
 
-📊 İSTATİSTİKLER:
-- Toplam Kayıt: ${istatistikler.toplamKayit}
-- Gelir Kayıtları: ${istatistikler.gelirKayit}
-- Gider Kayıtları: ${istatistikler.giderKayit}
-- Hesaba Yaz Kayıtları: ${istatistikler.hesabaYazKayit}
-
-💰 TOPLAMLAR:
-- Toplam Gelir: ${istatistikler.toplamGelir.toLocaleString("tr-TR")} ₺
-- Toplam Gider: ${istatistikler.toplamGider.toLocaleString("tr-TR")} ₺
-- Toplam Hesaba Yaz: ${istatistikler.toplamHesabaYaz.toLocaleString("tr-TR")} ₺
-- Net Kasa: ${istatistikler.netKasa.toLocaleString("tr-TR")} ₺
-
-📁 KAYNAKLAR:
-- Adisyon: ${istatistikler.kaynaklar.ADISYON}
-- Bilardo: ${istatistikler.kaynaklar.BİLARDO}
-- Gider: ${istatistikler.kaynaklar.GİDER}
-- Tahsilat: ${istatistikler.kaynaklar.TAHSILAT}
-- Manuel: ${istatistikler.kaynaklar.MANUEL}
-
-💾 LOCALSTORAGE DURUMU:
-- Key: "${FİNANS_HAVUZU_KEY}"
-- Veri Uzunluğu: ${havuz.length}
-- Son kayıt: ${havuz.length > 0 ? havuz[havuz.length - 1]?.aciklama || "N/A" : "BOŞ"}
-  `;
-  
-  console.log(mesaj);
-  return mesaj;
-};
-
-/* ---------------------------------------------------------
-   DEFAULT EXPORT
---------------------------------------------------------- */
-
-// Tüm fonksiyonları içeren bir nesne olarak export edelim
 const mcFinansHavuzu = {
-  // Temel fonksiyonlar
-  getFinansHavuzu,
-  finansKaydiEkle,
-  finansHavuzunuTemizle,
-  
-  // Otomatik aktarma
-  tumAdisyonlariFinansHavuzunaAktar,
-  
-  // Filtreleme ve sorgulama
-  tariheGoreFiltrele,
-  tureGoreFiltrele,
-  odemeTuruGoreFiltrele,
-  odemeTuruBazliToplamlar,
-  toplamGelirHesapla,
-  toplamGiderHesapla,
-  toplamHesabaYazHesapla,
-  netKasaHesapla,
-  
-  // Otomatik kayıt (GÜNCELLENMİŞ)
-  adisyonKapandigindaKaydet,
-  giderEklendigindeKaydet,
-  bilardoAdisyonuKapandigindaKaydet,
-  
-  // Debug ve kontrol (GÜNCELLENMİŞ)
-  getFinansHavuzuIstatistikleri,
-  debugFinansHavuzu,
-  finansHavuzuKontrol,
-  testKaydiEkle,
-  veriKaynaklariniKontrol,
-  manuelFinansHavuzuKontrol,
-  odemeTuruDebug,
-  mevcutOdemeTurleriniDuzenle
+    // ANA FONKSİYONLAR
+    finansKayitlariEkle,
+    kayitEkle,
+    
+    // RAPORLAMA
+    gunlukFinansRaporuAl,
+    tarihAraligiFinansRaporuAl,
+    
+    // YARDIMCI FONKSİYONLAR
+    finansHavuzuDurumu,
+    finansHavuzunuTemizle,
+    
+    // TARİH FONKSİYONLARI
+    gunIdAl,
+    
+    // KURALLAR (salt okunur)
+    KURALLAR: Object.freeze({ ...FINANS_KURALLARI }),
+    
+    // KEY'LER
+    KEYLER: {
+        FINANS_HAVUZU_KEY,
+        AKTIF_GUN_KEY
+    },
+    
+    // DOĞRULAMA FONKSİYONLARI (geliştirme için)
+    _finansKaydiDogrula: finansKaydiDogrula,
+    _finansKaydiNormalizeEt: finansKaydiNormalizeEt
 };
 
 export default mcFinansHavuzu;

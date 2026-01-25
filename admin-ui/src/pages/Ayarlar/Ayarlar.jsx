@@ -73,6 +73,7 @@ export default function Ayarlar() {
 
   // 📌 TAM YEDEKLEME FONKSİYONU (Ürünler Dahil)
   const handleBackup = () => {
+    // Önce tüm verileri topla
     const backupData = {
       date: new Date().toISOString(),
       version: "2.0",
@@ -114,22 +115,31 @@ export default function Ayarlar() {
       // Diğer Ayarlar
       masaAyarlari: localStorage.getItem("mc_masa_ayarlari") ? JSON.parse(localStorage.getItem("mc_masa_ayarlari")) : null,
       printerAyarlari: localStorage.getItem("mc_printer_ayarlari") ? JSON.parse(localStorage.getItem("mc_printer_ayarlari")) : null,
-      
-      // Backup Metadata
-      backupInfo: {
-        totalSize: JSON.stringify(backupData).length,
-        itemCount: Object.keys(backupData).filter(key => 
-          backupData[key] !== null && 
-          backupData[key] !== undefined &&
-          !['date', 'version', 'system', 'backupInfo'].includes(key)
-        ).length,
-        timestamp: new Date().toISOString(),
-        generatedBy: user?.username || "System"
-      }
     };
 
+    // backupInfo hesaplamasını ayrı yap
+    const dataKeys = Object.keys(backupData).filter(key => 
+      backupData[key] !== null && 
+      backupData[key] !== undefined &&
+      !['date', 'version', 'system'].includes(key)
+    );
+    
+    // JSON string'ini al
     const dataStr = JSON.stringify(backupData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    
+    // backupInfo'yu ekle
+    backupData.backupInfo = {
+      totalSize: dataStr.length,
+      itemCount: dataKeys.length,
+      timestamp: new Date().toISOString(),
+      generatedBy: user?.username || "System"
+    };
+
+    // Şimdi backupInfo ile birlikte yeniden stringify yap
+    const finalDataStr = JSON.stringify(backupData, null, 2);
+    
+    // Dosyayı indir
+    const dataBlob = new Blob([finalDataStr], { type: "application/json" });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
@@ -517,24 +527,6 @@ export default function Ayarlar() {
           </div>
 
           <div className="temizleme-bilgi">
-            <h3>📦 Yedeklenecek Veriler (Tüm Sistem):</h3>
-            <ul>
-              <li>• 👤 <strong>Kullanıcı Bilgileri</strong> (Giriş, rol, yetkiler)</li>
-              <li>• 🎱 <strong>Bilardo Sistemi</strong> (Masalar, ücretler, bildirimler)</li>
-              <li>• 💰 <strong>Ücret Tarifesi</strong> (30dk, 1saat, dakika ücreti)</li>
-              <li>• 🔔 <strong>Bildirim Ayarları</strong> (Popup, ses, otomatik kapanma)</li>
-              <li>• 👥 <strong>Müşteri İşlemleri</strong> (Hesaba yaz kayıtları, borç defteri)</li>
-              <li>• 📋 <strong>Adisyon Kayıtları</strong> (Tüm kapalı ve açık adisyonlar)</li>
-              <li>• 💳 <strong>Borç Kayıtları</strong> (Yeni borç sistemi kayıtları)</li>
-              <li>• 🏦 <strong>Tahsilatlar</strong> (Alınan tüm ödemeler)</li>
-              <li>• 💵 <strong>Finans Havuzu</strong> (Tüm parasal hareketler)</li>
-              <li>• 📉 <strong>Giderler</strong> (Sistemde kayıtlı tüm giderler)</li>
-              <li>• 🛒 <strong>Ürünler ve Menü</strong> (Tüm ürünler, kategoriler, fiyatlar)</li>
-              <li>• ☕ <strong>Sipariş Geçmişi</strong> (Tüm adisyon ve ödemeler)</li>
-              <li>• 📊 <strong>Raporlar</strong> (Günlük, haftalık, aylık istatistikler)</li>
-              <li>• ⚙️ <strong>Sistem Ayarları</strong> (Kafe adı, çalışma saatleri)</li>
-              <li>• 🖨️ <strong>Yazıcı Ayarları</strong> (Fatura ve fiş yazdırma)</li>
-            </ul>
           </div>
 
           <div className="input-grup">

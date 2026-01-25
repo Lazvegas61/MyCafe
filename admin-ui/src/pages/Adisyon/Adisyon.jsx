@@ -6,10 +6,8 @@ import { useAuth } from "../../context/AuthContext";
 // SYNC SERVICE IMPORT - EKLENDİ
 import syncService from "../../services/syncService";
 
-// KASA HAREKETİ UTILITY IMPORT - YENİ EKLENDİ
-import { kasaHareketiEkle } from "../../services/utils/kasaHareketleri";
-
-// mc_finans_havuzu IMPORT - YENİ EKLENDİ (Raporlama Sistemi Entegrasyonu)
+// ⚠️ TEK GEÇERLİ FİNANS YOLU
+// mc_finans_havuzu dışı kullanım YASAKTIR
 import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 // LocalStorage key'leri
@@ -18,6 +16,7 @@ const ADISYON_KEY = "mc_adisyonlar";
 const URUN_KEY = "mc_urunler";
 const MUSTERI_KEY = "mc_musteriler";
 const BORC_KEY = "mc_borclar";
+const KATEGORI_KEY = "mc_kategoriler";
 
 export default function Adisyon() {
     const navigate = useNavigate();
@@ -27,8 +26,8 @@ export default function Adisyon() {
     // GENEL STATE
     // --------------------------------------------------
     const [masaNo, setMasaNo] = useState("MASA 1");
-    const [gercekMasaNo, setGercekMasaNo] = useState("1"); // Gerçek masa numarası (1, 2, 3, ...)
-    const [adisyon, setAdisyon] = useState(null); // YENİ ADISYON
+    const [gercekMasaNo, setGercekMasaNo] = useState("1");
+    const [adisyon, setAdisyon] = useState(null);
     const [gecenSure, setGecenSure] = useState("00:00");
     const [indirimInput, setIndirimInput] = useState("");
     const [indirim, setIndirim] = useState(0);
@@ -40,12 +39,13 @@ export default function Adisyon() {
 
     // MENÜ
     const [urunler, setUrunler] = useState([]);
-    const [aktifKategori, setAktifKategori] = useState("");
+    const [kategoriler, setKategoriler] = useState([]);
+    const [aktifKategoriId, setAktifKategoriId] = useState(null);
     const [seciliUrun, setSeciliUrun] = useState(null);
     const [adetPanelAcik, setAdetPanelAcik] = useState(false);
     const [adet, setAdet] = useState(1);
     
-    // ÜRÜN ARAMA - YENİ EKLENDİ
+    // ÜRÜN ARAMA
     const [urunArama, setUrunArama] = useState("");
 
     // SİPARİŞ YEMEK alanı
@@ -68,13 +68,13 @@ export default function Adisyon() {
     // --------------------------------------------------
     // ÇOKLU HESABI AYIR (MULTIPLE SPLIT BILL) STATE'LERİ
     // --------------------------------------------------
-    const [splitAdisyonlar, setSplitAdisyonlar] = useState([]); // ESKİ ADISYONLAR (KİLİTLİ)
-    const [splitAciklamaInput, setSplitAciklamaInput] = useState(""); // Yeni split için açıklama
-    const [splitTutarInput, setSplitTutarInput] = useState(""); // Yeni split için manuel tutar girişi
-    const [splitOranInput, setSplitOranInput] = useState(""); // Yeni split için oran girişi
+    const [splitAdisyonlar, setSplitAdisyonlar] = useState([]);
+    const [splitAciklamaInput, setSplitAciklamaInput] = useState("");
+    const [splitTutarInput, setSplitTutarInput] = useState("");
+    const [splitOranInput, setSplitOranInput] = useState("");
 
     // --------------------------------------------------
-    // SYNC SERVICE KONTROLÜ - YENİ EKLENDİ
+    // SYNC SERVICE KONTROLÜ
     // --------------------------------------------------
     const [syncServiceReady, setSyncServiceReady] = useState(false);
 
@@ -84,10 +84,10 @@ export default function Adisyon() {
     const [isBilardo, setIsBilardo] = useState(false);
     const [bilardoBaslangicSaat, setBilardoBaslangicSaat] = useState(null);
     const [bilardoSure, setBilardoSure] = useState("00:00");
-    const [bilardoUcret, setBilardoUcret] = useState(0); // BİLARDO ÜCRETİ
+    const [bilardoUcret, setBilardoUcret] = useState(0);
 
     // --------------------------------------------------
-    // BİLARDO TRANSFER DETAYLARI İÇİN YENİ STATE'LER
+    // BİLARDO TRANSFER DETAYLARI
     // --------------------------------------------------
     const [bilardoTransferDetaylari, setBilardoTransferDetaylari] = useState(null);
     const [bilardoEkUrunler, setBilardoEkUrunler] = useState([]);
@@ -111,7 +111,6 @@ export default function Adisyon() {
     }
 
     useEffect(() => {
-        // SyncService kontrolü
         if (window.syncService && typeof window.syncService.masaBul === 'function') {
             setSyncServiceReady(true);
             console.log('✅ SyncService hazır');
@@ -141,29 +140,25 @@ export default function Adisyon() {
         localStorage.setItem(key, JSON.stringify(value));
     };
 
-    // GERÇEK MASA NO'YU BUL - DÜZELTİLDİ
+    // GERÇEK MASA NO'YU BUL
     const gercekMasaNoBul = (masaLabel) => {
         if (!masaLabel) return "1";
 
         console.log('🔍 Masa label analizi:', masaLabel);
 
-        // "MASA 1" formatından sadece sayıyı al
         let bulunanNo = "1";
 
         if (typeof masaLabel === 'string') {
-            // Eğer adisyon ID'si ise, adisyondan masa numarasını bul
             if (masaLabel.startsWith('ad_')) {
                 const adisyonlar = okuJSON(ADISYON_KEY, []);
                 const adisyon = adisyonlar.find(a => a.id === masaLabel);
                 if (adisyon) {
-                    // Adisyondan masa numarasını al
                     const adisyonMasaNo = adisyon.masaNum ||
                         (adisyon.masaNo ? adisyon.masaNo.replace('MASA ', '') : "1");
                     bulunanNo = adisyonMasaNo;
                     console.log('📌 Adisyon ID\'sinden masa bulundu:', { adisyonId: masaLabel, masaNo: bulunanNo });
                 }
             } else {
-                // Normal masa etiketinden sayıyı çıkar
                 const numMatch = masaLabel.match(/\d+/);
                 bulunanNo = numMatch ? numMatch[0] : "1";
             }
@@ -171,10 +166,8 @@ export default function Adisyon() {
             bulunanNo = String(masaLabel);
         }
 
-        // Bulunan no'nun geçerli bir masa olup olmadığını kontrol et
         const masalar = okuJSON(MASA_KEY, []);
 
-        // Önce no ile eşleşen masa ara
         let masa = masalar.find(m =>
             m.no === bulunanNo ||
             m.id === Number(bulunanNo) ||
@@ -187,7 +180,6 @@ export default function Adisyon() {
             return masa.no;
         }
 
-        // Eğer masa bulunamazsa, masaları kontrol et ve boş masa bul
         for (let i = 1; i <= 30; i++) {
             const masa = masalar.find(m => m.no === String(i) || m.id === i);
             if (masa && masa.durum === "BOŞ") {
@@ -197,7 +189,7 @@ export default function Adisyon() {
         }
 
         console.log('⚠️ Masa bulunamadı, varsayılan 1 kullanılıyor');
-        return "1"; // Fallback
+        return "1";
     };
 
     const odemeTipiLabel = (tip) => {
@@ -216,61 +208,50 @@ export default function Adisyon() {
     };
 
     // --------------------------------------------------
-    // BİLARDO MASASI KONTROLÜ - GUNCELLENDI
+    // BİLARDO MASASI KONTROLÜ
     // --------------------------------------------------
     const isBilardoMasa = (masaStr) => {
         if (!masaStr) return false;
 
-        // Eğer sayı ise string'e çevir
         const str = typeof masaStr === 'number' ? String(masaStr) : masaStr;
         const upper = str.toUpperCase();
 
-        // KESİN KURALLAR:
-        // 1. "BİLARDO" kelimesi içeriyorsa
         if (upper.includes("BİLARDO") || upper.includes("BILARDO")) return true;
         
-        // 2. "B" ile başlıyorsa ve ardından sayı geliyorsa (B1, B2, B10)
         const isBilardoPrefix = /^B\d+$/i.test(str);
         if (isBilardoPrefix) return true;
         
-        // 3. SyncService'de bilardo olarak işaretlenmişse
         if (window.syncService && window.syncService.masaBul) {
             const masa = window.syncService.masaBul(str);
             if (masa && masa.isBilardo === true) return true;
         }
         
-        // 4. Masa adında bilardo geçiyorsa
         if (upper.includes("BİLARDO") || upper.includes("BILARDO")) return true;
         
         return false;
     };
 
     // --------------------------------------------------
-    // URL'DEN MASA NUMARASINI AL ve GERÇEK MASA NO'YU BUL - DÜZELTİLDİ
+    // URL'DEN MASA NUMARASINI AL ve GERÇEK MASA NO'YU BUL
     // --------------------------------------------------
     useEffect(() => {
-        const path = window.location.pathname; // /adisyon/ad_1765649913244
+        const path = window.location.pathname;
         const parts = path.split("/");
         const urlParam = parts[2] || "1";
 
         console.log('🔍 URL Analizi:', { path, parts, urlParam });
 
-        // URL parametresini analiz et
         if (urlParam.startsWith('ad_')) {
-            // Bu bir adisyon ID'si
             const adisyonlar = okuJSON(ADISYON_KEY, []);
             const adisyon = adisyonlar.find(a => a.id === urlParam);
 
             if (adisyon) {
-                // Adisyondan masa numarasını al
                 const masaLabel = adisyon.masaNo || adisyon.masaNum || "MASA 1";
                 setMasaNo(masaLabel);
 
-                // Gerçek masa numarasını bul
-                const gercekNo = gercekMasaNoBul(urlParam); // Adisyon ID'sini gönder
+                const gercekNo = gercekMasaNoBul(urlParam);
                 setGercekMasaNo(gercekNo);
 
-                // Bilardo kontrolü
                 const bilardoMi = isBilardoMasa(gercekNo);
                 setIsBilardo(bilardoMi);
 
@@ -281,17 +262,14 @@ export default function Adisyon() {
                     isBilardo: bilardoMi
                 });
             } else {
-                // Adisyon bulunamazsa varsayılan değer
                 setMasaNo("MASA 1");
                 setGercekMasaNo("1");
                 setIsBilardo(false);
                 console.log('⚠️ Adisyon bulunamadı, varsayılan masa kullanılıyor');
             }
         } else {
-            // Normal masa numarası (1, 2, 3, ... veya B1, B2)
             let masaLabel = `MASA ${urlParam}`;
             
-            // YENİ: Gelişmiş bilardo kontrolü
             const bilardoMi = isBilardoMasa(urlParam);
             setIsBilardo(bilardoMi);
 
@@ -301,32 +279,149 @@ export default function Adisyon() {
 
             setMasaNo(masaLabel);
 
-            // Gerçek masa numarasını bul
             const gercekNo = gercekMasaNoBul(masaLabel);
             setGercekMasaNo(gercekNo);
 
             console.log('📌 Normal masa numarası:', {
                 masaLabel,
                 gercekMasaNo: gercekNo,
-                isBilardo: bilardoMi,
-                kontrolFonksiyonu: isBilardoMasa(urlParam)
+                isBilardo: bilardoMi
             });
         }
     }, []);
 
     // --------------------------------------------------
-    // ADISYON YÜKLE (Yeni ve Eski) - ÇOKLU SPLIT İÇİN DÜZELTİLDİ
+    // KATEGORİLERİ YÜKLE
+    // --------------------------------------------------
+    useEffect(() => {
+        const kategoriListesi = okuJSON(KATEGORI_KEY, []);
+        
+        const siraliKategoriler = [...kategoriListesi].sort((a, b) => 
+            a.ad.localeCompare(b.ad, 'tr')
+        );
+        
+        setKategoriler(siraliKategoriler);
+        
+        if (siraliKategoriler.length > 0 && !aktifKategoriId) {
+            setAktifKategoriId(siraliKategoriler[0].id);
+        }
+        
+        console.log('📂 Kategoriler yüklendi:', {
+            toplam: siraliKategoriler.length,
+            ilkKategori: siraliKategoriler[0]?.ad || 'Yok'
+        });
+    }, []);
+
+    // --------------------------------------------------
+    // ÜRÜNLERİ YÜKLE
+    // --------------------------------------------------
+    useEffect(() => {
+        const list = okuJSON(URUN_KEY, []);
+        
+        console.log('🔍 [DEBUG] Ürünler yükleniyor:', {
+            key: URUN_KEY,
+            length: Array.isArray(list) ? list.length : 'Not array'
+        });
+
+        const fixed = (Array.isArray(list) ? list : []).map(u => {
+            const kategoriId = u.kategoriId || u.categoryId || u.kategori?.id || null;
+            
+            const salePrice = 
+                u.salePrice !== undefined && u.salePrice !== null
+                    ? Number(u.salePrice)
+                    : u.satis !== undefined && u.satis !== null
+                    ? Number(u.satis)
+                    : u.Fiyat !== undefined && u.Fiyat !== null
+                    ? Number(u.Fiyat)
+                    : 0;
+            
+            return {
+                ...u,
+                kategoriId: kategoriId,
+                ad: u.ad || u.name || u.UrunAdi || "",
+                salePrice: salePrice,
+            };
+        });
+
+        // Kategorilere göre gruplama
+        const kategorilereGoreGrupla = () => {
+            const gruplu = {};
+            const kategoriAdMap = {};
+
+            kategoriler.forEach(kategori => {
+                kategoriAdMap[kategori.id] = kategori.ad;
+            });
+
+            fixed.forEach((u) => {
+                if (u.kategoriId) {
+                    if (!gruplu[u.kategoriId]) {
+                        gruplu[u.kategoriId] = [];
+                    }
+                    gruplu[u.kategoriId].push(u);
+                }
+            });
+
+            Object.keys(gruplu).forEach(kategoriId => {
+                gruplu[kategoriId].sort((a, b) =>
+                    a.ad.localeCompare(b.ad, 'tr')
+                );
+            });
+
+            return { gruplu, kategoriAdMap };
+        };
+
+        const { gruplu, kategoriAdMap } = kategorilereGoreGrupla();
+
+        const siraliUrunler = [];
+
+        kategoriler.forEach(kategori => {
+            if (gruplu[kategori.id]) {
+                siraliUrunler.push(...gruplu[kategori.id]);
+            }
+        });
+
+        const kategorisizUrunler = fixed.filter(u => !u.kategoriId);
+        if (kategorisizUrunler.length > 0) {
+            console.warn(`⚠️ ${kategorisizUrunler.length} adet kategorisiz ürün bulundu`);
+            siraliUrunler.push(...kategorisizUrunler);
+        }
+
+        if (isBilardo) {
+            const bilardoKategori = kategoriler.find(k => 
+                k.ad.toUpperCase().includes("BİLARDO") || 
+                k.ad.toUpperCase().includes("BILARDO")
+            );
+            
+            if (bilardoKategori) {
+                siraliUrunler.sort((a, b) => {
+                    const aIsBilardo = a.kategoriId === bilardoKategori.id;
+                    const bIsBilardo = b.kategoriId === bilardoKategori.id;
+
+                    if (aIsBilardo && !bIsBilardo) return -1;
+                    if (!aIsBilardo && bIsBilardo) return 1;
+                    return 0;
+                });
+            }
+        }
+
+        setUrunler(siraliUrunler);
+        
+        console.log('📦 Ürünler yüklendi:', {
+            toplam: siraliUrunler.length
+        });
+    }, [kategoriler, isBilardo]);
+
+    // --------------------------------------------------
+    // ADISYON YÜKLE (Yeni ve Eski)
     // --------------------------------------------------
     useEffect(() => {
         if (!masaNo || !gercekMasaNo) return;
 
         console.log('🔄 Adisyon yükleniyor:', { masaNo, gercekMasaNo, isBilardo });
 
-        // Bilardo masası için özel console log
         if (isBilardo) {
             console.log('🎱 Bilardo masası tespit edildi:', gercekMasaNo);
 
-            // Masalar sayfasını güncelle (bilardo için)
             setTimeout(() => {
                 if (window.syncService && window.syncService.senkronizeMasalar) {
                     console.log('🔄 Bilardo masaları için senkronizasyon yapılıyor...');
@@ -350,7 +445,7 @@ export default function Adisyon() {
             yeniAdisyon = {
                 id: `ad_${Date.now().toString()}`,
                 masaNo: masaNo,
-                masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
+                masaNum: gercekMasaNo,
                 acilisZamani: new Date().toISOString(),
                 kapanisZamani: null,
                 kalemler: [],
@@ -358,16 +453,15 @@ export default function Adisyon() {
                 indirim: 0,
                 hesabaYazKayitlari: [],
                 kapali: false,
-                isSplit: false, // Yeni adisyon
+                isSplit: false,
                 parentAdisyonId: null,
                 durum: "AÇIK",
                 musteriAdi: null,
                 toplamTutar: "0.00",
                 guncellemeZamani: new Date().toISOString(),
-                // KRITIK: Bilardo flag'ini ekle - STANDARTLAŞTIRILDI
-                isBilardo: isBilardo,  // Boolean flag
+                isBilardo: isBilardo,
                 tur: isBilardo ? "BİLARDO" : "NORMAL",
-                masaTipi: isBilardo ? "BİLARDO" : "NORMAL"  // Masa tipi (syncService için)
+                masaTipi: isBilardo ? "BİLARDO" : "NORMAL"
             };
 
             // BİLARDO MASASI İSE BAŞLANGIÇ SAATİNİ KAYDET
@@ -376,7 +470,6 @@ export default function Adisyon() {
                 yeniAdisyon.bilardoBaslangic = baslangic;
                 setBilardoBaslangicSaat(baslangic);
 
-                // BİLARDO ÜCRETİNİ LOCALSTORAGE'DAN AL
                 const bilardoUcreti = localStorage.getItem('mc_bilardo_ucret') || '0';
                 setBilardoUcret(Number(bilardoUcreti));
 
@@ -386,7 +479,7 @@ export default function Adisyon() {
             adisyonlar.push(yeniAdisyon);
             yazJSON(ADISYON_KEY, adisyonlar);
 
-            // SYNC SERVICE: Yeni adisyon için masa aç - GERÇEK MASA NO İLE
+            // SYNC SERVICE: Yeni adisyon için masa aç
             if (syncServiceReady && window.syncService.masaAc) {
                 console.log('🔄 SyncService.masaAc çağrılıyor:', { gercekMasaNo, adisyonId: yeniAdisyon.id, isBilardo });
                 window.syncService.masaAc(gercekMasaNo, yeniAdisyon.id, null, isBilardo);
@@ -397,7 +490,6 @@ export default function Adisyon() {
         if (isBilardo && yeniAdisyon && yeniAdisyon.bilardoBaslangic) {
             setBilardoBaslangicSaat(yeniAdisyon.bilardoBaslangic);
 
-            // BİLARDO ÜCRETİNİ LOCALSTORAGE'DAN AL (eğer henüz yüklenmediyse)
             if (bilardoUcret === 0) {
                 const bilardoUcreti = localStorage.getItem('mc_bilardo_ucret') || '0';
                 setBilardoUcret(Number(bilardoUcreti));
@@ -409,7 +501,6 @@ export default function Adisyon() {
         if (yeniAdisyon && yeniAdisyon.bilardoTransfer) {
             console.log('🎱 Bilardo transfer edilmiş adisyon tespit edildi:', yeniAdisyon);
             
-            // KRITIK: Transfer edilmiş bilardo adisyonunu BİLARDO olarak işaretle
             if (!yeniAdisyon.tur) {
                 yeniAdisyon.tur = "BİLARDO";
             }
@@ -420,7 +511,6 @@ export default function Adisyon() {
                 yeniAdisyon.isBilardo = true;
             }
             
-            // State'i güncelle
             setIsBilardo(true);
             
             const transferDetaylari = {
@@ -435,7 +525,6 @@ export default function Adisyon() {
 
             setBilardoTransferDetaylari(transferDetaylari);
             
-            // BİLARDO EK ÜRÜNLERİ BUL
             const bilardoEkUrunler = (yeniAdisyon.kalemler || []).filter(k =>
                 (k.tur === "EKTRA" || k.tur === "URUN") && k.bilardoTransfer === true
             );
@@ -444,14 +533,13 @@ export default function Adisyon() {
 
             console.log('📊 Bilardo transfer detayları yüklendi:', transferDetaylari);
         } else {
-            // Bilardo transfer değilse state'leri temizle
             setBilardoTransferDetaylari(null);
             setBilardoEkUrunler([]);
         }
 
         setAdisyon(yeniAdisyon);
 
-        // 2. Eski (Split) Adisyonları Bul (ÇOKLU SPLIT)
+        // 2. Eski (Split) Adisyonları Bul
         const eskiAdisyonlar = adisyonlar.filter(
             (a) =>
                 (a.masaNo === masaNo || a.masaNum === gercekMasaNo ||
@@ -470,7 +558,7 @@ export default function Adisyon() {
     }, [masaNo, gercekMasaNo, syncServiceReady, isBilardo]);
 
     // --------------------------------------------------
-    // GEÇEN SÜRE HESAPLA (YENİ adisyon üzerinden)
+    // GEÇEN SÜRE HESAPLA
     // --------------------------------------------------
     useEffect(() => {
         if (!adisyon || !adisyon.acilisZamani) return;
@@ -500,7 +588,6 @@ export default function Adisyon() {
                 // BİLARDO SÜRE BİTİMİ KONTROLÜ
                 const bilardoSuresiDakika = Number(localStorage.getItem('mc_bilardo_suresi') || '60');
                 if (bilardoDakika >= bilardoSuresiDakika) {
-                    // Süre doldu, otomatik olarak bilardo ücretini ekle
                     otomatikBilardoUcretiEkle();
                 }
             }
@@ -517,7 +604,6 @@ export default function Adisyon() {
     const otomatikBilardoUcretiEkle = () => {
         if (!isBilardo || !adisyon || bilardoUcret <= 0) return;
 
-        // Eğer zaten bilardo ücreti eklenmişse tekrar ekleme
         const bilardoUcretiEkliMi = adisyon.kalemler.some(k =>
             k.urunAd === "BİLARDO ÜCRETİ" || k.urunAd.includes("BİLARDO")
         );
@@ -543,14 +629,13 @@ export default function Adisyon() {
         setAdisyon(guncel);
         guncelAdisyonLocal(guncel);
 
-        // Masa güncelle
         guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
         alert(`Bilardo süresi doldu! ${bilardoUcret} TL bilardo ücreti eklendi.`);
     };
 
     // --------------------------------------------------
-    // MÜŞTERİ / BORÇ VERİLERİNİ YÜKLE - DÜZELTİLDİ: Müşterileri yükle
+    // MÜŞTERİ VERİLERİNİ YÜKLE
     // --------------------------------------------------
     useEffect(() => {
         const mList = okuJSON(MUSTERI_KEY, []);
@@ -558,14 +643,13 @@ export default function Adisyon() {
     }, []);
 
     // --------------------------------------------------
-    // HESABA YAZ MODU AÇ/KAPA - YENİ EKLENDİ
+    // HESABA YAZ MODU AÇ/KAPA
     // --------------------------------------------------
     useEffect(() => {
-        // Hesaba Yaz butonuna tıklandığında modu aç
         if (aktifOdemeTipi === "HESABA_YAZ" && !hesabaYazModu) {
             console.log("🟢 HESABA_YAZ modu açılıyor!");
             setHesabaYazModu(true);
-            setBorcTutarInput(String(kalan || 0)); // Varsayılan tutar = kalan
+            setBorcTutarInput(String(kalan || 0));
         }
     }, [aktifOdemeTipi, hesabaYazModu, kalan]);
 
@@ -579,7 +663,6 @@ export default function Adisyon() {
 
             const bugun = new Date();
 
-            // Bugün veya geçmişte ödeme sözü verilen borçları kontrol et
             const hatirlatilacakBorclar = borclar.filter(b => {
                 if (!b.odemeSozu || b.hatirlatildi) return false;
 
@@ -600,17 +683,15 @@ export default function Adisyon() {
             }
         };
 
-        // İlk kontrol
         kontrolEt();
 
-        // Her 30 saniyede bir kontrol et
         const interval = setInterval(kontrolEt, 30000);
 
         return () => clearInterval(interval);
     }, []);
 
     // --------------------------------------------------
-    // ADISYON TOPLAM ve KALAN HESABI - ÇOKLU SPLIT İÇİN GUNCELLENDI
+    // ADISYON TOPLAM ve KALAN HESABI
     // --------------------------------------------------
     useEffect(() => {
         // 1. YENİ adisyon toplamları
@@ -619,7 +700,6 @@ export default function Adisyon() {
             0
         );
 
-        // BİLARDO ÜCRETİ EKLEME (EĞER HENÜZ EKLENMEDİYSE VE BİLARDO MASASI İSE)
         if (isBilardo && bilardoUcret > 0 && adisyon) {
             const bilardoUcretiEkliMi = adisyon.kalemler.some(k =>
                 k.urunAd === "BİLARDO ÜCRETİ" || k.urunAd.includes("BİLARDO")
@@ -636,7 +716,7 @@ export default function Adisyon() {
         );
         const yeniIndirim = indirim || 0;
 
-        // 2. ESKİ adisyonlar toplamları (ÇOKLU SPLIT)
+        // 2. ESKİ adisyonlar toplamları
         const eskiToplamlar = splitAdisyonlar.map(split => {
             return (split?.kalemler || []).reduce(
                 (sum, k) => sum + (Number(k.toplam) || 0),
@@ -646,12 +726,11 @@ export default function Adisyon() {
         
         const eskiToplam = eskiToplamlar.reduce((sum, tutar) => sum + tutar, 0);
 
-        // 3. TOPLAM değerler (YENİ + TÜM ESKİ SPLIT'LER)
+        // 3. TOPLAM değerler
         const toplamSatir = yeniSatirToplam + eskiToplam;
-        const toplamOdemeler = yeniOdemelerToplam; // Sadece yeni adisyondaki ödemeler
+        const toplamOdemeler = yeniOdemelerToplam;
         const toplamKalan = Math.max(toplamSatir - yeniIndirim - toplamOdemeler, 0);
 
-        // ANA panelde gösterilecek toplam
         setToplam(toplamSatir);
         setKalan(toplamKalan);
 
@@ -664,15 +743,10 @@ export default function Adisyon() {
             splitSayisi: splitAdisyonlar.length
         });
 
-        // =============================
-        // YENİ EKLENEN KOD: TOPLAM TUTARI MASALAR SAYFASI İÇİN KAYDET
-        // =============================
         if (adisyon?.id && gercekMasaNo) {
             try {
-                // 1. Ana adisyon toplamını localStorage'a kaydet
                 localStorage.setItem(`mc_adisyon_toplam_${adisyon.id}`, yeniSatirToplam.toString());
 
-                // 2. Split adisyonlar varsa, her birinin toplamını kaydet
                 splitAdisyonlar.forEach((split, index) => {
                     const splitToplam = (split.kalemler || []).reduce(
                         (sum, k) => sum + (Number(k.toplam) || 0),
@@ -681,11 +755,9 @@ export default function Adisyon() {
                     localStorage.setItem(`mc_adisyon_toplam_${split.id}`, splitToplam.toString());
                 });
 
-                // 3. Masa için toplam tutarı kaydet (ana + tüm split'ler)
                 const masaToplamTutar = toplamSatir;
                 localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
 
-                // 4. Masalar sayfasını güncellemek için event gönder
                 window.dispatchEvent(new CustomEvent('adisyonGuncellendi', {
                     detail: {
                         masaNo: gercekMasaNo,
@@ -708,140 +780,48 @@ export default function Adisyon() {
                 console.error('❌ Toplam tutar kaydedilemedi:', error);
             }
         }
-        // =============================
-        // YENİ EKLENEN KOD SONU
-        // =============================
 
     }, [adisyon, splitAdisyonlar, indirim, isBilardo, bilardoUcret]);
 
     // --------------------------------------------------
-    // MENÜ ÜRÜNLERİNİ YÜKLE ve SIRALA
-    // --------------------------------------------------
-    useEffect(() => {
-        const list = okuJSON(URUN_KEY, []);
-
-        const fixed = (Array.isArray(list) ? list : []).map(u => ({
-            ...u,
-            kategori: u.kategori || u.categoryName || u.kategoriAd || u.Kategori || "GENEL",
-            ad: u.ad || u.name || u.UrunAdi || "",
-            satis: Number(u.satis || u.salePrice || u.Fiyat || 0)
-        }));
-
-        // KATEGORİLERE GÖRE GRUPLAMA ve ALFABETİK SIRALAMA
-        const kategorilereGoreGrupla = () => {
-            const gruplu = {};
-
-            // Önce kategorilere göre grupla
-            fixed.forEach((u) => {
-                if (!gruplu[u.kategori]) {
-                    gruplu[u.kategori] = [];
-                }
-                gruplu[u.kategori].push(u);
-            });
-
-            // Her kategori içindeki ürünleri alfabetik sırala
-            Object.keys(gruplu).forEach(kategori => {
-                gruplu[kategori].sort((a, b) =>
-                    a.ad.localeCompare(b.ad, 'tr')
-                );
-            });
-
-            return gruplu;
-        };
-
-        const grupluUrunler = kategorilereGoreGrupla();
-
-        // Gruplu veriyi düzleştir (sıralı şekilde)
-        const siraliUrunler = [];
-
-        // Kategorileri alfabetik sırala
-        const siraliKategoriler = Object.keys(grupluUrunler).sort((a, b) =>
-            a.localeCompare(b, 'tr')
-        );
-
-        // Her kategori için ürünleri ekle
-        siraliKategoriler.forEach(kategori => {
-            siraliUrunler.push(...grupluUrunler[kategori]);
-        });
-
-        // BİLARDO MASASI İSE "BİLARDO" KATEGORİSİNDEKİ ÜRÜNLERİ ÖNE ÇIKAR
-        if (isBilardo) {
-            // Bilardo kategorisindeki ürünleri öne al
-            siraliUrunler.sort((a, b) => {
-                const aIsBilardo = a.kategori.toUpperCase().includes("BİLARDO") || a.kategori.toUpperCase().includes("BILARDO");
-                const bIsBilardo = b.kategori.toUpperCase().includes("BİLARDO") || b.kategori.toUpperCase().includes("BILARDO");
-
-                if (aIsBilardo && !bIsBilardo) return -1;
-                if (!aIsBilardo && bIsBilardo) return 1;
-                return 0;
-            });
-        }
-
-        setUrunler(siraliUrunler);
-    }, [adisyon, isBilardo]);
-
-    const kategoriler = useMemo(() => {
-        const set = new Set();
-        urunler.forEach((u) => {
-            if (u.kategori) set.add(u.kategori);
-        });
-        set.add("SİPARİŞ YEMEK");
-        const arr = Array.from(set);
-        return arr.sort((a, b) => a.localeCompare(b, "tr"));
-    }, [urunler]);
-
-    useEffect(() => {
-        if (!aktifKategori && kategoriler.length > 0) {
-            setAktifKategori(kategoriler[0]);
-        }
-    }, [kategoriler, aktifKategori]);
-
-    // --------------------------------------------------
-    // ARANAN ÜRÜNLERİ FİLTRELE - TÜM KATEGORİLERDE ARAMA
+    // FİLTRELİ ÜRÜNLER
     // --------------------------------------------------
     const filtreliUrunler = useMemo(() => {
-        // Tüm kategorilerde arama yap
         if (urunArama.trim() !== "") {
             const aramaTerimi = urunArama.toLowerCase();
             
-            // Tüm ürünlerde arama yap
             let tumUrunlerArama = urunler.filter((u) =>
                 u.ad.toLowerCase().includes(aramaTerimi)
             );
             
-            // SİPARİŞ YEMEK özel durumu
             if (aramaTerimi.includes("sipariş") || aramaTerimi.includes("yemek")) {
                 tumUrunlerArama.unshift({
                     id: "siparis-yemek",
                     ad: "SİPARİŞ YEMEK",
-                    kategori: "SİPARİŞ YEMEK",
-                    satis: 0
+                    kategoriId: null,
+                    salePrice: 0
                 });
             }
             
             return tumUrunlerArama;
         }
         
-        // Arama yoksa, aktif kategorideki ürünleri göster
-        if (!aktifKategori) return [];
+        if (!aktifKategoriId) return [];
         
-        if (aktifKategori === "SİPARİŞ YEMEK") {
-            return [
-                {
-                    id: "siparis-yemek",
-                    ad: "SİPARİŞ YEMEK",
-                    kategori: "SİPARİŞ YEMEK",
-                    satis: 0
-                },
-            ];
+        if (aktifKategoriId === "SIPARIS_YEMEK") {
+            return [{
+                id: "siparis-yemek",
+                ad: "SİPARİŞ YEMEK",
+                kategoriId: null,
+                salePrice: 0
+            }];
         }
         
-        // Aktif kategorideki ürünleri göster
-        return urunler.filter((u) => u.kategori === aktifKategori);
-    }, [urunler, aktifKategori, urunArama]);
+        return urunler.filter((u) => u.kategoriId === aktifKategoriId);
+    }, [urunler, aktifKategoriId, urunArama]);
 
     // --------------------------------------------------
-    // ADET PANEL EKLE FONKSİYONU - EKLENDİ
+    // ADET PANEL EKLE FONKSİYONU
     // --------------------------------------------------
     const adetPanelEkle = () => {
         if (!adisyon || !seciliUrun) return;
@@ -870,12 +850,8 @@ export default function Adisyon() {
             setAdisyon(guncel);
             guncelAdisyonLocal(guncel);
 
-            // Masa güncelle - Bilardo kontrolü ile
             guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
-            // =============================
-            // YENİ EKLENEN KOD: Sipariş yemek eklendiğinde masalar sayfasını güncelle
-            // =============================
             if (gercekMasaNo && adisyon.id) {
                 setTimeout(() => {
                     const toplamTutar = (guncel.kalemler || []).reduce(
@@ -896,9 +872,6 @@ export default function Adisyon() {
                     window.dispatchEvent(new Event('adisyonGuncellendi'));
                 }, 100);
             }
-            // =============================
-            // YENİ EKLENEN KOD SONU
-            // =============================
         }
 
         setAdetPanelAcik(false);
@@ -908,7 +881,7 @@ export default function Adisyon() {
     };
 
     // --------------------------------------------------
-    // ADISYONA ÜRÜN EKLEME - SYNC SERVICE ENTEGRASYONLU
+    // ADISYONA ÜRÜN EKLEME
     // --------------------------------------------------
     const guncelAdisyonLocal = (yeniAdisyon) => {
         const adisyonlar = okuJSON(ADISYON_KEY, []);
@@ -920,17 +893,12 @@ export default function Adisyon() {
         }
         yazJSON(ADISYON_KEY, adisyonlar);
 
-        // =============================
-        // YENİ EKLENEN KOD: Kalem eklendiğinde masalar sayfasını güncelle
-        // =============================
         if (yeniAdisyon?.id && gercekMasaNo) {
-            // Toplam tutarı hesapla
             const toplamTutar = (yeniAdisyon.kalemler || []).reduce(
                 (sum, k) => sum + (Number(k.toplam) || 0),
                 0
             );
 
-            // Eski adisyon toplamını da ekle
             const eskiToplam = splitAdisyonlar.reduce(
                 (sum, split) => sum + ((split?.kalemler || []).reduce(
                     (s, k) => s + (Number(k.toplam) || 0),
@@ -941,26 +909,20 @@ export default function Adisyon() {
 
             const masaToplamTutar = toplamTutar + eskiToplam;
 
-            // LocalStorage'a kaydet
             localStorage.setItem(`mc_adisyon_toplam_${yeniAdisyon.id}`, toplamTutar.toString());
             localStorage.setItem(`mc_masa_toplam_${gercekMasaNo}`, masaToplamTutar.toString());
 
-            // Masalar sayfasını güncelle
             window.dispatchEvent(new Event('adisyonGuncellendi'));
         }
-        // =============================
-        // YENİ EKLENEN KOD SONU
-        // =============================
     };
 
     const uruneTiklandi = (urun) => {
-        // Sadece YENİ adisyona ürün ekleyebiliriz
         if (!adisyon) {
             alert("Adisyon bulunamadı.");
             return;
         }
 
-        if (urun.kategori === "SİPARİŞ YEMEK") {
+        if (urun.id === "siparis-yemek") {
             setSeciliUrun(urun);
             setSiparisYemekFiyat("");
             setSiparisYemekNot("");
@@ -972,25 +934,24 @@ export default function Adisyon() {
         // SYNC SERVICE ile kalem ekleme
         if (syncServiceReady && window.syncService.kalemEkleVeToplamGuncelle) {
             console.log('➕ SyncService ile kalem ekleniyor:', urun.ad);
-            console.log('📌 Masa Bilgisi:', { gercekMasaNo, adisyonId: adisyon.id, isBilardo });
 
             const kalemData = {
                 urunId: urun.id,
                 urunAdi: urun.ad,
-                birimFiyat: Number(urun.satis || 0),
+                birimFiyat: Number(urun.salePrice || 0),
                 miktar: 1,
                 isBilardo: isBilardo
             };
 
-            // TOPLAM TUTARI HESAPLA VE GÖNDER
             const mevcutKalemler = [...(adisyon.kalemler || [])];
             const index = mevcutKalemler.findIndex(
-                (k) => k.urunId === urun.id && Number(k.birimFiyat) === Number(urun.satis || 0)
+                (k) => k.urunId === urun.id && 
+                       Number(k.birimFiyat) === Number(urun.salePrice || 0)
             );
 
             let yeniToplam = 0;
             if (index === -1) {
-                yeniToplam = Number(urun.satis || 0);
+                yeniToplam = Number(urun.salePrice || 0);
             } else {
                 const kalem = { ...mevcutKalemler[index] };
                 yeniToplam = (kalem.adet + 1) * kalem.birimFiyat;
@@ -1000,13 +961,12 @@ export default function Adisyon() {
                 adisyon.id,
                 kalemData,
                 yeniToplam,
-                isBilardo, // Bilardo bilgisini gönder
-                gercekMasaNo // Gerçek masa numarasını da gönder
+                isBilardo,
+                gercekMasaNo
             );
 
             if (success) {
                 console.log('✅ SyncService ile kalem eklendi');
-                // Adisyonu güncelle
                 setTimeout(() => {
                     const adisyonlar = okuJSON(ADISYON_KEY, []);
                     const updatedAdisyon = adisyonlar.find(a => a.id === adisyon.id);
@@ -1020,12 +980,12 @@ export default function Adisyon() {
             }
         }
 
-        // MANUEL ekleme (fallback)
+        // MANUEL ekleme
         const mevcutKalemler = [...(adisyon.kalemler || [])];
         const index = mevcutKalemler.findIndex(
             (k) =>
                 k.urunId === urun.id &&
-                Number(k.birimFiyat) === Number(urun.satis || 0)
+                Number(k.birimFiyat) === Number(urun.salePrice || 0)
         );
 
         if (index === -1) {
@@ -1034,9 +994,9 @@ export default function Adisyon() {
                 urunId: urun.id,
                 urunAd: urun.ad,
                 adet: 1,
-                birimFiyat: Number(urun.satis || 0),
-                toplam: Number(urun.satis || 0),
-                isBilardo: isBilardo // Bilardo ürünü mü?
+                birimFiyat: Number(urun.salePrice || 0),
+                toplam: Number(urun.salePrice || 0),
+                isBilardo: isBilardo
             };
             mevcutKalemler.push(yeniKalem);
         } else {
@@ -1050,25 +1010,21 @@ export default function Adisyon() {
         setAdisyon(guncel);
         guncelAdisyonLocal(guncel);
 
-        // Masa güncellemesini yap - GERÇEK MASA NO İLE
         console.log('🔄 Manuel masa güncellemesi:', { gercekMasaNo, adisyonId: adisyon.id, isBilardo });
         guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
     };
 
-    // MASA BİLGİSİNİ GÜNCELLEYEN FONKSİYON - SYNC SERVICE ENTEGRASYONLU (GUNCELLENDI)
+    // MASA BİLGİSİNİ GÜNCELLEYEN FONKSİYON
     const guncelMasaLocal = (masaNum, anaAdisyonId, splitAdisyonList, isBilardoMasa = false) => {
-        // GERÇEK MASA NO'YU KULLAN
         const gercekMasaNoToUse = masaNum;
 
         console.log('🔄 Masa güncelleniyor:', {
             gercekMasaNo: gercekMasaNoToUse,
             anaAdisyonId,
             splitAdisyonSayisi: splitAdisyonList.length,
-            isBilardo: isBilardoMasa,
-            currentGercekMasaNo: gercekMasaNo // State'deki değer
+            isBilardo: isBilardoMasa
         });
 
-        // Toplam tutarı hesapla
         const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
         const eskiToplam = splitAdisyonList.reduce(
             (sum, split) => sum + ((split?.kalemler || []).reduce(
@@ -1079,24 +1035,20 @@ export default function Adisyon() {
         );
         const toplamTutar = yeniToplam + eskiToplam;
 
-        console.log('💰 Toplam Tutar Hesaplandı:', { yeniToplam, eskiToplam, toplamTutar: toplamTutar.toFixed(2) });
+        console.log('💰 Toplam Tutar Hesaplandı:', { toplamTutar: toplamTutar.toFixed(2) });
 
-        // SYNC SERVICE KULLAN - NORMALIZE ET
+        // SYNC SERVICE KULLAN
         if (syncServiceReady && window.syncService.guncelMasa) {
             console.log('🔄 SyncService ile masa güncelleniyor:', gercekMasaNoToUse);
-
-            // SyncService'e toplam tutarı da gönder
             window.syncService.guncelMasa(gercekMasaNoToUse, anaAdisyonId, splitAdisyonList, toplamTutar.toFixed(2), isBilardoMasa);
             return;
         }
 
-        // FALLBACK: Manuel güncelleme - DETAYLI MASALAR GÜNCELLEMESİ
+        // FALLBACK: Manuel güncelleme
         let masalar = okuJSON(MASA_KEY, []);
 
-        // Bilardo masaları için farklı filtreleme
         let masaIdx = -1;
         if (isBilardoMasa) {
-            // Bilardo masası için "BİLARDO" veya "B" ile başlayan masa ara
             masaIdx = masalar.findIndex((m) =>
                 m.no === gercekMasaNoToUse ||
                 m.masaNo?.toUpperCase().includes("BİLARDO") ||
@@ -1104,15 +1056,13 @@ export default function Adisyon() {
                 m.masaNum?.toUpperCase().includes("B")
             );
         } else {
-            // Normal masa için sayısal masa ara
             const masaNoNum = Number(gercekMasaNoToUse);
-            masaIdx = masalar.findIndex((m) => Number(m.no) === masaNoNum);
+            masaIdx = masalar.findIndex(m => Number(m.no) === masaNoNum);
         }
 
         if (masaIdx !== -1) {
             const masaAdi = isBilardoMasa ? `BİLARDO ${gercekMasaNoToUse}` : `MASA ${gercekMasaNoToUse}`;
 
-            // Split adisyon ID'lerini topla
             const splitAdisyonIds = splitAdisyonList.map(split => split.id).filter(Boolean);
             
             masalar[masaIdx] = {
@@ -1122,16 +1072,15 @@ export default function Adisyon() {
                 adisyonId: anaAdisyonId,
                 splitAdisyonIds: splitAdisyonIds.length > 0 ? splitAdisyonIds : null,
                 splitAdisyonSayisi: splitAdisyonList.length,
-                toplamTutar: toplamTutar.toFixed(2), // MASALAR SAYFASINDA GÖRÜNECEK TUTAR
-                durum: "DOLU", // DOLU OLARAK İŞARETLE
-                renk: "red", // KIRMIZI RENK
+                toplamTutar: toplamTutar.toFixed(2),
+                durum: "DOLU",
+                renk: "red",
                 acilisZamani: adisyon?.acilisZamani || new Date().toISOString(),
                 guncellemeZamani: new Date().toISOString(),
-                isBilardo: isBilardoMasa // Bilardo masası mı?
+                isBilardo: isBilardoMasa
             };
             yazJSON(MASA_KEY, masalar);
 
-            // Storage event'ini tetikle - MASALAR SAYFASININ GÜNCELLENMESİ İÇİN
             window.dispatchEvent(new StorageEvent('storage', {
                 key: MASA_KEY,
                 newValue: JSON.stringify(masalar)
@@ -1155,12 +1104,8 @@ export default function Adisyon() {
         setAdisyon(guncel);
         guncelAdisyonLocal(guncel);
 
-        // Masa güncellemesini yap - GERÇEK MASA NO İLE
         guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
-        // =============================
-        // YENİ EKLENEN KOD: Satır silindiğinde masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (guncel.kalemler || []).reduce(
@@ -1181,9 +1126,6 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENEN KOD SONU
-        // =============================
     };
 
     const adetArtir = (kalemId) => {
@@ -1203,12 +1145,8 @@ export default function Adisyon() {
         setAdisyon(guncel);
         guncelAdisyonLocal(guncel);
 
-        // Masa güncellemesini yap - GERÇEK MASA NO İLE
         guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
-        // =============================
-        // YENİ EKLENEN KOD: Adet artırıldığında masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (guncel.kalemler || []).reduce(
@@ -1229,9 +1167,6 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENEN KOD SONU
-        // =============================
     };
 
     const adetAzalt = (kalemId) => {
@@ -1257,12 +1192,8 @@ export default function Adisyon() {
         setAdisyon(guncel);
         guncelAdisyonLocal(guncel);
 
-        // Masa güncellemesini yap - GERÇEK MASA NO İLE
         guncelMasaLocal(gercekMasaNo, adisyon.id, splitAdisyonlar, isBilardo);
 
-        // =============================
-        // YENİ EKLENDİ: Adet azaltıldığında masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (guncel.kalemler || []).reduce(
@@ -1283,13 +1214,10 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
-    // İNDİRİM - DÜZELTİLDİ (SADECE YENİ ADISYON)
+    // İNDİRİM
     // --------------------------------------------------
     const indirimEnter = (e) => {
         if (e.key !== "Enter") return;
@@ -1300,17 +1228,13 @@ export default function Adisyon() {
             return;
         }
 
-        // İndirim sadece YENİ adisyona uygulanır
         const guncel = { ...adisyon, indirim: val };
         setAdisyon(guncel);
         setIndirim(val);
         guncelAdisyonLocal(guncel);
 
-        setIndirimInput(""); // Input'u temizle
+        setIndirimInput("");
 
-        // =============================
-        // YENİ EKLENDİ: İndirim uygulandığında masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (guncel.kalemler || []).reduce(
@@ -1331,13 +1255,10 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
-    // ÖDEME SİLME (SADECE YENİ ADISYON)
+    // ÖDEME SİLME
     // --------------------------------------------------
     const odemeSil = (odemeId) => {
         if (!adisyon) return;
@@ -1352,9 +1273,6 @@ export default function Adisyon() {
         setAdisyon(yeniAdisyon);
         guncelAdisyonLocal(yeniAdisyon);
 
-        // =============================
-        // YENİ EKLENDİ: Ödeme silindiğinde masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (yeniAdisyon.kalemler || []).reduce(
@@ -1375,13 +1293,10 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
-    // İNDİRİM SIFIRLAMA - DÜZELTİLDİ
+    // İNDİRİM SIFIRLAMA
     // --------------------------------------------------
     const indirimSifirla = () => {
         const guncel = { ...adisyon, indirim: 0 };
@@ -1390,9 +1305,6 @@ export default function Adisyon() {
         setIndirimInput("");
         guncelAdisyonLocal(guncel);
 
-        // =============================
-        // YENİ EKLENDİ: İndirim sıfırlandığında masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (guncel.kalemler || []).reduce(
@@ -1413,13 +1325,10 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
-    // HESABA YAZ ÖZETİ (Secili müşteri için) - GUNCELLENDI
+    // HESABA YAZ ÖZETİ
     // --------------------------------------------------
     const mevcutBorcOzet = useMemo(() => {
         if (!seciliMusteriId) return { toplamBorc: 0, toplamOdeme: 0, kalan: 0 };
@@ -1442,13 +1351,11 @@ export default function Adisyon() {
     }, [seciliMusteriId, hesabaYazModu, borcTutarInput]);
 
     // --------------------------------------------------
-    // ÖDEME EKLEME - GUNCELLENDI (Hesaba Yaz kontrolü düzeltildi)
+    // ÖDEME EKLEME
     // --------------------------------------------------
     const odemeEkle = () => {
-        // Ödeme her zaman YENİ adisyona eklenir
         if (!adisyon) return;
 
-        // Eğer Hesaba Yaz modu açıksa, bu fonksiyon çağrılmamalı
         if (aktifOdemeTipi === "HESABA_YAZ" && hesabaYazModu) {
             console.log("🟢 HESABA_YAZ modu zaten açık, odemeEkle çağrılmamalı!");
             return;
@@ -1456,7 +1363,6 @@ export default function Adisyon() {
 
         let tutar = Number(odemeInput);
         if (!tutar || tutar <= 0) {
-            // Ödeme input boşsa, kalan tutarın tamamını öde
             tutar = kalan;
         }
 
@@ -1480,9 +1386,6 @@ export default function Adisyon() {
         guncelAdisyonLocal(yeniAdisyon);
         setOdemeInput("");
 
-        // =============================
-        // YENİ EKLENDİ: Ödeme eklendiğinde masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (yeniAdisyon.kalemler || []).reduce(
@@ -1503,13 +1406,10 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
-    // HESABA YAZ KAYDET (SADECE YENİ ADISYON) - GUNCELLENDI
+    // HESABA YAZ KAYDET
     // --------------------------------------------------
     const hesabaYazKaydet = () => {
         if (!adisyon) return;
@@ -1520,7 +1420,6 @@ export default function Adisyon() {
             return;
         }
 
-        // TUTAR KONTROLÜ: Girilen tutar kalan tutardan fazla olamaz
         if (borcTutar > kalan) {
             alert(`Borç tutarı kalan tutardan (${kalan.toFixed(2)} TL) fazla olamaz!`);
             return;
@@ -1529,7 +1428,6 @@ export default function Adisyon() {
         let guncelMusteriler = [...musteriler];
         let musteriId = seciliMusteriId;
 
-        // YENİ MÜŞTERİ KONTROLÜ - DÜZELTİLDİ
         if (!musteriId) {
             if (!yeniMusteriAdSoyad.trim()) {
                 alert("Yeni müşteri için Ad Soyad giriniz.");
@@ -1541,14 +1439,12 @@ export default function Adisyon() {
                 return;
             }
 
-            // Telefon numarası benzersiz kontrolü
             const existingCustomer = guncelMusteriler.find(c =>
                 c.telefon === yeniMusteriTelefon.trim()
             );
 
             if (existingCustomer) {
                 alert("Bu telefon numarası zaten kayıtlı!");
-                // Otomatik olarak mevcut müşteriyi seç
                 setSeciliMusteriId(existingCustomer.id);
                 musteriId = existingCustomer.id;
             } else {
@@ -1567,12 +1463,11 @@ export default function Adisyon() {
             }
         }
 
-        // ADISYON_KEY'E DE MÜŞTERİ ID'SİNİ KAYDET (ÖNEMLİ!)
+        // ADISYON_KEY'E MÜŞTERİ ID'SİNİ KAYDET
         const adisyonlar = okuJSON(ADISYON_KEY, []);
         const adisyonIndex = adisyonlar.findIndex(a => a.id === adisyon.id);
 
         if (adisyonIndex !== -1) {
-            // Adisyona müşteri ID'sini ve borç bilgisini ekle
             adisyonlar[adisyonIndex] = {
                 ...adisyonlar[adisyonIndex],
                 musteriId: musteriId,
@@ -1580,7 +1475,7 @@ export default function Adisyon() {
                 musteriAdi: musteriId ?
                     (guncelMusteriler.find(m => m.id === musteriId)?.adSoyad || "Yeni Müşteri")
                     : yeniMusteriAdSoyad.trim(),
-                tarih: new Date().toISOString() // Tarihi de kaydet
+                tarih: new Date().toISOString()
             };
             yazJSON(ADISYON_KEY, adisyonlar);
         }
@@ -1591,8 +1486,8 @@ export default function Adisyon() {
             id: `borc_${Date.now().toString()}`,
             musteriId,
             masaNo: isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`,
-            masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
-            adisyonId: adisyon.id, // Yeni adisyon ID'si
+            masaNum: gercekMasaNo,
+            adisyonId: adisyon.id,
             tutar: borcTutar,
             acilisZamani: new Date().toISOString(),
             kapanisZamani: null,
@@ -1606,15 +1501,15 @@ export default function Adisyon() {
                     aciklama: `Hesaba Yaz - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
                 },
             ],
-            remainingAmount: borcTutar, // Kalan ödenecek tutar
+            remainingAmount: borcTutar,
             isCollected: false,
             collectedAmount: 0,
-            urunler: adisyon?.kalemler || [] // ADISYON İÇERİĞİNİ KAYDET (ÖNEMLİ!)
+            urunler: adisyon?.kalemler || []
         };
         borclar.push(yeniBorc);
         yazJSON(BORC_KEY, borclar);
 
-        // ÖDEME KAYDI OLUŞTUR (Sadece adisyon içinde)
+        // ÖDEME KAYDI OLUŞTUR
         const yeniOdeme = {
             id: `hy_${Date.now().toString()}`,
             tip: "HESABA_YAZ",
@@ -1652,26 +1547,20 @@ export default function Adisyon() {
 
         alert(`Borç kaydedildi! ${borcTutar.toFixed(2)} TL müşteri hesabına yazıldı.\nAdisyon kapatılmadı - kalan: ${(kalan - borcTutar).toFixed(2)} TL`);
 
-        // HESABA YAZ MODUNU KAPAT
         setHesabaYazModu(false);
-        setAktifOdemeTipi("NAKIT"); // Ödeme tipini sıfırla
+        setAktifOdemeTipi("NAKIT");
         setHesabaYazSonrasiMasaDon(true);
 
-        // FORM ALANLARINI TEMİZLE
         setSeciliMusteriId(null);
         setYeniMusteriAdSoyad("");
         setYeniMusteriTelefon("");
         setYeniMusteriNot("");
         setBorcTutarInput("");
 
-        // MÜŞTERİ İŞLEMLERİ SAYFASINI GÜNCELLE
         setTimeout(() => {
             window.dispatchEvent(new Event('musteriBorclariGuncellendi'));
         }, 100);
 
-        // =============================
-        // YENİ EKLENDİ: Hesaba yaz kaydedildiğinde masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo && adisyon.id) {
             setTimeout(() => {
                 const toplamTutar = (guncelAdisyon.kalemler || []).reduce(
@@ -1692,17 +1581,14 @@ export default function Adisyon() {
                 window.dispatchEvent(new Event('adisyonGuncellendi'));
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
-    // HESABA YAZ İPTAL - YENİ EKLENDİ
+    // HESABA YAZ İPTAL
     // --------------------------------------------------
     const hesabaYazIptal = () => {
         setHesabaYazModu(false);
-        setAktifOdemeTipi("NAKIT"); // Ödeme tipini sıfırla
+        setAktifOdemeTipi("NAKIT");
         setSeciliMusteriId(null);
         setYeniMusteriAdSoyad("");
         setYeniMusteriTelefon("");
@@ -1712,84 +1598,70 @@ export default function Adisyon() {
     };
 
     // --------------------------------------------------
-    // ÇOKLU HESABI AYIR (ÇOKLU SPLIT BILL) - YENİ MANTIK
+    // ÇOKLU HESABI AYIR
     // --------------------------------------------------
     const hesabiAyir = () => {
-        // Eğer adisyon boşsa, hiçbir şey yapma
         if (!adisyon || (adisyon.kalemler || []).length === 0) {
             alert("Adisyonda ürün yok!");
             return;
         }
 
-        // Açıklama kontrolü
         if (!splitAciklamaInput.trim()) {
             alert("Lütfen hesap ayırma işlemi için bir açıklama giriniz (Örn: 'Kişi1', 'Çocuklar', 'Özel Hesap' vb.)");
             return;
         }
 
-        // Mevcut adisyonu ESKİ adisyon olarak kaydet (KİLİTLİ)
         const eskiAdisyon = {
             ...adisyon,
             id: adisyon.id,
-            isSplit: true, // Artık ESKİ adisyon
+            isSplit: true,
             durum: "KİLİTLİ",
-            splitAciklama: splitAciklamaInput.trim(), // Açıklama kaydet
+            splitAciklama: splitAciklamaInput.trim(),
             splitTarihi: new Date().toISOString(),
-            splitIndex: splitAdisyonlar.length // Hangi sırada ayrıldığını kaydet
+            splitIndex: splitAdisyonlar.length
         };
 
-        // YENİ bir adisyon oluştur
         const yeniAdisyon = {
             id: `ad_${Date.now().toString()}`,
             masaNo: isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`,
-            masaNum: gercekMasaNo, // GERÇEK MASA NUMARASINI KAYDET
+            masaNum: gercekMasaNo,
             acilisZamani: new Date().toISOString(),
             kapanisZamani: null,
-            kalemler: [], // Boş başlar
-            odemeler: [], // Ödeme geçmişi sıfırlanır
+            kalemler: [],
+            odemeler: [],
             indirim: 0,
             hesabaYazKayitlari: [],
             kapali: false,
-            isSplit: false, // Yeni adisyon
-            parentAdisyonId: eskiAdisyon.id, // Eski adisyonun ID'sini referans alır
+            isSplit: false,
+            parentAdisyonId: eskiAdisyon.id,
             durum: "AÇIK",
-            // KRITIK: Bilardo flag'ini ekle - STANDARTLAŞTIRILDI
-            isBilardo: isBilardo,  // Boolean flag
+            isBilardo: isBilardo,
             tur: isBilardo ? "BİLARDO" : "NORMAL",
-            masaTipi: isBilardo ? "BİLARDO" : "NORMAL"  // Masa tipi (syncService için)
+            masaTipi: isBilardo ? "BİLARDO" : "NORMAL"
         };
 
-        // 1. Eski adisyonu split listesine ekle
         const yeniSplitList = [...splitAdisyonlar, eskiAdisyon];
         setSplitAdisyonlar(yeniSplitList);
 
-        // 2. Yeni adisyonu aktif adisyon olarak ayarla
         setAdisyon(yeniAdisyon);
-        setIndirim(0); // Yeni adisyon için indirimi sıfırla
+        setIndirim(0);
         setIndirimInput("");
-        setSplitAciklamaInput(""); // Açıklama alanını temizle
-        setSplitTutarInput(""); // Tutar alanını temizle
-        setSplitOranInput(""); // Oran alanını temizle
+        setSplitAciklamaInput("");
+        setSplitTutarInput("");
+        setSplitOranInput("");
 
-        // 3. LocalStorage'ı güncelle
         let adisyonlar = okuJSON(ADISYON_KEY, []);
 
-        // Eski adisyonu güncelle
         const eskiIdx = adisyonlar.findIndex(a => a.id === eskiAdisyon.id);
         if (eskiIdx !== -1) {
             adisyonlar[eskiIdx] = eskiAdisyon;
         }
 
-        // Yeni adisyonu ekle
         adisyonlar.push(yeniAdisyon);
         yazJSON(ADISYON_KEY, adisyonlar);
 
-        // 4. Masa kaydını güncelle - GERÇEK MASA NO İLE
         guncelMasaLocal(gercekMasaNo, yeniAdisyon.id, yeniSplitList, isBilardo);
 
-        // =============================
-        // YENİ EKLENDİ: Hesap ayrıldığında masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo) {
             setTimeout(() => {
                 const yeniToplam = (yeniAdisyon.kalemler || []).reduce(
@@ -1807,7 +1679,6 @@ export default function Adisyon() {
 
                 localStorage.setItem(`mc_adisyon_toplam_${yeniAdisyon.id}`, yeniToplam.toString());
                 
-                // Tüm split adisyonların toplamını kaydet
                 yeniSplitList.forEach((split, index) => {
                     const splitToplam = (split.kalemler || []).reduce(
                         (sum, k) => sum + (Number(k.toplam) || 0),
@@ -1822,9 +1693,6 @@ export default function Adisyon() {
                 alert(`✅ Hesap başarıyla ayrıldı!\nAçıklama: "${splitAciklamaInput.trim()}"\nToplam ${yeniSplitList.length} adet ayrılmış hesap mevcut.`);
             }, 100);
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
@@ -1838,12 +1706,10 @@ export default function Adisyon() {
         const yeniSplitList = splitAdisyonlar.filter(split => split.id !== splitId);
         setSplitAdisyonlar(yeniSplitList);
 
-        // LocalStorage'dan da sil
         const adisyonlar = okuJSON(ADISYON_KEY, []);
         const guncelAdisyonlar = adisyonlar.filter(a => a.id !== splitId);
         yazJSON(ADISYON_KEY, guncelAdisyonlar);
 
-        // Masa kaydını güncelle
         guncelMasaLocal(gercekMasaNo, adisyon.id, yeniSplitList, isBilardo);
 
         alert("Ayrılmış hesap silindi.");
@@ -1855,7 +1721,6 @@ export default function Adisyon() {
     const odemeSozuPopupKapat = () => {
         if (!odemeSozuPopup) return;
 
-        // Borç kaydını güncelle - hatırlatıldı olarak işaretle
         const borclar = okuJSON(BORC_KEY, []);
         const borcIndex = borclar.findIndex(b => b.id === odemeSozuPopup.borcId);
 
@@ -1870,15 +1735,9 @@ export default function Adisyon() {
 
         setOdemeSozuPopup(null);
 
-        // =============================
-        // YENİ EKLENDİ: Popup kapatıldığında masalar sayfasını güncelle
-        // =============================
         if (gercekMasaNo) {
             window.dispatchEvent(new Event('adisyonGuncellendi'));
         }
-        // =============================
-        // YENİ EKLENDİ SONU
-        // =============================
     };
 
     // --------------------------------------------------
@@ -1887,437 +1746,517 @@ export default function Adisyon() {
     const odemeSozuPopupDetayaGit = () => {
         if (!odemeSozuPopup) return;
 
-        // Borç detay sayfasına yönlendir
         navigate(`/borc-detay?id=${odemeSozuPopup.borcId}`);
     };
 
     // ============================================================
-    // FİNANS HAVUZUNA EKLEME FONKSİYONU - YENİ EKLENDİ (DÜZELTİLDİ)
-    // ============================================================
-    const finansHavuzunaEkle = (adisyonData) => {
-        console.log("💰 [FINANS-HAVUZU] Adisyon kaydediliyor:", adisyonData);
-        
-        try {
-            const finansHavuzu = JSON.parse(localStorage.getItem("mc_finans_havuzu") || "[]");
-            const aktifGun = JSON.parse(localStorage.getItem("mc_aktif_gun") || "{}");
-            
-            const yeniKayit = {
-                id: `gelir_${adisyonData.id || `ad_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}`,
-                aciklama: `Adisyon #${adisyonData.id} (MASA ${adisyonData.masaNum})`,
-                tur: "GELIR",
-                odemeTuru: adisyonData.odemeTuru || "NAKIT", // BURASI ÇOK ÖNEMLİ!
-                tutar: adisyonData.toplamTutar,
-                kaynak: "ADISYON",
-                gunId: aktifGun.aktifGunId || new Date().toISOString().split('T')[0],
-                tarih: new Date().toISOString(),
-                kullanici: user?.username || "ADMIN",
-                adisyonId: adisyonData.id,
-                masaNo: adisyonData.masaNum,
-                isBilardo: adisyonData.isBilardo || false,
-                turDetay: adisyonData.isBilardo ? "BİLARDO" : "NORMAL",
-                kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
-                musteriId: adisyonData.musteriId || null,
-                musteriAdi: adisyonData.musteriAdi || null
-            };
-            
-            console.log("💰 [FINANS-HAVUZU] Yeni kayıt oluşturuldu:", yeniKayit);
-            
-            finansHavuzu.push(yeniKayit);
-            localStorage.setItem("mc_finans_havuzu", JSON.stringify(finansHavuzu));
-            
-            console.log("✅ [FINANS-HAVUZU] Adisyon başarıyla kaydedildi. Yeni toplam:", finansHavuzu.length);
-            
-            // mc_finans_havuzu modülü de kullan
-            if (mcFinansHavuzu && mcFinansHavuzu.adisyonKapandigindaKaydet) {
-                mcFinansHavuzu.adisyonKapandigindaKaydet(adisyonData);
-            }
-            
-            return yeniKayit;
-        } catch (error) {
-            console.error("❌ [FINANS-HAVUZU] Kayıt eklenemedi:", error);
-            return null;
-        }
+// TAM DOĞRU ADİSYON KAPATMA FONKSİYONU - DÜZELTİLMİŞ VERSİYON
+// ============================================================
+const adisyonKapat = () => {
+    console.log('🟡 [DEBUG] adisyonKapat fonksiyonu çağrıldı');
+    console.log('🟡 [DEBUG] Kullanıcı:', user?.username);
+    
+    // Kullanıcı kontrolü
+    if (!user) {
+        console.error('❌ [AUTH] Adisyon kapatma sırasında kullanıcı oturumu kapalı');
+        alert("Oturumunuz kapandı. Lütfen tekrar giriş yapın.");
+        navigate("/login");
+        return;
+    }
+
+    // Adisyon kontrolü
+    if (!adisyon) {
+        alert("Adisyon bulunamadı.");
+        return;
+    }
+
+    if (adisyon.kapali) {
+        alert("Bu adisyon zaten kapatılmış.");
+        return;
+    }
+
+    // YENİ: Adisyona ürün eklenmemişse ve toplam tutar 0 ise masayı kapatmak için izin ver
+    const yeniToplam = (adisyon?.kalemler || []).reduce(
+        (sum, k) => sum + (Number(k.toplam) || 0),
+        0
+    );
+    const eskiToplam = splitAdisyonlar.reduce(
+        (sum, split) => sum + ((split?.kalemler || []).reduce(
+            (s, k) => s + (Number(k.toplam) || 0),
+            0
+        )),
+        0
+    );
+    const toplamTutarMevcut = yeniToplam + eskiToplam;
+
+    // Eğer adisyonda hiç ürün yoksa ve toplam tutar 0 ise, kalan kontrolünü atla
+    const toplamKalemSayisi = (adisyon?.kalemler || []).length + 
+        splitAdisyonlar.reduce((sum, split) => sum + (split?.kalemler || []).length, 0);
+    
+    if (toplamKalemSayisi === 0 && toplamTutarMevcut === 0) {
+        console.log('ℹ️ Adisyonda ürün yok, toplam tutar 0 TL - Boş masa kapatılıyor');
+        // Boş masa kapatma işlemi
+    } else if (kalan > 0.01) {
+        alert("Kalan tutar ödenmeden adisyon kapatılamaz.");
+        return;
+    }
+
+    // ÖDEMELERİ ANALİZ ET - TEK DOĞRU KAYNAK
+    const odemeler = adisyon.odemeler || [];
+    
+    // 1️⃣ ÖDEME TÜRLERİNE GÖRE GRUPLAMA
+    const odemeGruplari = {
+        NAKIT: { toplam: 0, aciklama: "Nakit Ödeme" },
+        KART: { toplam: 0, aciklama: "Kredi Kartı Ödeme" },
+        HAVALE: { toplam: 0, aciklama: "Havale/EFT Ödeme" },
+        HESABA_YAZ: { toplam: 0, aciklama: "Hesaba Yazılan Borç" }
     };
 
-    // ============================================================
-    // ADISYON KAPATMA FONKSİYONU - TAM HALİ (GÜNCELLENDİ)
-    // ============================================================
-    const adisyonKapat = () => {
-        console.log('🟡 [DEBUG] adisyonKapat fonksiyonu çağrıldı');
-        console.log('🟡 [DEBUG] Kullanıcı:', user?.username);
+    // Gerçek ödemeleri grupla
+    odemeler.forEach(odeme => {
+        const tip = odeme.tip || "NAKIT";
+        const tutar = Number(odeme.tutar || 0);
         
-        // Kullanıcı kontrolü
-        if (!user) {
-            console.error('❌ [AUTH] Adisyon kapatma sırasında kullanıcı oturumu kapalı');
-            alert("Oturumunuz kapandı. Lütfen tekrar giriş yapın.");
-            navigate("/login");
-            return;
-        }
-
-        // Adisyon kontrolü
-        if (adisyon.kapali) {
-            alert("Bu adisyon zaten kapatılmış.");
-            return;
-        }
-
-        // Kalan tutar kontrolü
-        if (kalan > 0.01) {
-            alert("Kalan tutar ödenmeden adisyon kapatılamaz.");
-            return;
-        }
-
-        // Ödeme türünü belirle (aktif odeme tipinden) - DÜZELTİLDİ
-        let odemeTuru = "NAKIT";
-        if (aktifOdemeTipi === "HESABA_YAZ" && adisyon.odemeler && adisyon.odemeler.length > 0) {
-            // Eğer HESABA_YAZ ödemesi varsa, onu kullan
-            const hesabaYazOdeme = adisyon.odemeler.find(o => o.tip === "HESABA_YAZ");
-            if (hesabaYazOdeme) {
-                odemeTuru = "HESABA_YAZ";
-                console.log('💰 HESABA_YAZ ödemesi tespit edildi, ödeme türü ayarlandı');
-            } else {
-                odemeTuru = "NAKIT";
-                console.warn('⚠️ HESABA_YAZ seçilmiş ama HESABA_YAZ ödemesi bulunamadı');
-            }
+        if (odemeGruplari[tip]) {
+            odemeGruplari[tip].toplam += tutar;
         } else {
-            odemeTuru = aktifOdemeTipi;
+            // Bilinmeyen ödeme tipi için NAKIT olarak kaydet
+            odemeGruplari.NAKIT.toplam += tutar;
         }
+    });
 
-        // Toplam tutarı hesapla
-        const toplamKey = `mc_adisyon_toplam_${adisyon.id}`;
-        const toplam = Number(localStorage.getItem(toplamKey) || 0);
+    console.log('💰 Ödeme Grupları:', odemeGruplari);
 
-        if (toplam <= 0) {
-            alert("Toplam tutar geçersiz.");
-            return;
-        }
+    // Toplam ödeme kontrolü
+    const toplamOdemeler = Object.values(odemeGruplari).reduce((sum, g) => sum + g.toplam, 0);
+    const gercekToplamTutar = toplamTutarMevcut - (adisyon.indirim || 0);
 
-        console.log('🔴 MASAYI KAPAT tıklandı - adisyonId:', adisyon?.id, 
-                    'gercekMasaNo:', gercekMasaNo, 'isBilardo:', isBilardo,
-                    'toplam:', toplam, 'odemeTuru:', odemeTuru);
-
-        // ============================================================
-        // 1️⃣ KASA HAREKETİ EKLE
-        // ============================================================
-        const kasaHareketi = {
-            id: `kasa_adisyon_${Date.now()}`,
-            tip: "ADISYON_KAPANIS",
-            kaynak: "ADISYON",
-            adisyonId: adisyon.id,
-            masaNo: isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`,
-            masaNum: gercekMasaNo,
-            tutar: toplam,
-            odemeTuru: odemeTuru,
-            tarih: new Date().toISOString(),
-            aciklama: `${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} adisyon kapandı`,
-            personel: user?.adSoyad || user?.username || "Bilinmiyor"
-        };
-
-        // Kasa hareketini ekle
-        kasaHareketiEkle(kasaHareketi);
-        console.log('💰 Kasa hareketi eklendi:', kasaHareketi);
-
-        // ============================================================
-        // 2️⃣ FİNANS HAVUZUNA KAYDET - DÜZELTİLDİ
-        // ============================================================
-        try {
-            // Adisyon verisini hazırla
-            const adisyonData = {
-                id: adisyon.id,
-                masaNo: isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`,
-                masaNum: gercekMasaNo,
-                toplamTutar: toplam,
-                odemeTuru: odemeTuru, // DOĞRU ÖDEME TÜRÜ KULLANILACAK
-                acilisZamani: adisyon.acilisZamani,
-                kapanisZamani: new Date().toISOString(),
-                kalemler: adisyon.kalemler || [],
-                odemeler: adisyon.odemeler || [],
-                indirim: adisyon.indirim || 0,
-                musteriId: adisyon.musteriId || null,
-                musteriAdi: adisyon.musteriAdi || null,
-                hesabaYazKayitlari: adisyon.hesabaYazKayitlari || [],
-                kapatmaPersoneli: user?.adSoyad || user?.username,
-                isBilardo: isBilardo,
-                tur: isBilardo ? "BİLARDO" : "NORMAL",
-                status: "CLOSED",
-                kapatmaTarihi: new Date().toISOString()
-            };
-
-            console.log('💰 [FINANS-HAVUZU] Ana adisyon kaydediliyor:', adisyonData);
-            
-            // Finans havuzuna ekle
-            finansHavuzunaEkle(adisyonData);
-            
-            console.log('✅ [FINANS-HAVUZU] Ana adisyon kaydedildi');
-        } catch (error) {
-            console.error('❌ [FINANS-HAVUZU] Ana adisyon kaydedilirken hata:', error);
-        }
-
-        // ============================================================
-        // 3️⃣ ADİSYONLARI KAPAT (Yeni ve Split Adisyonlar)
-        // ============================================================
-        const updatedAdisyonlar = okuJSON(ADISYON_KEY, []);
-        const guncelEskiAdisyonlar = [];
-
-        // YENİ adisyonu kapat
-        let guncelYeniAdisyon = null;
-        if (adisyon) {
-            const yeniIdx = updatedAdisyonlar.findIndex((a) => a.id === adisyon.id);
-            if (yeniIdx !== -1) {
-                guncelYeniAdisyon = {
-                    ...adisyon,
-                    kapali: true,
-                    status: "CLOSED",
-                    durum: "KAPALI",
-                    kapanisZamani: new Date().toISOString(),
-                    toplamTutar: toplam.toFixed(2),
-                    kapatmaPersoneli: user?.adSoyad || user?.username,
-                    kapatmaOdemeTuru: odemeTuru
-                };
-                updatedAdisyonlar[yeniIdx] = guncelYeniAdisyon;
-                setAdisyon(guncelYeniAdisyon);
-            }
-        }
-
-        // ESKİ adisyonları kapat (tüm split'ler) ve finans havuzuna kaydet
-        splitAdisyonlar.forEach((split) => {
-            const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === split.id);
-            if (eskiIdx !== -1) {
-                const splitToplam = (split?.kalemler || []).reduce(
-                    (sum, k) => sum + (Number(k.toplam) || 0),
-                    0
-                );
-                
-                const guncelEskiAdisyon = {
-                    ...split,
-                    kapali: true,
-                    kapanisZamani: new Date().toISOString(),
-                    durum: "KAPALI",
-                    kapatmaPersoneli: user?.adSoyad || user?.username,
-                    kapatmaOdemeTuru: split.odemeler && split.odemeler.length > 0 ? split.odemeler[0].tip : odemeTuru
-                };
-                updatedAdisyonlar[eskiIdx] = guncelEskiAdisyon;
-                guncelEskiAdisyonlar.push(guncelEskiAdisyon);
-                
-                // Split adisyonları da finans havuzuna kaydet
-                try {
-                    const splitData = {
-                        id: split.id,
-                        masaNo: isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`,
-                        masaNum: gercekMasaNo,
-                        toplamTutar: splitToplam,
-                        odemeTuru: split.odemeler && split.odemeler.length > 0 ? split.odemeler[0].tip : odemeTuru,
-                        acilisZamani: split.acilisZamani,
-                        kapanisZamani: new Date().toISOString(),
-                        kalemler: split.kalemler || [],
-                        odemeler: split.odemeler || [],
-                        indirim: split.indirim || 0,
-                        kapatmaPersoneli: user?.adSoyad || user?.username,
-                        isBilardo: isBilardo,
-                        tur: isBilardo ? "BİLARDO" : "NORMAL",
-                        status: "CLOSED",
-                        kapatmaTarihi: new Date().toISOString(),
-                        isSplit: true,
-                        parentAdisyonId: adisyon.id,
-                        splitAciklama: split.splitAciklama || "",
-                        splitIndex: split.splitIndex || 0
-                    };
-
-                    console.log('💰 [FINANS-HAVUZU] Split adisyon kaydediliyor:', {
-                        id: splitData.id,
-                        splitAciklama: splitData.splitAciklama,
-                        toplamTutar: splitData.toplamTutar,
-                        odemeTuru: splitData.odemeTuru
-                    });
-                    
-                    finansHavuzunaEkle(splitData);
-                    console.log('✅ [FINANS-HAVUZU] Split adisyon kaydedildi');
-                } catch (error) {
-                    console.error('❌ [FINANS-HAVUZU] Split adisyon kaydedilirken hata:', error);
-                }
-            }
+    if (Math.abs(toplamOdemeler - gercekToplamTutar) > 0.01) {
+        console.warn('⚠️ Ödeme toplamı ile hesap toplamı uyuşmuyor:', {
+            toplamOdemeler,
+            gercekToplamTutar,
+            fark: toplamOdemeler - gercekToplamTutar
         });
+        alert(`Ödeme tutarları toplamı (${toplamOdemeler.toFixed(2)} TL) ile hesap toplamı (${gercekToplamTutar.toFixed(2)} TL) uyuşmuyor!`);
+        return;
+    }
 
-        // Adisyonları kaydet
-        yazJSON(ADISYON_KEY, updatedAdisyonlar);
-        console.log('✅ Adisyonlar kapatıldı', {
-            anaAdisyonId: adisyon?.id,
-            splitAdisyonSayisi: splitAdisyonlar.length,
-            finansHavuzuKayitSayisi: splitAdisyonlar.length + 1 // Ana adisyon + tüm split'ler
-        });
+    console.log('🔴 MASAYI KAPAT tıklandı - adisyonId:', adisyon?.id, 
+                'gercekMasaNo:', gercekMasaNo, 'isBilardo:', isBilardo,
+                'gercekToplamTutar:', gercekToplamTutar.toFixed(2),
+                'toplamKalemSayisi:', toplamKalemSayisi,
+                'odemeler:', odemeler);
 
-        // ============================================================
-        // 4️⃣ MASALARI BOŞALT (Sync Service ile veya Manuel)
-        // ============================================================
-        let syncSuccess = false;
+    // ============================================================
+// 1️⃣ FİNANS HAVUZUNA KAYDET - HESABA_YAZ EKLENDİ
+// ============================================================
 
-        // SYNC SERVICE KULLAN - TÜM MASAYI TEMİZLE
-        if (syncServiceReady && window.syncService.masaBosalt) {
-            console.log('🔄 SyncService.masaBosalt çağrılıyor:', gercekMasaNo);
+// FİNANS KAYITLARI OLUŞTUR (normalize edilmiş)
+const finansKayitlari = [];
 
-            // GERÇEK MASA NUMARASINI KULLAN
-            syncSuccess = window.syncService.masaBosalt(gercekMasaNo, isBilardo);
-
-            if (syncSuccess) {
-                console.log('✅ SyncService ile masa temizlendi');
-            } else {
-                console.error('❌ SyncService masa temizleme başarısız, manuel deneniyor');
-            }
-        }
-
-        // FALLBACK: Manuel temizleme
-        if (!syncSuccess) {
-            console.log('🔧 Manuel masa güncelleme yapılıyor');
-
-            const masalar = okuJSON(MASA_KEY, []);
-            let masaIdx = -1;
-
-            if (isBilardo) {
-                // Bilardo masası için "BİLARDO" veya "B" ile başlayan masa ara
-                masaIdx = masalar.findIndex(m =>
-                    m.no === gercekMasaNo ||
-                    m.masaNo?.toUpperCase().includes("BİLARDO") ||
-                    m.masaNo?.toUpperCase().startsWith("B") ||
-                    m.masaNum?.toUpperCase().includes("B")
-                );
-            } else {
-                // Normal masa için sayısal masa ara
-                const masaNoNum = Number(gercekMasaNo);
-                masaIdx = masalar.findIndex(m => Number(m.no) === masaNoNum);
-            }
-
-            if (masaIdx !== -1) {
-                const masaAdi = isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`;
-
-                masalar[masaIdx] = {
-                    ...masalar[masaIdx],
-                    masaNo: masaAdi,
-                    masaNum: gercekMasaNo,
-                    adisyonId: null,
-                    splitAdisyonIds: null,
-                    splitAdisyonSayisi: 0,
-                    toplamTutar: "0.00",
-                    acilisZamani: null,
-                    kapanisZamani: new Date().toISOString(),
-                    durum: "BOŞ",
-                    renk: "gri",
-                    musteriAdi: null,
-                    kisiSayisi: null,
-                    guncellemeZamani: new Date().toISOString(),
-                    isBilardo: isBilardo
+try {
+    // ✅ HER ÖDEME TÜRÜ İÇİN AYRI FİNANS KAYDI (HESABA_YAZ DAHİL)
+    Object.entries(odemeGruplari).forEach(([tip, grup]) => {
+        if (grup.toplam > 0) {
+            // HESABA_YAZ ÖZEL KONTROLÜ - ARTIK FİNANS HAVUZUNA KAYDEDİLECEK
+            if (tip === "HESABA_YAZ") {
+                console.log('💰 HESABA_YAZ ödemesi finans havuzuna kaydediliyor (borç takibi için)', {
+                    tip: tip,
+                    tutar: grup.toplam,
+                    masaNo: gercekMasaNo,
+                    adisyonId: adisyon.id
+                });
+                
+                // HESABA_YAZ için özel finans kaydı
+                const hesabaYazKaydi = {
+                    id: `finans_${Date.now()}_HESABA_YAZ_${Math.random().toString(36).substr(2, 9)}`,
+                    tur: "GELIR", // ✅ GELIR olarak kaydedilecek
+                    odemeTuru: "HESABA_YAZ", // ✅ Ödeme türü HESABA_YAZ
+                    tutar: grup.toplam,
+                    aciklama: `Müşteri hesabına yazıldı - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
+                    kaynak: "HESABA_YAZ", // ✅ Özel kaynak
+                    adisyonId: adisyon.id,
+                    referansId: adisyon.id,
+                    masaId: gercekMasaNo,
+                    masaNo: gercekMasaNo,
+                    isBilardo: isBilardo,
+                    turDetay: isBilardo ? "BİLARDO" : "NORMAL",
+                    kullanici: user?.username || "ADMIN",
+                    kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
+                    musteriId: adisyon.musteriId || null,
+                    musteriAdi: adisyon.musteriAdi || null,
+                    tarih: new Date().toISOString(),
+                    gunId: new Date().toISOString().split('T')[0],
+                    borcIslemi: true, // ✅ Borç işlemi olduğunu belirt
+                    aciklamaDetay: "Bu tutar kasaya girmez, müşteri borcu olarak kaydedildi."
                 };
-                yazJSON(MASA_KEY, masalar);
-
-                // Storage event'ini tetikle
-                window.dispatchEvent(new StorageEvent('storage', {
-                    key: MASA_KEY,
-                    newValue: JSON.stringify(masalar)
-                }));
-
-                syncSuccess = true;
-                console.log('✅ Manuel masa güncelleme başarılı');
-            } else {
-                console.error('❌ Masa bulunamadı:', gercekMasaNo);
-                alert('Masa bulunamadı!');
+                
+                finansKayitlari.push(hesabaYazKaydi);
+                console.log(`✅ HESABA_YAZ finans kaydı oluşturuldu: ${grup.toplam.toFixed(2)} TL`);
                 return;
             }
+            
+            // DİĞER ÖDEME TÜRLERİ (NAKIT, KART, HAVALE, INDIRIM)
+            const finansKaydi = {
+                id: `finans_${Date.now()}_${tip}_${Math.random().toString(36).substr(2, 9)}`,
+                tur: "GELIR",
+                odemeTuru: tip,
+                tutar: grup.toplam,
+                aciklama: `${grup.aciklama} - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
+                kaynak: "ADISYON",
+                adisyonId: adisyon.id,
+                masaNo: gercekMasaNo,
+                isBilardo: isBilardo,
+                turDetay: isBilardo ? "BİLARDO" : "NORMAL",
+                kullanici: user?.username || "ADMIN",
+                kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
+                musteriId: adisyon.musteriId || null,
+                musteriAdi: adisyon.musteriAdi || null,
+                tarih: new Date().toISOString(),
+                gunId: new Date().toISOString().split('T')[0]
+            };
+            
+            finansKayitlari.push(finansKaydi);
+            console.log(`✅ Finans kaydı oluşturuldu: ${tip} - ${grup.toplam.toFixed(2)} TL`);
+        }
+    });
+
+    // ✅ İNDİRİM VARSA AYRI FİNANS KAYDI
+    if (adisyon.indirim && adisyon.indirim > 0) {
+        const indirimKaydi = {
+            id: `finans_${Date.now()}_INDIRIM_${Math.random().toString(36).substr(2, 9)}`,
+            tur: "INDIRIM",
+            odemeTuru: "INDIRIM",
+            tutar: adisyon.indirim,
+            aciklama: `İndirim - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
+            kaynak: "ADISYON",
+            adisyonId: adisyon.id,
+            masaNo: gercekMasaNo,
+            isBilardo: isBilardo,
+            turDetay: isBilardo ? "BİLARDO" : "NORMAL",
+            kullanici: user?.username || "ADMIN",
+            kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
+            tarih: new Date().toISOString(),
+            gunId: new Date().toISOString().split('T')[0]
+        };
+        
+        finansKayitlari.push(indirimKaydi);
+        console.log(`✅ İndirim finans kaydı oluşturuldu: ${adisyon.indirim.toFixed(2)} TL`);
+    }
+
+    // ✅ FİNANS KAYITLARINI mc_finans_havuzu'NA GÖNDER
+    if (mcFinansHavuzu && mcFinansHavuzu.finansKayitlariEkle) {
+        console.log('💰 [FINANS][ADISYON_KAPAT] Finans kayıtları mc_finans_havuzu\'ya gönderiliyor:', {
+            kayitSayisi: finansKayitlari.length,
+            toplamTutar: gercekToplamTutar.toFixed(2),
+            odemeGruplari: Object.entries(odemeGruplari)
+                .filter(([_, g]) => g.toplam > 0)
+                .map(([t, g]) => `${t}: ${g.toplam.toFixed(2)} TL`),
+            finansKayitlariDetay: finansKayitlari.map(k => ({
+                tur: k.tur,
+                odemeTuru: k.odemeTuru,
+                tutar: k.tutar,
+                kaynak: k.kaynak,
+                adisyonId: k.adisyonId
+            }))
+        });
+        
+        // TEK DOĞRU FİNANS YOLU: normalize edilmiş finans kayıtları
+        const finansSonuc = mcFinansHavuzu.finansKayitlariEkle(finansKayitlari);
+        
+        if (finansSonuc.success) {
+            console.log('✅ [FINANS][ADISYON_KAPAT] Finans kayıtları başarıyla kaydedildi:', {
+                eklenen: finansSonuc.eklenen,
+                kayitIds: finansSonuc.kayitIds,
+                hatalar: finansSonuc.hatalar
+            });
+        } else {
+            console.error('❌ [FINANS][ADISYON_KAPAT] Finans kayıtları kaydedilemedi:', finansSonuc.hatalar);
+            
+            // HESABA_YAZ kaydı başarısız olduysa uyarı ver ama işlemi durdurma
+            const hesabaYazHatasi = finansSonuc.hatalar?.some(h => 
+                h.kayitId && h.kayitId.includes('HESABA_YAZ')
+            );
+            
+            if (hesabaYazHatasi) {
+                console.warn('⚠️ HESABA_YAZ kaydı eklenemedi, ancak diğer işlemlere devam ediliyor');
+                // İşleme devam et, sadece uyarı ver
+            } else {
+                throw new Error('Finans kayıtları kaydedilemedi');
+            }
+        }
+    } else {
+        console.error('❌ [FINANS][ADISYON_KAPAT] mcFinansHavuzu.finansKayitlariEkle fonksiyonu bulunamadı');
+        throw new Error('Finans havuzu fonksiyonu bulunamadı');
+    }
+} catch (error) {
+    console.error('❌ [FINANS][ADISYON_KAPAT] Finans kayıtları oluşturulurken hata:', error);
+    
+    // HESABA_YAZ hatası mı kontrol et
+    if (error.message.includes('HESABA_YAZ') || error.message.includes('Reddedilen ödeme türü')) {
+        alert("HESABA_YAZ işlemi finans sistemine kaydedilemedi, ancak adisyon kapatıldı. Lütfen yöneticiye bildirin.");
+        // İşleme devam et, sadece uyarı göster
+    } else {
+        alert("Finans kayıtları oluşturulurken bir hata oluştu! İşlem iptal edildi.");
+        return; // HATA DURUMUNDA İŞLEMİ DURDUR
+    }
+}
+
+// ============================================================
+// 2️⃣ ADİSYONLARI KAPAT (Yeni ve Split Adisyonlar) - GÜNCELLENDİ
+// ============================================================
+const updatedAdisyonlar = okuJSON(ADISYON_KEY, []);
+
+// HESABA_YAZ durumunu kontrol et
+const hasHesabaYaz = Object.keys(odemeGruplari).includes("HESABA_YAZ") && 
+                     odemeGruplari["HESABA_YAZ"]?.toplam > 0;
+
+// YENİ adisyonu kapat
+let guncelYeniAdisyon = null;
+if (adisyon) {
+    const yeniIdx = updatedAdisyonlar.findIndex((a) => a.id === adisyon.id);
+    if (yeniIdx !== -1) {
+        guncelYeniAdisyon = {
+            ...adisyon,
+            kapali: true,
+            status: "CLOSED",
+            durum: "KAPALI",
+            kapanisZamani: new Date().toISOString(),
+            toplamTutar: gercekToplamTutar.toFixed(2),
+            kapatmaPersoneli: user?.adSoyad || user?.username,
+            finansKayitlariOlusturuldu: true,
+            finansKayitlari: finansKayitlari.map(k => k.id),
+            // HESABA_YAZ için özel alanlar
+            hesabaYazildi: hasHesabaYaz,
+            hesabaYazTutari: hasHesabaYaz ? odemeGruplari["HESABA_YAZ"].toplam : 0,
+            borcDurumu: hasHesabaYaz ? "BEKLEYEN" : "YOK"
+        };
+        updatedAdisyonlar[yeniIdx] = guncelYeniAdisyon;
+        setAdisyon(guncelYeniAdisyon);
+        
+        if (hasHesabaYaz) {
+            console.log(`📝 Adisyon HESABA_YAZ ile kapatıldı: ${gercekToplamTutar.toFixed(2)} TL borç kaydı oluşturuldu`);
+        }
+    }
+}
+
+// ⚠️ SPLIT ADİSYONLARI FİNANS HAVUZUNA KAYDETME - ÇİFT KAYIT ÖNLENDİ
+// Split adisyonlar finans üretmez, sadece ana adisyon finans kaydı oluşturur
+splitAdisyonlar.forEach((split) => {
+    const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === split.id);
+    if (eskiIdx !== -1) {
+        const guncelEskiAdisyon = {
+            ...split,
+            kapali: true,
+            kapanisZamani: new Date().toISOString(),
+            durum: "KAPALI",
+            kapatmaPersoneli: user?.adSoyad || user?.username,
+            finansKayitlariOlusturuldu: true, // Ana adisyon tarafından oluşturuldu
+            parentFinansKayitlari: finansKayitlari.map(k => k.id) // Ana adisyonun finans kayıtlarını referans al
+        };
+        updatedAdisyonlar[eskiIdx] = guncelEskiAdisyon;
+        
+        console.log(`✅ Split adisyon kapatıldı (finans üretilmedi): ${split.id} - ${split.splitAciklama || 'Ayrılmış Hesap'}`);
+    }
+});
+
+// Adisyonları kaydet
+yazJSON(ADISYON_KEY, updatedAdisyonlar);
+console.log('✅ Adisyonlar kapatıldı', {
+    anaAdisyonId: adisyon?.id,
+    splitAdisyonSayisi: splitAdisyonlar.length,
+    finansKayitSayisi: finansKayitlari.length,
+    finansToplam: finansKayitlari.reduce((sum, k) => sum + k.tutar, 0).toFixed(2),
+    hesabaYazVar: hasHesabaYaz,
+    hesabaYazTutari: hasHesabaYaz ? odemeGruplari["HESABA_YAZ"].toplam.toFixed(2) : '0'
+});
+
+    // ============================================================
+    // 3️⃣ MASALARI BOŞALT (Sync Service ile veya Manuel)
+    // ============================================================
+    let syncSuccess = false;
+
+    // SYNC SERVICE KULLAN
+    if (syncServiceReady && window.syncService.masaBosalt) {
+        console.log('🔄 SyncService.masaBosalt çağrılıyor:', gercekMasaNo);
+
+        syncSuccess = window.syncService.masaBosalt(gercekMasaNo, isBilardo);
+
+        if (syncSuccess) {
+            console.log('✅ SyncService ile masa temizlendi');
+        } else {
+            console.error('❌ SyncService masa temizleme başarısız, manuel deneniyor');
+        }
+    }
+
+    // FALLBACK: Manuel temizleme
+    if (!syncSuccess) {
+        console.log('🔧 Manuel masa güncelleme yapılıyor');
+
+        const masalar = okuJSON(MASA_KEY, []);
+        let masaIdx = -1;
+
+        if (isBilardo) {
+            masaIdx = masalar.findIndex(m =>
+                m.no === gercekMasaNo ||
+                m.masaNo?.toUpperCase().includes("BİLARDO") ||
+                m.masaNo?.toUpperCase().startsWith("B") ||
+                m.masaNum?.toUpperCase().includes("B")
+            );
+        } else {
+            const masaNoNum = Number(gercekMasaNo);
+            masaIdx = masalar.findIndex(m => Number(m.no) === masaNoNum);
         }
 
-        if (!syncSuccess) {
-            console.error('❌ Masa temizlenemedi!');
-            alert('Masa temizlenirken bir hata oluştu!');
+        if (masaIdx !== -1) {
+            const masaAdi = isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`;
+
+            masalar[masaIdx] = {
+                ...masalar[masaIdx],
+                masaNo: masaAdi,
+                masaNum: gercekMasaNo,
+                adisyonId: null,
+                splitAdisyonIds: null,
+                splitAdisyonSayisi: 0,
+                toplamTutar: "0.00",
+                acilisZamani: null,
+                kapanisZamani: new Date().toISOString(),
+                durum: "BOŞ",
+                renk: "gri",
+                musteriAdi: null,
+                kisiSayisi: null,
+                guncellemeZamani: new Date().toISOString(),
+                isBilardo: isBilardo
+            };
+            yazJSON(MASA_KEY, masalar);
+
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: MASA_KEY,
+                newValue: JSON.stringify(masalar)
+            }));
+
+            syncSuccess = true;
+            console.log('✅ Manuel masa güncelleme başarılı');
+        } else {
+            console.error('❌ Masa bulunamadı:', gercekMasaNo);
+            alert('Masa bulunamadı!');
             return;
         }
+    }
 
-        // ============================================================
-        // 5️⃣ BİLARDO MASASI İÇİN ÖZEL TEMİZLİK
-        // ============================================================
-        if (isBilardo) {
-            console.log('🎱 Bilardo masası kapatılıyor:', gercekMasaNo);
+    if (!syncSuccess) {
+        console.error('❌ Masa temizlenemedi!');
+        alert('Masa temizlenirken bir hata oluştu!');
+        return;
+    }
 
-            // Bilardo masası için ekstra temizlik
-            const bilardoMasalar = okuJSON("mc_bilardo_masalar", []);
-            const bilardoMasaIndex = bilardoMasalar.findIndex(m =>
-                m.no === gercekMasaNo || m.masaNum === gercekMasaNo
-            );
+    // ============================================================
+    // 4️⃣ BİLARDO MASASI İÇİN ÖZEL TEMİZLİK
+    // ============================================================
+    if (isBilardo) {
+        console.log('🎱 Bilardo masası kapatılıyor:', gercekMasaNo);
 
-            if (bilardoMasaIndex !== -1) {
-                bilardoMasalar[bilardoMasaIndex] = {
-                    ...bilardoMasalar[bilardoMasaIndex],
-                    durum: "BOŞ",
-                    adisyonId: null,
-                    toplamTutar: "0.00",
-                    guncellemeZamani: new Date().toISOString()
-                };
-                yazJSON("mc_bilardo_masalar", bilardoMasalar);
-                console.log('✅ Bilardo masası temizlendi:', gercekMasaNo);
-            }
-        }
-
-        // ============================================================
-        // 6️⃣ ÖNBELLEK TEMİZLİĞİ
-        // ============================================================
-        const temizlemeListesi = [];
-        if (adisyon?.id) temizlemeListesi.push(`mc_adisyon_toplam_${adisyon.id}`);
-        
-        // Tüm split adisyonların toplamlarını temizle
-        splitAdisyonlar.forEach((split, index) => {
-            if (split?.id) temizlemeListesi.push(`mc_adisyon_toplam_${split.id}`);
-        });
-        
-        if (gercekMasaNo) temizlemeListesi.push(`mc_masa_toplam_${gercekMasaNo}`);
-
-        temizlemeListesi.forEach(key => {
-            localStorage.removeItem(key);
-            console.log(`🗑️ Temizlendi: ${key}`);
-        });
-
-        // ============================================================
-        // 7️⃣ BAŞARI MESAJI VE YÖNLENDİRME
-        // ============================================================
-        const masaAdi = isBilardo ? `Bilardo ${gercekMasaNo}` : `Masa ${gercekMasaNo}`;
-        setKapanisMesaji(
-            `✅ ${masaAdi} başarıyla kapatıldı! Toplam: ${toplam.toFixed(2)} TL\n${splitAdisyonlar.length} adet ayrılmış hesap ile birlikte kapatıldı.\nAnaEkran'a yönlendiriliyorsunuz...`
+        const bilardoMasalar = okuJSON("mc_bilardo_masalar", []);
+        const bilardoMasaIndex = bilardoMasalar.findIndex(m =>
+            m.no === gercekMasaNo || m.masaNum === gercekMasaNo
         );
 
-        // Masalar sayfasında güncelleme için ek senkronizasyon
+        if (bilardoMasaIndex !== -1) {
+            bilardoMasalar[bilardoMasaIndex] = {
+                ...bilardoMasalar[bilardoMasaIndex],
+                durum: "BOŞ",
+                adisyonId: null,
+                toplamTutar: "0.00",
+                guncellemeZamani: new Date().toISOString()
+            };
+            yazJSON("mc_bilardo_masalar", bilardoMasalar);
+            console.log('✅ Bilardo masası temizlendi:', gercekMasaNo);
+        }
+    }
+
+    // ============================================================
+    // 5️⃣ ÖNBELLEK TEMİZLİĞİ
+    // ============================================================
+    const temizlemeListesi = [];
+    if (adisyon?.id) temizlemeListesi.push(`mc_adisyon_toplam_${adisyon.id}`);
+    
+    splitAdisyonlar.forEach((split, index) => {
+        if (split?.id) temizlemeListesi.push(`mc_adisyon_toplam_${split.id}`);
+    });
+    
+    if (gercekMasaNo) temizlemeListesi.push(`mc_masa_toplam_${gercekMasaNo}`);
+
+    temizlemeListesi.forEach(key => {
+        localStorage.removeItem(key);
+        console.log(`🗑️ Temizlendi: ${key}`);
+    });
+
+    // ============================================================
+    // 6️⃣ BAŞARI MESAJI VE YÖNLENDİRME
+    // ============================================================
+    const masaAdi = isBilardo ? `Bilardo ${gercekMasaNo}` : `Masa ${gercekMasaNo}`;
+    
+    let mesaj = `✅ ${masaAdi} başarıyla kapatıldı! `;
+    if (gercekToplamTutar > 0) {
+        mesaj += `Toplam: ${gercekToplamTutar.toFixed(2)} TL\n`;
+        
+        // Ödeme detaylarını ekle
+        const odemeDetaylari = Object.entries(odemeGruplari)
+            .filter(([_, g]) => g.toplam > 0)
+            .map(([t, g]) => `${t}: ${g.toplam.toFixed(2)} TL`)
+            .join(', ');
+        
+        if (odemeDetaylari) {
+            mesaj += `Ödemeler: ${odemeDetaylari}\n`;
+        }
+        
+        if (adisyon.indirim && adisyon.indirim > 0) {
+            mesaj += `İndirim: ${adisyon.indirim.toFixed(2)} TL\n`;
+        }
+    } else {
+        mesaj += `Boş masa kapatıldı\n`;
+    }
+    
+    if (splitAdisyonlar.length > 0) {
+        mesaj += `${splitAdisyonlar.length} adet ayrılmış hesap ile birlikte kapatıldı.\n`;
+    }
+    
+    mesaj += `AnaEkran'a yönlendiriliyorsunuz...`;
+    
+    setKapanisMesaji(mesaj);
+
+    // Masalar sayfasında güncelleme için ek senkronizasyon
+    setTimeout(() => {
+        if (window.syncService && window.syncService.senkronizeMasalar) {
+            console.log('🔄 Masalar sayfası için senkronizasyon yapılıyor...');
+            window.syncService.senkronizeMasalar();
+        }
+
+        // Masalar sayfasını güncellemek için son bir event gönder
+        window.dispatchEvent(new Event('adisyonGuncellendi'));
+
+        // AnaEkran'a yönlendir
+        console.log('📍 [DEBUG] adisyonKapat: AnaEkran\'a yönlendiriliyor');
+        console.log('📍 [DEBUG] Kullanıcı bilgisi:', user?.username);
+        
         setTimeout(() => {
-            if (window.syncService && window.syncService.senkronizeMasalar) {
-                console.log('🔄 Masalar sayfası için senkronizasyon yapılıyor...');
-                window.syncService.senkronizeMasalar();
+            try {
+                navigate("/ana");
+            } catch (error) {
+                console.error('❌ [DEBUG] navigate hatası, fallback kullanılıyor:', error);
+                window.location.href = "/ana";
             }
-
-            // Masalar sayfasını güncellemek için son bir event gönder
-            window.dispatchEvent(new Event('adisyonGuncellendi'));
-
-            // ✅ ANA DEĞİŞİKLİK: AnaEkran'a yönlendir
-            console.log('📍 [DEBUG] adisyonKapat: AnaEkran\'a yönlendiriliyor');
-            console.log('📍 [DEBUG] Kullanıcı bilgisi:', user?.username);
-            
-            // Kısa bir gecikme
-            setTimeout(() => {
-                try {
-                    navigate("/ana");
-                } catch (error) {
-                    console.error('❌ [DEBUG] navigate hatası, fallback kullanılıyor:', error);
-                    // Fallback
-                    window.location.href = "/ana";
-                }
-            }, 1500);
-        }, 500);
-    };
-
-    // ============================================================
-    // ADISYON KAPATMA FONKSİYONU SONU
-    // ============================================================
+        }, 1500);
+    }, 500);
+};
 
     // --------------------------------------------------
-    // MASAYA DÖN - GUNCELLENDI: AnaEkran'a yönlendir
+    // MASAYA DÖN
     // --------------------------------------------------
     const masayaDon = () => {
         console.log('🟡 [DEBUG] masayaDon fonksiyonu çağrıldı');
         console.log('🟡 [DEBUG] Kullanıcı:', user?.username);
         
-        // Önce kullanıcı kontrolü yap
         if (!user) {
             console.error('❌ [AUTH] Kullanıcı oturumu kapalı, login sayfasına yönlendiriliyor');
             navigate("/login");
@@ -2338,7 +2277,6 @@ export default function Adisyon() {
                 console.log('📍 [DEBUG] Bilardo sayfasına yönlendiriliyor');
                 navigate(url);
             } else {
-                // ✅ DEĞİŞİKLİK: Masalar yerine AnaEkran'a yönlendir
                 const url = query ? `/ana?${query}` : "/ana";
                 console.log('📍 [DEBUG] AnaEkran\'a yönlendiriliyor');
                 navigate(url);
@@ -2346,7 +2284,6 @@ export default function Adisyon() {
         } catch (error) {
             console.error('❌ [DEBUG] Yönlendirme hatası:', error);
             
-            // Fallback: Sayfayı yenile
             if (isBilardo) {
                 window.location.href = "/bilardo";
             } else {
@@ -2455,7 +2392,6 @@ export default function Adisyon() {
                     </div>
                 </div>
 
-                {/* BİLARDO ÜCRETİ VE EK ÜRÜNLER ÖZETİ */}
                 <div style={{
                     marginTop: "12px",
                     paddingTop: "12px",
@@ -2495,7 +2431,6 @@ export default function Adisyon() {
                         </span>
                     </div>
 
-                    {/* TOPLAM TRANSFER TUTARI */}
                     <div style={{
                         display: "flex",
                         justifyContent: "space-between",
@@ -2513,7 +2448,6 @@ export default function Adisyon() {
                     </div>
                 </div>
 
-                {/* EK ÜRÜN DETAYLARI (isteğe bağlı) */}
                 {bilardoEkUrunler.length > 0 && (
                     <div style={{
                         marginTop: "10px",
@@ -2555,17 +2489,43 @@ export default function Adisyon() {
     }, [splitAdisyonlar]);
 
     // --------------------------------------------------
+    // UI KATEGORİLERİ
+    // --------------------------------------------------
+    const uiKategorileri = useMemo(() => {
+        const gercekKategoriler = [...kategoriler];
+        
+        const sonKategoriler = [...gercekKategoriler, {
+            id: "SIPARIS_YEMEK",
+            ad: "SİPARİŞ YEMEK"
+        }];
+        
+        return sonKategoriler;
+    }, [kategoriler]);
+
+    // --------------------------------------------------
+    // AKTİF KATEGORİ ADINI AL
+    // --------------------------------------------------
+    const aktifKategoriAdi = useMemo(() => {
+        if (!aktifKategoriId) return "";
+        
+        if (aktifKategoriId === "SIPARIS_YEMEK") {
+            return "SİPARİŞ YEMEK";
+        }
+        
+        const kategori = kategoriler.find(k => k.id === aktifKategoriId);
+        return kategori ? kategori.ad : "";
+    }, [aktifKategoriId, kategoriler]);
+
+    // --------------------------------------------------
     // RENDER
     // --------------------------------------------------
     if (!adisyon) {
         return <div>Adisyon yükleniyor...</div>;
     }
 
-    // YENİ adisyon ve ESKİ adisyon toplamları
     const yeniToplam = (adisyon?.kalemler || []).reduce((sum, k) => sum + (Number(k.toplam) || 0), 0);
     const toplamTutar = yeniToplam + splitToplamTutari;
 
-    // Yapılan ödemeler toplamı (SADECE YENİ ADISYONDAN)
     const yapilanOdemeler = (adisyon?.odemeler || []).reduce((sum, o) => sum + (Number(o.tutar) || 0), 0);
 
     return (
@@ -2636,10 +2596,8 @@ export default function Adisyon() {
                         </span>
                     </div>
 
-                    {/* BİLARDO TRANSFER ÖZETİ */}
                     {bilardoTransferOzetiGoster()}
 
-                    {/* BİLARDO SÜRESİ VE ÜCRETİ */}
                     {isBilardo && (
                         <>
                             {bilardoBaslangicSaat && (
@@ -2662,8 +2620,7 @@ export default function Adisyon() {
                         </>
                     )}
 
-
-                    {/* ÖDEME LİSTESİ (SADECE YENİ ADISYON) */}
+                    {/* ÖDEME LİSTESİ */}
                     <div
                         style={{
                             minHeight: "100px",
@@ -2748,7 +2705,6 @@ export default function Adisyon() {
                             </span>
                         </div>
 
-                        {/* ÇOKLU SPLIT ADISYONLAR SATIRI - KOYU MAVİ */}
                         {splitAdisyonlar.length > 0 && (
                             <div
                                 style={{
@@ -2900,7 +2856,7 @@ export default function Adisyon() {
                         </div>
                     </div>
 
-                    {/* ÖDEME TİPİ SEÇİMİ - GUNCELLENDI: HESABA_YAZ seçildiğinde işlem yapma */}
+                    {/* ÖDEME TİPİ SEÇİMİ */}
                     <div
                         style={{
                             marginTop: "14px",
@@ -2924,7 +2880,6 @@ export default function Adisyon() {
                                         setHesabaYazModu(true);
                                         setBorcTutarInput(String(kalan || 0));
                                     } else {
-                                        // Diğer ödeme tiplerinde Hesaba Yaz modunu kapat
                                         if (hesabaYazModu) {
                                             setHesabaYazModu(false);
                                         }
@@ -3031,7 +2986,7 @@ export default function Adisyon() {
                         </div>
                     )}
 
-                    {/* HESABI AYIR ALANI - ÇOKLU SPLIT İÇİN */}
+                    {/* HESABI AYIR ALANI */}
                     <div style={{ marginTop: "14px", borderTop: "1px solid #ecd3a5", paddingTop: "12px" }}>
                         <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#c57f3e" }}>
                             ✂️ HESABI AYIR (ÇOKLU)
@@ -3055,7 +3010,6 @@ export default function Adisyon() {
                             />
                         </div>
                         
-                        {/* HESABI AYIR butonu - Sadece YENİ adisyonda ürün varsa göster */}
                         {adisyon && adisyon.kalemler && adisyon.kalemler.length > 0 && (
                             <button
                                 onClick={hesabiAyir}
@@ -3103,14 +3057,16 @@ export default function Adisyon() {
                             padding: "10px",
                             borderRadius: "10px",
                             border: "none",
-                            background: kalan === 0 ? "#27ae60" : "#95a5a6",
+                            // YENİ: Adisyona ürün eklenmemişse ve toplam 0 ise kapatmaya izin ver
+                            background: (kalan === 0 || (adisyon.kalemler.length === 0 && splitAdisyonlar.length === 0)) ? "#27ae60" : "#95a5a6",
                             color: "#fff",
-                            cursor: kalan === 0 ? "pointer" : "not-allowed",
+                            cursor: (kalan === 0 || (adisyon.kalemler.length === 0 && splitAdisyonlar.length === 0)) ? "pointer" : "not-allowed",
                             fontSize: "16px",
                             fontWeight: "bold",
                             marginBottom: "8px",
                         }}
-                        disabled={kalan !== 0}
+                        disabled={!(kalan === 0 || (adisyon.kalemler.length === 0 && splitAdisyonlar.length === 0))}
+                        title={!(kalan === 0 || (adisyon.kalemler.length === 0 && splitAdisyonlar.length === 0)) ? "Kalan tutar ödenmeden adisyon kapatılamaz" : "Masayı kapat"}
                     >
                         MASAYI KAPAT
                     </button>
@@ -3267,7 +3223,6 @@ export default function Adisyon() {
                                             </div>
                                         </div>
                                         
-                                        {/* Split adisyon içeriği (ürünler) */}
                                         <div style={{
                                             fontSize: "12px",
                                             color: "#555",
@@ -3309,7 +3264,6 @@ export default function Adisyon() {
 
                 {/* HESABA YAZ MODU AÇIKSA HESABA YAZ PANELİ */}
                 {hesabaYazModu ? (
-                    // HESABA YAZ MODU
                     <div style={{ flex: 1, padding: "12px", boxSizing: "border-box" }}>
                         <div
                             style={{
@@ -3317,7 +3271,7 @@ export default function Adisyon() {
                                 fontSize: "24px",
                                 marginBottom: "20px",
                                 textAlign: "center",
-                                color: "#2980b9", // MAVİ RENK
+                                color: "#2980b9",
                                 borderBottom: "2px solid #2980b9",
                                 paddingBottom: "10px"
                             }}
@@ -3332,7 +3286,6 @@ export default function Adisyon() {
                                 gap: "20px",
                             }}
                         >
-                            {/* Sol: Müşteri bilgileri */}
                             <div>
                                 <div style={{ marginBottom: "15px" }}>
                                     <div style={{ fontWeight: "500", marginBottom: "4px" }}>
@@ -3342,7 +3295,6 @@ export default function Adisyon() {
                                         value={seciliMusteriId || ""}
                                         onChange={(e) => {
                                             setSeciliMusteriId(e.target.value || null);
-                                            // Eğer mevcut müşteri seçildiyse, yeni müşteri formunu temizle
                                             if (e.target.value) {
                                                 setYeniMusteriAdSoyad("");
                                                 setYeniMusteriTelefon("");
@@ -3378,7 +3330,6 @@ export default function Adisyon() {
                                         value={yeniMusteriAdSoyad}
                                         onChange={(e) => {
                                             setYeniMusteriAdSoyad(e.target.value);
-                                            // Yeni müşteri girildiğinde mevcut müşteri seçimini temizle
                                             if (e.target.value.trim()) {
                                                 setSeciliMusteriId(null);
                                             }
@@ -3398,7 +3349,6 @@ export default function Adisyon() {
                                         value={yeniMusteriTelefon}
                                         onChange={(e) => {
                                             setYeniMusteriTelefon(e.target.value);
-                                            // Yeni müşteri girildiğinde mevcut müşteri seçimini temizle
                                             if (e.target.value.trim()) {
                                                 setSeciliMusteriId(null);
                                             }
@@ -3429,7 +3379,6 @@ export default function Adisyon() {
                                 </div>
                             </div>
 
-                            {/* Sağ: Borç özeti ve tutar */}
                             <div>
                                 <div style={{ marginBottom: "20px" }}>
                                     <div style={{ fontWeight: "500", marginBottom: "4px", fontSize: "16px" }}>
@@ -3440,7 +3389,6 @@ export default function Adisyon() {
                                         value={borcTutarInput}
                                         onChange={(e) => {
                                             const value = e.target.value;
-                                            // Maksimum kalan tutarı geçemez
                                             const maxTutar = Number(kalan.toFixed(2));
                                             const enteredTutar = Number(value);
 
@@ -3574,7 +3522,6 @@ export default function Adisyon() {
                                     ❌ İPTAL
                                 </button>
 
-                                {/* BİLGİ MESAJI */}
                                 <div style={{
                                     marginTop: "15px",
                                     padding: "10px",
@@ -3591,14 +3538,13 @@ export default function Adisyon() {
                         </div>
                     </div>
                 ) : (
-                    // YENİ ADISYON İÇERİĞİ - SİYAH RENK (Normal mod)
                     <div style={{ flex: 1, overflowY: "auto" }}>
                         <div
                             style={{
                                 fontWeight: "bold",
                                 fontSize: "18px",
                                 marginBottom: "10px",
-                                color: "#000000", // SİYAH
+                                color: "#000000",
                             }}
                         >
                             ADISYON
@@ -3667,7 +3613,6 @@ export default function Adisyon() {
                                                 }}
                                             >
                                                 {k.urunAd}
-                                                {/* SİPARİŞ YEMEK notu varsa göster */}
                                                 {k.not && k.not.trim() !== "" && (
                                                     <div
                                                         style={{
@@ -3681,7 +3626,6 @@ export default function Adisyon() {
                                                         📝 {k.not}
                                                     </div>
                                                 )}
-                                                {/* BİLARDO ÜRÜNÜ İSE İŞARETLE */}
                                                 {k.isBilardo && (
                                                     <div
                                                         style={{
@@ -3836,7 +3780,7 @@ export default function Adisyon() {
                             style={{
                                 width: "100%",
                                 padding: "10px 12px",
-                                paddingLeft: "36px", // İkon için boşluk
+                                paddingLeft: "36px",
                                 borderRadius: "8px",
                                 border: "1px solid #d0b48c",
                                 fontSize: "14px",
@@ -3890,7 +3834,7 @@ export default function Adisyon() {
                             textAlign: "center"
                         }}>
                             "{urunArama}" için {filtreliUrunler.length} ürün bulundu
-                            {aktifKategori && aktifKategori !== "SİPARİŞ YEMEK" && (
+                            {aktifKategoriId && aktifKategoriId !== "SIPARIS_YEMEK" && (
                                 <span style={{ marginLeft: "8px", fontStyle: "italic" }}>
                                     (Tüm kategorilerde aranıyor)
                                 </span>
@@ -3960,7 +3904,7 @@ export default function Adisyon() {
                                             color: "#4b2e05",
                                         }}
                                     >
-                                        {u.satis ? u.satis.toFixed(2) : "0.00"} TL
+                                        {u.salePrice ? u.salePrice.toFixed(2) : "0.00"} TL
                                     </span>
                                 </button>
                             ))}
@@ -4139,22 +4083,22 @@ export default function Adisyon() {
                         alignContent: "start",
                     }}
                 >
-                    {kategoriler.map((kat) => (
+                    {uiKategorileri.map((kat) => (
                         <button
-                            key={kat}
+                            key={kat.id}
                             onClick={() => {
-                                setAktifKategori(kat);
-                                setUrunArama(""); // Kategori değiştirince aramayı temizle
+                                setAktifKategoriId(kat.id);
+                                setUrunArama("");
                             }}
                             style={{
                                 padding: "15px 5px",
                                 borderRadius: "8px",
                                 border:
-                                    aktifKategori === kat
+                                    aktifKategoriId === kat.id
                                         ? "2px solid #c57f3e"
                                         : "1px solid #bfa37d",
                                 background:
-                                    aktifKategori === kat ? "#f7d9a8" : "rgba(255,255,255,0.9)",
+                                    aktifKategoriId === kat.id ? "#f7d9a8" : "rgba(255,255,255,0.9)",
                                 cursor: "pointer",
                                 fontSize: "14px",
                                 fontWeight: "bold",
@@ -4168,10 +4112,28 @@ export default function Adisyon() {
                                 lineHeight: "1.2",
                             }}
                         >
-                            {kat}
+                            {kat.ad}
                         </button>
                     ))}
                 </div>
+                
+                {aktifKategoriId && (
+                    <div style={{
+                        marginTop: "10px",
+                        padding: "8px",
+                        borderRadius: "6px",
+                        background: "#e8f5e9",
+                        border: "1px solid #4caf50",
+                        fontSize: "12px",
+                        textAlign: "center",
+                        color: "#1b5e20"
+                    }}>
+                        <strong>Aktif Kategori:</strong> {aktifKategoriAdi}
+                        <div style={{ fontSize: "10px", marginTop: "2px" }}>
+                            ID: {aktifKategoriId}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ÖDEME SÖZÜ POPUP */}

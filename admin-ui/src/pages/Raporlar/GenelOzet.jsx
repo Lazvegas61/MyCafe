@@ -1,22 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 /*
-  GENEL ÖZET RAPORU - MERKEZİ FİNANS HAVUZU İLE
-  ---------------------------------------------
-  - mc_finans_havuzu'dan TEK KAYNAKTAN beslenir
-  - Tüm diğer raporların ÜST KÜMESİ'dir
-  - YENİ HESAPLAMA YOK, sadece toplama/gruplama
+  GENEL ÖZET - FİNAL MİMARİ
+  ------------------------
+  - TEK KAYNAK: mc_finans_havuzu
+  - PURE hesaplama
+  - HESABA_YAZ ciroya girmez (bilgi amaçlı gösterilir)
   - TAM SAYFA GÖRÜNÜM
 */
 
-export default function GenelOzet() {
+const GenelOzet = () => {
   const [baslangic, setBaslangic] = useState("");
   const [bitis, setBitis] = useState("");
   const [finansVerileri, setFinansVerileri] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
-  const [giderler, setGiderler] = useState([]);
   const navigate = useNavigate();
 
   /* ------------------ RAPOR MENÜSÜ ------------------ */
@@ -65,126 +63,120 @@ export default function GenelOzet() {
     }
   ];
 
-  /* ------------------ TÜM VERİLERİ OKU ------------------ */
+  /* ------------------ VERİ OKU (TEK KAYNAK) ------------------ */
   useEffect(() => {
-    console.log("🔄 Genel Özet: Veriler yükleniyor...");
-    
-    // 1. Finans havuzunu oku
-    const guncelFinansVerileri = mcFinansHavuzu.getFinansHavuzu();
-    console.log(`📊 Finans havuzunda ${guncelFinansVerileri.length} kayıt var`);
-    
-    // 2. Giderleri oku
-    const giderlerData = JSON.parse(localStorage.getItem("mc_giderler") || "[]");
-    
-    setFinansVerileri(guncelFinansVerileri);
-    setGiderler(giderlerData);
+    const havuz = JSON.parse(localStorage.getItem("mc_finans_havuzu") || "[]");
+    setFinansVerileri(havuz);
     setYukleniyor(false);
-    
+    console.log(`📊 Finans havuzunda ${havuz.length} kayıt yüklendi`);
   }, []);
 
-  /* ------------------ FİLTRELENMİŞ VERİLER ------------------ */
+  /* ------------------ TARİH FİLTRELEME ------------------ */
   const filtrelenmisVeriler = useMemo(() => {
-    if (!baslangic && !bitis) {
-      return finansVerileri;
-    }
+    if (!baslangic && !bitis) return finansVerileri;
     
-    return mcFinansHavuzu.tariheGoreFiltrele(baslangic, bitis);
+    return finansVerileri.filter(kayit => {
+      const tarihStr = kayit.tarih ? new Date(kayit.tarih).toISOString().split('T')[0] : "";
+      if (baslangic && tarihStr < baslangic) return false;
+      if (bitis && tarihStr > bitis) return false;
+      return true;
+    });
   }, [finansVerileri, baslangic, bitis]);
 
-  /* ------------------ TEMEL METRİKLER ------------------ */
+  /* ------------------ PURE HESAPLAMALAR ------------------ */
+
+  // Toplam GELİR (ciro) - HESABA_YAZ hariç
   const toplamGelir = useMemo(() => {
-    return mcFinansHavuzu.toplamGelirHesapla(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.odemeTuru !== "HESABA_YAZ")
+      .reduce((s, k) => s + Number(k.tutar || 0), 0);
+  }, [filtrelenmisVeriler]);
 
+  // Toplam GİDER
   const toplamGider = useMemo(() => {
-    return mcFinansHavuzu.toplamGiderHesapla(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GIDER")
+      .reduce((s, k) => s + Number(k.tutar || 0), 0);
+  }, [filtrelenmisVeriler]);
 
+  // Toplam İNDİRİM
+  const toplamIndirim = useMemo(() => {
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "INDIRIM")
+      .reduce((s, k) => s + Number(k.tutar || 0), 0);
+  }, [filtrelenmisVeriler]);
+
+  // 🔥 HESABA YAZ (BİLGİ AMAÇLI – CİROYA GİRMEZ)
   const toplamHesabaYaz = useMemo(() => {
-    return mcFinansHavuzu.toplamHesabaYazHesapla(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.odemeTuru === "HESABA_YAZ")
+      .reduce((s, k) => s + Number(k.tutar || 0), 0);
+  }, [filtrelenmisVeriler]);
 
+  // Net Kasa
   const netKasa = toplamGelir - toplamGider;
 
-  /* ------------------ ÖDEME TÜRÜ DAĞILIMI ------------------ */
-  const odemeTuruGruplari = useMemo(() => {
-    return mcFinansHavuzu.odemeTuruBazliToplamlar(baslangic, bitis);
-  }, [baslangic, bitis, finansVerileri]);
-
-  /* ------------------ BİLARDO GELİRİ ------------------ */
-  const bilardoGeliri = useMemo(() => {
-    const bilardoKayitlar = filtrelenmisVeriler.filter(
-      k => k.kaynak === "BİLARDO" && k.tur === "GELIR"
-    );
-    
-    return bilardoKayitlar.reduce((toplam, kayit) => 
-      toplam + Number(kayit.tutar || 0), 0
-    );
-  }, [filtrelenmisVeriler]);
-
-  /* ------------------ ADİSYON SAYISI ------------------ */
-  const adisyonSayisi = useMemo(() => {
-    return filtrelenmisVeriler.filter(
-      k => (k.kaynak === "ADISYON" || k.kaynak === "BİLARDO") && k.tur === "GELIR"
-    ).length;
-  }, [filtrelenmisVeriler]);
-
-  /* ------------------ ORTALAMA ADİSYON TUTARI ------------------ */
-  const ortalamaAdisyonTutari = useMemo(() => {
-    const gelirKayitlari = filtrelenmisVeriler.filter(
-      k => k.tur === "GELIR" && (k.kaynak === "ADISYON" || k.kaynak === "BİLARDO")
-    );
-    
-    if (gelirKayitlari.length === 0) return 0;
-    
-    const toplam = gelirKayitlari.reduce((sum, k) => sum + Number(k.tutar || 0), 0);
-    return toplam / gelirKayitlari.length;
-  }, [filtrelenmisVeriler]);
-
-  /* ------------------ GİDER DAĞILIMI ------------------ */
-  const giderDagilimi = useMemo(() => {
-    const giderKayitlari = filtrelenmisVeriler.filter(k => k.tur === "GIDER");
-    const gruplar = {};
-    
-    giderKayitlari.forEach(kayit => {
-      const kategori = kayit.kategori || "GENEL";
-      if (!gruplar[kategori]) {
-        gruplar[kategori] = { toplam: 0, sayi: 0 };
-      }
-      gruplar[kategori].toplam += Number(kayit.tutar || 0);
-      gruplar[kategori].sayi += 1;
-    });
-    
-    return gruplar;
-  }, [filtrelenmisVeriler]);
-
-  /* ------------------ KÂR MARJI ------------------ */
-  const karMarjiYuzdesi = useMemo(() => {
+  // Kâr Marjı
+  const karMarji = useMemo(() => {
     if (toplamGelir === 0) return 0;
     return ((netKasa / toplamGelir) * 100).toFixed(1);
   }, [toplamGelir, netKasa]);
 
-  /* ------------------ VERİ AKTARMA ------------------ */
-  const handleVeriAktar = () => {
-    if (window.confirm("Tüm eski adisyon ve giderler finans havuzuna aktarılacak. Devam edilsin mi?")) {
-      const aktarilan = mcFinansHavuzu.tumAdisyonlariFinansHavuzunaAktar();
-      alert(`✅ ${aktarilan} kayıt finans havuzuna aktarıldı. Sayfa yenileniyor...`);
-      window.location.reload();
-    }
-  };
+  /* ------------------ ÖDEME TÜRLERİ ANALİZİ ------------------ */
+  const odemeTuruDagilimi = useMemo(() => {
+    const dagilim = {};
+    filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.odemeTuru && k.odemeTuru !== "HESABA_YAZ")
+      .forEach(kayit => {
+        const tur = kayit.odemeTuru || "DIĞER";
+        if (!dagilim[tur]) {
+          dagilim[tur] = { toplam: 0, sayi: 0 };
+        }
+        dagilim[tur].toplam += Number(kayit.tutar || 0);
+        dagilim[tur].sayi += 1;
+      });
+    return dagilim;
+  }, [filtrelenmisVeriler]);
 
-  /* ------------------ FİLTRELENMİŞ GİDERLER ------------------ */
-  const filtrelenmisGiderler = useMemo(() => {
-    return giderler.filter(gider => {
-      const tarihStr = gider.tarih ? new Date(gider.tarih).toISOString().split('T')[0] : "";
-      
-      if (baslangic && tarihStr < baslangic) return false;
-      if (bitis && tarihStr > bitis) return false;
-      
-      return true;
-    });
-  }, [giderler, baslangic, bitis]);
+  /* ------------------ GİDER KATEGORİLERİ ------------------ */
+  const giderKategorileri = useMemo(() => {
+    const kategoriler = {};
+    filtrelenmisVeriler
+      .filter(k => k.tur === "GIDER")
+      .forEach(kayit => {
+        const kategori = kayit.kategori || "GENEL";
+        if (!kategoriler[kategori]) {
+          kategoriler[kategori] = { toplam: 0, sayi: 0 };
+        }
+        kategoriler[kategori].toplam += Number(kayit.tutar || 0);
+        kategoriler[kategori].sayi += 1;
+      });
+    return kategoriler;
+  }, [filtrelenmisVeriler]);
 
+  /* ------------------ ADİSYON ANALİZİ ------------------ */
+  const adisyonAnalizi = useMemo(() => {
+    const gelirAdisyonlari = filtrelenmisVeriler.filter(
+      k => k.tur === "GELIR" && 
+           k.odemeTuru !== "HESABA_YAZ" && 
+           (k.kaynak === "ADISYON" || k.kaynak === "BİLARDO")
+    );
+    
+    const toplamTutar = gelirAdisyonlari.reduce((s, k) => s + Number(k.tutar || 0), 0);
+    const sayi = gelirAdisyonlari.length;
+    const ortalama = sayi > 0 ? toplamTutar / sayi : 0;
+    
+    return { sayi, ortalama, toplamTutar };
+  }, [filtrelenmisVeriler]);
+
+  /* ------------------ BİLARDO GELİRİ ------------------ */
+  const bilardoGeliri = useMemo(() => {
+    return filtrelenmisVeriler
+      .filter(k => k.tur === "GELIR" && k.kaynak === "BİLARDO" && k.odemeTuru !== "HESABA_YAZ")
+      .reduce((s, k) => s + Number(k.tutar || 0), 0);
+  }, [filtrelenmisVeriler]);
+
+  /* ------------------ YÜKLENİYOR DURUMU ------------------ */
   if (yukleniyor) {
     return (
       <div style={{ 
@@ -261,7 +253,7 @@ export default function GenelOzet() {
               fontSize: "2.4rem",
               fontWeight: "bold"
             }}>
-              📊 Raporlar – Genel Özet
+              📊 Genel Özet (Final Mimari)
             </h2>
             <p style={{ 
               marginTop: 10, 
@@ -269,7 +261,7 @@ export default function GenelOzet() {
               fontSize: 17,
               lineHeight: 1.5
             }}>
-              mc_finans_havuzu tek kaynak | Tüm raporların özeti
+              TEK kaynak: <strong>mc_finans_havuzu</strong> | 
               <span style={{ 
                 background: "#3498db", 
                 color: "white",
@@ -281,6 +273,19 @@ export default function GenelOzet() {
               }}>
                 {finansVerileri.length} kayıt
               </span>
+              {baslangic || bitis ? (
+                <span style={{ 
+                  background: "#2ecc71", 
+                  color: "white",
+                  padding: "4px 12px",
+                  borderRadius: 20,
+                  marginLeft: 12,
+                  fontSize: 15,
+                  fontWeight: "bold"
+                }}>
+                  {filtrelenmisVeriler.length} filtrelendi
+                </span>
+              ) : null}
             </p>
           </div>
           
@@ -305,43 +310,6 @@ export default function GenelOzet() {
               Saat: {new Date().toLocaleTimeString("tr-TR")}
             </div>
           </div>
-        </div>
-        
-        {/* YÖNETİM BUTONU */}
-        <div style={{ 
-          display: "flex", 
-          gap: 12, 
-          marginTop: 16
-        }}>
-          <button
-            onClick={handleVeriAktar}
-            style={{
-              padding: "12px 20px",
-              background: "#3498db",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 15,
-              fontWeight: "bold",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "0 3px 6px rgba(52, 152, 219, 0.3)",
-              transition: "all 0.3s"
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 5px 10px rgba(52, 152, 219, 0.4)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 3px 6px rgba(52, 152, 219, 0.3)";
-            }}
-            title="Eski verileri finans havuzuna ekler"
-          >
-            🔄 Veri Aktar
-          </button>
         </div>
       </div>
 
@@ -457,13 +425,14 @@ export default function GenelOzet() {
         }}
       >
         <strong>{baslangic && bitis ? `${baslangic} - ${bitis}` : "Tüm zamanlar"}</strong> tarih aralığına ait veriler görüntülenmektedir.
+        {baslangic || bitis ? ` (${filtrelenmisVeriler.length} kayıt)` : ""}
       </div>
 
       {/* TEMEL METRİKLER */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: 24,
           marginBottom: 40
         }}
@@ -472,47 +441,283 @@ export default function GenelOzet() {
           baslik="Toplam Ciro"
           deger={toplamGelir}
           renk="#2ecc71"
-          para
           icon="💰"
+          aciklama="Hesaba Yaz hariç"
         />
         <OzetKart
           baslik="Net Kasa"
           deger={netKasa}
           renk={netKasa >= 0 ? "#3498db" : "#e74c3c"}
-          para
           icon={netKasa >= 0 ? "📈" : "📉"}
-        />
-        <OzetKart
-          baslik="Açık Borç"
-          deger={toplamHesabaYaz}
-          renk="#e67e22"
-          para
-          icon="📝"
-        />
-        <OzetKart
-          baslik="Bilardo Geliri"
-          deger={bilardoGeliri}
-          renk="#1abc9c"
-          para
-          icon="🎱"
+          aciklama={`%${karMarji} kâr marjı`}
         />
         <OzetKart
           baslik="Toplam Gider"
           deger={toplamGider}
           renk="#e74c3c"
-          para
           icon="💸"
+          aciklama={`${Object.keys(giderKategorileri).length} kategori`}
         />
         <OzetKart
-          baslik="Ort. Adisyon"
-          deger={ortalamaAdisyonTutari}
+          baslik="Toplam İndirim"
+          deger={toplamIndirim}
           renk="#9b59b6"
-          para
+          icon="🎁"
+          aciklama="Müşteri indirimleri"
+        />
+        <OzetKart
+          baslik="Bilardo Geliri"
+          deger={bilardoGeliri}
+          renk="#1abc9c"
+          icon="🎱"
+          aciklama="Sadece bilardo gelirleri"
+        />
+        <OzetKart
+          baslik="Hesaba Yaz (Bilgi)"
+          deger={toplamHesabaYaz}
+          renk="#e67e22"
+          icon="📝"
+          aciklama="Ciroya dahil değildir"
+        />
+        <OzetKart
+          baslik="Adisyon Sayısı"
+          deger={adisyonAnalizi.sayi}
+          renk="#34495e"
           icon="🍽️"
+          aciklama={`Ortalama: ${adisyonAnalizi.ortalama.toFixed(1)} ₺`}
+        />
+        <OzetKart
+          baslik="Açık Adisyon"
+          deger={toplamHesabaYaz}
+          renk="#d35400"
+          icon="📋"
+          aciklama="Kapanmamış borçlar"
         />
       </div>
 
-      {/* RAPORLAR ÖZET PANOSU */}
+      {/* ÖDEME TÜRLERİ DAĞILIMI */}
+      {Object.keys(odemeTuruDagilimi).length > 0 && (
+        <div style={{
+          background: "#fff",
+          padding: 28,
+          borderRadius: 14,
+          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+          marginBottom: 40
+        }}>
+          <h3 style={{ 
+            margin: "0 0 24px 0", 
+            color: "#7a3e06",
+            fontSize: "1.8rem",
+            fontWeight: "bold",
+            display: "flex",
+            alignItems: "center",
+            gap: 12
+          }}>
+            💳 Ödeme Türleri Dağılımı
+            <span style={{ 
+              fontSize: 14, 
+              background: "#f8f9fa",
+              color: "#666",
+              padding: "6px 12px",
+              borderRadius: 20,
+              fontWeight: "500"
+            }}>
+              {Object.keys(odemeTuruDagilimi).length} ödeme türü
+            </span>
+          </h3>
+          
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+            gap: 20
+          }}>
+            {Object.entries(odemeTuruDagilimi).map(([tur, veri]) => {
+              const yuzde = toplamGelir > 0 ? ((veri.toplam / toplamGelir) * 100).toFixed(1) : 0;
+              const odemeRenkleri = {
+                NAKIT: "#2ecc71",
+                KART: "#3498db",
+                HAVALE: "#9b59b6",
+                BILARDO: "#1abc9c",
+                POS: "#3498db",
+                NAKİT: "#2ecc71"
+              };
+              
+              const odemeIconlari = {
+                NAKIT: "💵",
+                KART: "💳",
+                HAVALE: "🏦",
+                BILARDO: "🎱",
+                POS: "💳",
+                NAKİT: "💵"
+              };
+              
+              return (
+                <div key={tur} style={{
+                  padding: 20,
+                  background: "#f8f9fa",
+                  borderRadius: 10,
+                  borderLeft: `4px solid ${odemeRenkleri[tur] || "#95a5a6"}`,
+                  transition: "all 0.3s"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 6px 12px rgba(0,0,0,0.1)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}>
+                  <div style={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 12
+                  }}>
+                    <span style={{ fontSize: 24 }}>{odemeIconlari[tur] || "💰"}</span>
+                    <div style={{ 
+                      fontSize: 16, 
+                      fontWeight: "600",
+                      color: "#555"
+                    }}>
+                      {tur === "NAKIT" ? "Nakit" : 
+                       tur === "KART" ? "Kredi Kartı" : 
+                       tur === "HAVALE" ? "Havale" : 
+                       tur === "BILARDO" ? "Bilardo" : 
+                       tur === "POS" ? "POS" : tur}
+                    </div>
+                    <div style={{
+                      marginLeft: "auto",
+                      fontSize: 13,
+                      background: (odemeRenkleri[tur] || "#95a5a6") + "20",
+                      color: odemeRenkleri[tur] || "#95a5a6",
+                      padding: "3px 8px",
+                      borderRadius: 12,
+                      fontWeight: "bold"
+                    }}>
+                      {veri.sayi} işlem
+                    </div>
+                  </div>
+                  <div style={{ 
+                    fontSize: 22, 
+                    fontWeight: "bold", 
+                    color: odemeRenkleri[tur] || "#95a5a6",
+                    marginBottom: 8
+                  }}>
+                    {veri.toplam.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div style={{ 
+                    fontSize: 14, 
+                    color: "#777",
+                    fontWeight: "500"
+                  }}>
+                    %{yuzde} pay | Ort: {(veri.toplam / veri.sayi).toFixed(1)} ₺
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* GİDER KATEGORİLERİ */}
+      {Object.keys(giderKategorileri).length > 0 && (
+        <div style={{
+          background: "#fff",
+          padding: 28,
+          borderRadius: 14,
+          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
+          marginBottom: 40
+        }}>
+          <h3 style={{ 
+            margin: "0 0 24px 0", 
+            color: "#7a3e06",
+            fontSize: "1.8rem",
+            fontWeight: "bold",
+            display: "flex",
+            alignItems: "center",
+            gap: 12
+          }}>
+            💸 Gider Kategorileri
+            <span style={{ 
+              fontSize: 14, 
+              background: "#f8f9fa",
+              color: "#666",
+              padding: "6px 12px",
+              borderRadius: 20,
+              fontWeight: "500"
+            }}>
+              {Object.keys(giderKategorileri).length} kategori
+            </span>
+          </h3>
+          
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+            gap: 20
+          }}>
+            {Object.entries(giderKategorileri).map(([kategori, veri]) => {
+              const yuzde = toplamGider > 0 ? ((veri.toplam / toplamGider) * 100).toFixed(1) : 0;
+              return (
+                <div key={kategori} style={{
+                  padding: 20,
+                  background: "linear-gradient(135deg, #fff9f9 0%, #ffffff 100%)",
+                  borderRadius: 10,
+                  border: "1px solid #ffebee",
+                  transition: "all 0.3s"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 6px 12px rgba(231, 76, 60, 0.1)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}>
+                  <div style={{ 
+                    fontSize: 16, 
+                    fontWeight: "600",
+                    color: "#e74c3c",
+                    marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8
+                  }}>
+                    <span>📋</span>
+                    {kategori}
+                    <div style={{
+                      marginLeft: "auto",
+                      fontSize: 12,
+                      background: "#e74c3c20",
+                      color: "#e74c3c",
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      fontWeight: "bold"
+                    }}>
+                      {veri.sayi} adet
+                    </div>
+                  </div>
+                  <div style={{ 
+                    fontSize: 22, 
+                    fontWeight: "bold", 
+                    color: "#e74c3c"
+                  }}>
+                    {veri.toplam.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div style={{ 
+                    fontSize: 14, 
+                    color: "#777",
+                    marginTop: 8
+                  }}>
+                    Giderlerin %{yuzde}'u | Ort: {(veri.toplam / veri.sayi).toFixed(1)} ₺
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* DETAYLI RAPORLAR PANOSU */}
       <div style={{
         background: "#fff",
         padding: 28,
@@ -622,222 +827,104 @@ export default function GenelOzet() {
         </div>
       </div>
 
-      {/* ÖDEME TÜRLERİ ÖZETİ */}
+      {/* MİMARİ BİLGİ */}
       <div style={{
-        background: "#fff",
-        padding: 28,
-        borderRadius: 14,
-        boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-        marginBottom: 40
+        background: "#fff9e6",
+        padding: 24,
+        borderRadius: 12,
+        marginBottom: 40,
+        border: "1px solid #ffeaa7",
+        position: "relative",
+        overflow: "hidden"
       }}>
-        <h3 style={{ 
-          margin: "0 0 24px 0", 
+        <div style={{
+          position: "absolute",
+          top: -10,
+          right: -10,
+          fontSize: 48,
+          opacity: 0.1,
           color: "#7a3e06",
-          fontSize: "1.8rem",
-          fontWeight: "bold"
+          transform: "rotate(15deg)"
         }}>
-          💳 ÖDEME TÜRLERİ ÖZETİ
+          ⚡
+        </div>
+        
+        <h3 style={{ 
+          margin: "0 0 16px 0", 
+          color: "#7a3e06",
+          fontSize: "1.5rem",
+          fontWeight: "bold",
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        }}>
+          🏗️ Mimari Bilgiler
         </h3>
         
-        {Object.values(odemeTuruGruplari).some(grup => grup.toplam > 0) ? (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: 20
-          }}>
-            {Object.entries(odemeTuruGruplari)
-              .filter(([tur, grup]) => grup.toplam > 0)
-              .map(([tur, grup]) => {
-                const odemeRenkleri = {
-                  NAKIT: "#2ecc71",
-                  KART: "#3498db",
-                  HAVALE: "#9b59b6",
-                  HESABA_YAZ: "#e67e22",
-                  BILARDO: "#1abc9c"
-                };
-                
-                const odemeIconlari = {
-                  NAKIT: "💵",
-                  KART: "💳",
-                  HAVALE: "🏦",
-                  HESABA_YAZ: "📝",
-                  BILARDO: "🎱"
-                };
-                
-                const yuzde = toplamGelir > 0 ? ((grup.toplam / toplamGelir) * 100).toFixed(1) : 0;
-                
-                return (
-                  <div key={tur} style={{
-                    padding: 20,
-                    background: "#f8f9fa",
-                    borderRadius: 10,
-                    borderLeft: `4px solid ${odemeRenkleri[tur] || "#95a5a6"}`,
-                    transition: "all 0.3s"
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 6px 12px rgba(0,0,0,0.1)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}>
-                    <div style={{ 
-                      display: "flex", 
-                      alignItems: "center",
-                      gap: 10,
-                      marginBottom: 12
-                    }}>
-                      <span style={{ fontSize: 24 }}>{odemeIconlari[tur] || "💰"}</span>
-                      <div style={{ 
-                        fontSize: 16, 
-                        fontWeight: "600",
-                        color: "#555"
-                      }}>
-                        {tur === "NAKIT" ? "Nakit" : 
-                         tur === "KART" ? "K.Kartı" : 
-                         tur === "HAVALE" ? "Havale" : 
-                         tur === "HESABA_YAZ" ? "Hesaba Yaz" : 
-                         tur === "BILARDO" ? "Bilardo" : tur}
-                      </div>
-                      <div style={{
-                        marginLeft: "auto",
-                        fontSize: 13,
-                        background: odemeRenkleri[tur] + "20",
-                        color: odemeRenkleri[tur],
-                        padding: "3px 8px",
-                        borderRadius: 12,
-                        fontWeight: "bold"
-                      }}>
-                        {grup.sayi} adet
-                      </div>
-                    </div>
-                    <div style={{ 
-                      fontSize: 22, 
-                      fontWeight: "bold", 
-                      color: odemeRenkleri[tur],
-                      marginBottom: 8
-                    }}>
-                      {grup.toplam.toLocaleString("tr-TR")} ₺
-                    </div>
-                    <div style={{ 
-                      fontSize: 14, 
-                      color: "#777",
-                      fontWeight: "500"
-                    }}>
-                      %{yuzde} pay
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        ) : (
-          <div style={{ 
-            padding: 40, 
-            textAlign: "center", 
-            color: "#999", 
-            fontStyle: "italic",
-            background: "#f9f9f9",
-            borderRadius: 12
-          }}>
-            <div style={{ fontSize: 20, marginBottom: 16 }}>
-              💡 Ödeme türü verisi bulunamadı
-            </div>
-            <div style={{ fontSize: 15, color: "#666" }}>
-              "Veri Aktar" butonunu kullanın veya yeni adisyonlar kapatın.
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* GİDER DAĞILIMI */}
-      {Object.keys(giderDagilimi).length > 0 && (
         <div style={{
-          background: "#fff",
-          padding: 28,
-          borderRadius: 14,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
-          marginBottom: 40
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: 16,
+          fontSize: 14,
+          lineHeight: 1.6
         }}>
-          <h3 style={{ 
-            margin: "0 0 24px 0", 
-            color: "#7a3e06",
-            fontSize: "1.8rem",
-            fontWeight: "bold"
-          }}>
-            💸 GİDER DAĞILIMI
-          </h3>
+          <div>
+            <div style={{ fontWeight: "bold", color: "#7a3e06", marginBottom: 6 }}>
+              ✅ TEK KAYNAK
+            </div>
+            <div style={{ color: "#666" }}>
+              • Tüm veriler <strong>mc_finans_havuzu</strong>'dan okunur<br/>
+              • Veri çakışması mümkün değil<br/>
+              • Yeni hesaplama yok - sadece toplama
+            </div>
+          </div>
           
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: 20
-          }}>
-            {Object.entries(giderDagilimi).map(([kategori, veri]) => (
-              <div key={kategori} style={{
-                padding: 20,
-                background: "linear-gradient(135deg, #fff9f9 0%, #ffffff 100%)",
-                borderRadius: 10,
-                border: "1px solid #ffebee",
-                transition: "all 0.3s"
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = "translateY(-4px)";
-                e.currentTarget.style.boxShadow = "0 6px 12px rgba(231, 76, 60, 0.1)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}>
-                <div style={{ 
-                  fontSize: 16, 
-                  fontWeight: "600",
-                  color: "#e74c3c",
-                  marginBottom: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8
-                }}>
-                  <span>📋</span>
-                  {kategori}
-                  <div style={{
-                    marginLeft: "auto",
-                    fontSize: 12,
-                    background: "#e74c3c20",
-                    color: "#e74c3c",
-                    padding: "2px 8px",
-                    borderRadius: 10,
-                    fontWeight: "bold"
-                  }}>
-                    {veri.sayi} adet
-                  </div>
-                </div>
-                <div style={{ 
-                  fontSize: 22, 
-                  fontWeight: "bold", 
-                  color: "#e74c3c"
-                }}>
-                  {veri.toplam.toLocaleString("tr-TR")} ₺
-                </div>
-                <div style={{ 
-                  fontSize: 14, 
-                  color: "#777",
-                  marginTop: 8
-                }}>
-                  Giderlerin %{toplamGider > 0 ? ((veri.toplam / toplamGider) * 100).toFixed(1) : 0}'u
-                </div>
-              </div>
-            ))}
+          <div>
+            <div style={{ fontWeight: "bold", color: "#7a3e06", marginBottom: 6 }}>
+              📊 HESABA YAZ (BİLGİ)
+            </div>
+            <div style={{ color: "#666" }}>
+              • Finansal borçtur<br/>
+              • Ciroya <strong>DAHİL DEĞİLDİR</strong><br/>
+              • Yönetim bilgisi olarak gösterilir
+            </div>
+          </div>
+          
+          <div>
+            <div style={{ fontWeight: "bold", color: "#7a3e06", marginBottom: 6 }}>
+              🔄 FİLTRELEME
+            </div>
+            <div style={{ color: "#666" }}>
+              • Tarih bazlı filtreleme<br/>
+              • Tüm metrikler otomatik güncellenir<br/>
+              • Gerçek zamanlı hesaplama
+            </div>
           </div>
         </div>
-      )}
+        
+        <div style={{
+          marginTop: 20,
+          padding: 12,
+          background: "#f8f9fa",
+          borderRadius: 8,
+          fontSize: 13,
+          color: "#666",
+          textAlign: "center"
+        }}>
+          <strong>Toplam Kayıt:</strong> {finansVerileri.length} | 
+          <strong> Filtrelenmiş:</strong> {filtrelenmisVeriler.length} | 
+          <strong> Son Güncelleme:</strong> {new Date().toLocaleTimeString("tr-TR")}
+        </div>
+      </div>
     </div>
   );
-}
+};
 
-/* ------------------ YARDIMCI BİLEŞEN ------------------ */
+export default GenelOzet;
 
-function OzetKart({ baslik, deger, renk, para, icon }) {
+/* ------------------ ÖZET KART BİLEŞENİ ------------------ */
+
+const OzetKart = ({ baslik, deger, renk, icon, aciklama }) => {
   return (
     <div
       style={{
@@ -893,15 +980,25 @@ function OzetKart({ baslik, deger, renk, para, icon }) {
         style={{
           fontSize: 28,
           fontWeight: "bold",
-          color: renk
+          color: renk,
+          marginBottom: aciklama ? 6 : 0
         }}
       >
         {typeof deger === "number"
-          ? para
-            ? deger.toLocaleString("tr-TR") + " ₺"
-            : deger.toFixed(1).toLocaleString("tr-TR")
+          ? deger.toLocaleString("tr-TR") + " ₺"
           : deger}
       </div>
+      
+      {aciklama && (
+        <div style={{ 
+          fontSize: 13, 
+          color: "#777",
+          fontWeight: "500",
+          marginTop: 4
+        }}>
+          {aciklama}
+        </div>
+      )}
     </div>
   );
-}
+};

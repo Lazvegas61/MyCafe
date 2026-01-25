@@ -1,4 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
+// Yardımcı fonksiyonlar
+const generateId = () => crypto.randomUUID();
+const read = (k, d) => {
+  try {
+    const raw = localStorage.getItem(k);
+    return raw ? JSON.parse(raw) : d;
+  } catch {
+    return d;
+  }
+};
+const write = (k, val) => localStorage.setItem(k, JSON.stringify(val));
 
 export default function UrunStokYonetimi() {
   const KATEGORI_KEY = "mc_kategoriler";
@@ -9,15 +21,15 @@ export default function UrunStokYonetimi() {
   const [urunler, setUrunler] = useState([]);
   const [yeniKategori, setYeniKategori] = useState("");
   const [uAd, setUAd] = useState("");
-  const [uKategori, setUKategori] = useState("");
+  const [uKategoriId, setUKategoriId] = useState("");
   const [uBarkod, setUBarkod] = useState("");
   const [uMaliyet, setUMaliyet] = useState("");
   const [uSatis, setUSatis] = useState("");
   const [uStok, setUStok] = useState("");
   const [uKritik, setUKritik] = useState("10");
   const [uTakip, setUTakip] = useState(true);
-  const [filtreKategori, setFiltreKategori] = useState("");
-  const [seciliUrunAd, setSeciliUrunAd] = useState("");
+  const [filtreKategoriId, setFiltreKategoriId] = useState("");
+  const [seciliUrunId, setSeciliUrunId] = useState("");
   const [gStok, setGStok] = useState("");
   const [gMaliyet, setGMaliyet] = useState("");
   const [gSatis, setGSatis] = useState("");
@@ -29,9 +41,9 @@ export default function UrunStokYonetimi() {
   const [urunGuncellemeModu, setUrunGuncellemeModu] = useState(false);
   const [kategoriGuncellemeModu, setKategoriGuncellemeModu] = useState(false);
   const [guncellenenUrunAd, setGuncellenenUrunAd] = useState("");
-  const [guncellenenUrunKategori, setGuncellenenUrunKategori] = useState("");
+  const [guncellenenUrunKategoriId, setGuncellenenUrunKategoriId] = useState("");
   const [guncellenenKategoriAd, setGuncellenenKategoriAd] = useState("");
-  const [seciliKategoriAd, setSeciliKategoriAd] = useState("");
+  const [seciliKategoriId, setSeciliKategoriId] = useState("");
 
   const guncelleRef = useRef(null);
   const kategoriInputRef = useRef(null);
@@ -138,29 +150,86 @@ export default function UrunStokYonetimi() {
     }
   };
 
-  // ---------- HELPERS ----------
-  const read = (k, d) => {
-    try {
-      const raw = localStorage.getItem(k);
-      return raw ? JSON.parse(raw) : d;
-    } catch {
-      return d;
-    }
+  // ---------- MIGRATION (Eski verileri dönüştür) ----------
+useEffect(() => {
+  const migrateOldData = () => {
+    const eskiUrunler = read(URUN_KEY, []);
+    if (eskiUrunler.length === 0) return;
+    
+    // Eski veride kategoriId var mı kontrol et (yeni format)
+    const ilkUrun = eskiUrunler[0];
+    if (ilkUrun.kategoriId && ilkUrun.name) return; // Zaten yeni formatta
+    
+    // Migration yap - hem eski hem yeni formatları destekle
+    const migratedUrunler = eskiUrunler.map(urun => {
+      // Kategori ID'sini belirle
+      let kategoriId;
+      if (urun.kategoriId) {
+        kategoriId = urun.kategoriId.toString(); // Var olan kategoriId'yi string yap
+      } else if (urun.categoryId) {
+        kategoriId = urun.categoryId.toString(); // categoryId'den al
+      } else {
+        kategoriId = "1"; // Varsayılan kategori
+      }
+      
+      return {
+        id: urun.id || generateId(),
+        name: urun.name || "",
+        kategoriId: kategoriId,
+        barkod: urun.barkod || "",
+        costPrice: Number(urun.costPrice || urun.maliyet || 0),
+        salePrice: Number(urun.salePrice || urun.satis || 0),
+        stock: Number(urun.stock || urun.stok || 0),
+        critical: Number(urun.critical || urun.kritik || 10),
+        stokTakibi: urun.stokTakibi !== undefined ? urun.stokTakibi : true,
+      };
+    });
+    
+    write(URUN_KEY, migratedUrunler);
+    console.log(`${migratedUrunler.length} ürün migrate edildi`);
   };
+  
+  const migrateOldCategories = () => {
+    const eskiKategoriler = read(KATEGORI_KEY, []);
+    if (eskiKategoriler.length === 0) return;
+    
+    const ilkKategori = eskiKategoriler[0];
+    if (ilkKategori.ad) return; // Zaten yeni formatta
+    
+    const migratedKategoriler = eskiKategoriler.map(kat => ({
+      id: (kat.id || kat.categoryId || generateId()).toString(),
+      ad: kat.ad || kat.name || kat.categoryName || ""
+    }));
+    
+    write(KATEGORI_KEY, migratedKategoriler);
+    console.log(`${migratedKategoriler.length} kategori migrate edildi`);
+  };
+  
+  try {
+    migrateOldCategories();
+    migrateOldData();
+  } catch (error) {
+    console.error("Migration hatası:", error);
+  }
+}, []);
 
-  const write = (k, val) => localStorage.setItem(k, JSON.stringify(val));
-
+  // ---------- REFRESH ----------
   const refresh = () => {
     const kat = read(KATEGORI_KEY, []);
     const ur = read(URUN_KEY, []);
     
     // Kategorileri alfabetik sırala
     const sortedKat = [...kat].sort((a, b) => 
+      (a.ad || "").localeCompare(b.ad || "")
+    );
+    
+    // Ürünleri alfabetik sırala
+    const sortedUr = [...ur].sort((a, b) => 
       (a.name || "").localeCompare(b.name || "")
     );
     
     setKategoriler(sortedKat);
-    setUrunler(ur);
+    setUrunler(sortedUr);
   };
 
   const notify = () => window.dispatchEvent(new Event("mc_data_updated"));
@@ -181,139 +250,141 @@ export default function UrunStokYonetimi() {
 
   // ---------- KATEGORİ ----------
   const kategoriEkle = () => {
-    const name = yeniKategori.trim().toUpperCase();
-    if (!name) return alert("Kategori adı giriniz.");
+    const ad = yeniKategori.trim().toUpperCase();
+    if (!ad) return alert("Kategori adı giriniz.");
     const list = read(KATEGORI_KEY, []);
-    if (list.some((k) => (k.name || k.ad) === name)) {
+    if (list.some((k) => k.ad === ad)) {
       return alert("Bu kategori zaten var.");
     }
-    list.push({ name });
     
-    // Alfabetik sırala ve kaydet
+    const yeniKategoriObj = { 
+      id: generateId(), 
+      ad 
+    };
+    list.push(yeniKategoriObj);
+    
     const sortedList = [...list].sort((a, b) => 
-      (a.name || "").localeCompare(b.name || "")
+      (a.ad || "").localeCompare(b.ad || "")
     );
     write(KATEGORI_KEY, sortedList);
 
     setYeniKategori("");
     refresh();
     notify();
-    // Input'a focusla
     if (kategoriInputRef.current) {
       kategoriInputRef.current.focus();
     }
   };
 
-  const kategoriSil = (name) => {
-    if (!window.confirm(`${name} kategorisi ve bu kategorideki tüm ürünler silinsin mi?`)) return;
-    const kat = read(KATEGORI_KEY, []).filter((k) => k.name !== name);
+  const kategoriSil = useCallback((silinecekKategoriId) => {
+    const kategori = kategoriler.find(k => k.id === silinecekKategoriId);
+    if (!kategori) return;
     
-    // Sıralı kaydet
+    if (!window.confirm(`${kategori.ad} kategorisi ve bu kategorideki tüm ürünler silinsin mi?`)) return;
+    
+    const kat = read(KATEGORI_KEY, []).filter((k) => k.id !== silinecekKategoriId);
     const sortedKat = [...kat].sort((a, b) => 
-      (a.name || "").localeCompare(b.name || "")
+      (a.ad || "").localeCompare(b.ad || "")
     );
     write(KATEGORI_KEY, sortedKat);
 
-    const uru = read(URUN_KEY, []).filter((u) => u.categoryName !== name);
+    const uru = read(URUN_KEY, []).filter((u) => u.kategoriId !== silinecekKategoriId);
     write(URUN_KEY, uru);
 
     refresh();
     notify();
     
-    if (seciliKategoriAd === name) {
-      setSeciliKategoriAd("");
+    if (seciliKategoriId === silinecekKategoriId) {
+      setSeciliKategoriId("");
     }
-  };
+  }, [kategoriler, seciliKategoriId]);
 
   // Kategori düzenle
   const kategoriDuzenle = () => {
     const yeniAd = guncellenenKategoriAd.trim().toUpperCase();
     if (!yeniAd) return alert("Kategori adı giriniz.");
-    if (yeniAd === seciliKategoriAd) {
+    
+    const seciliKategori = kategoriler.find(k => k.id === seciliKategoriId);
+    if (!seciliKategori) return;
+    
+    if (yeniAd === seciliKategori.ad) {
       setKategoriGuncellemeModu(false);
       return;
     }
 
     const katList = read(KATEGORI_KEY, []);
-    if (katList.some((k) => k.name === yeniAd && k.name !== seciliKategoriAd)) {
+    if (katList.some((k) => k.ad === yeniAd && k.id !== seciliKategoriId)) {
       return alert("Bu kategori adı zaten kullanılıyor.");
     }
 
-    // Kategoriyi güncelle
     const yeniKatList = katList.map(k => 
-      k.name === seciliKategoriAd ? { ...k, name: yeniAd } : k
+      k.id === seciliKategoriId ? { ...k, ad: yeniAd } : k
     );
     
-    // Sıralı kaydet
     const sortedKatList = [...yeniKatList].sort((a, b) => 
-      (a.name || "").localeCompare(b.name || "")
+      (a.ad || "").localeCompare(b.ad || "")
     );
     write(KATEGORI_KEY, sortedKatList);
 
-    // Bu kategoriye ait ürünlerin kategorisini de güncelle
-    const urunList = read(URUN_KEY, []);
-    const guncellenmisUrunler = urunList.map(u => 
-      u.categoryName === seciliKategoriAd ? { ...u, categoryName: yeniAd } : u
-    );
-    write(URUN_KEY, guncellenmisUrunler);
-
     refresh();
     notify();
-    setSeciliKategoriAd(yeniAd);
     setKategoriGuncellemeModu(false);
     
-    // Eğer filtrede bu kategori varsa güncelle
-    if (filtreKategori === seciliKategoriAd) {
-      setFiltreKategori(yeniAd);
+    if (filtreKategoriId === seciliKategoriId) {
+      setFiltreKategoriId(seciliKategoriId);
     }
   };
 
   // Kategori satırına tıklandığında
-  const kategoriSec = (kategoriAdi) => {
-    setSeciliKategoriAd(kategoriAdi);
-    setGuncellenenKategoriAd(kategoriAdi);
+  const kategoriSec = useCallback((kategoriId) => {
+    setSeciliKategoriId(kategoriId);
+    const kategori = kategoriler.find(k => k.id === kategoriId);
+    if (kategori) {
+      setGuncellenenKategoriAd(kategori.ad);
+    }
     setKategoriGuncellemeModu(false);
     
     // Bu kategoriye ait ürünleri bul
-    const kategoriUrunleri = urunMap.filter(u => u.categoryName === kategoriAdi);
+    const kategoriUrunleri = urunler.filter(u => u.kategoriId === kategoriId);
     
     if (kategoriUrunleri.length > 0) {
       // İlk ürünü seç
-      setFiltreKategori(kategoriAdi);
-      setSeciliUrunAd(kategoriUrunleri[0].name);
+      setFiltreKategoriId(kategoriId);
+      setSeciliUrunId(kategoriUrunleri[0].id);
     } else {
       // Kategori boşsa sadece filtreyi ayarla
-      setFiltreKategori(kategoriAdi);
-      setSeciliUrunAd("");
+      setFiltreKategoriId(kategoriId);
+      setSeciliUrunId("");
     }
     
-    // Güncelleme paneline scroll et
     setTimeout(() => {
       guncelleRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
-  };
+  }, [kategoriler, urunler]);
 
   // ---------- ÜRÜN EKLE ----------
   const urunEkle = () => {
-    if (!uAd.trim() || !uKategori.trim())
+    if (!uAd.trim() || !uKategoriId.trim())
       return alert("Ürün adı ve kategori zorunludur.");
 
     const list = read(URUN_KEY, []);
     if (list.some((x) => x.name === uAd.trim()))
       return alert("Bu ürün zaten var.");
 
-    list.push({
+    const yeniUrun = {
+      id: generateId(),
       name: uAd.trim(),
-      categoryName: uKategori.trim(),
+      kategoriId: uKategoriId.trim(),
       barkod: uBarkod.trim(),
       costPrice: Number(uMaliyet || 0),
       salePrice: Number(uSatis || 0),
       stock: Number(uStok || 0),
       critical: Number(uKritik || 10),
       stokTakibi: uTakip,
-    });
+    };
 
-    // Ürünleri alfabetik sırala ve kaydet
+    list.push(yeniUrun);
+
     const sortedList = [...list].sort((a, b) => 
       (a.name || "").localeCompare(b.name || "")
     );
@@ -325,25 +396,26 @@ export default function UrunStokYonetimi() {
     // Formu temizle
     setUAd("");
     setUBarkod("");
-    setUKategori("");
+    setUKategoriId("");
     setUMaliyet("");
     setUSatis("");
     setUStok("");
     setUKritik("10");
     setUTakip(true);
     
-    // Ürün adı input'una focusla
     if (urunAdInputRef.current) {
       urunAdInputRef.current.focus();
     }
   };
 
-  const urunSil = (name) => {
-    if (!window.confirm(`${name} ürünü silinsin mi?`)) return;
-    const list = read(URUN_KEY, []);
-    const yeni = list.filter((u) => u.name !== name);
+  const urunSil = useCallback((urunId) => {
+    const urun = urunler.find(u => u.id === urunId);
+    if (!urun) return;
     
-    // Sıralı kaydet
+    if (!window.confirm(`${urun.name} ürünü silinsin mi?`)) return;
+    const list = read(URUN_KEY, []);
+    const yeni = list.filter((u) => u.id !== urunId);
+    
     const sortedList = [...yeni].sort((a, b) => 
       (a.name || "").localeCompare(b.name || "")
     );
@@ -352,67 +424,37 @@ export default function UrunStokYonetimi() {
     refresh();
     notify();
 
-    if (seciliUrunAd === name) {
-      setSeciliUrunAd("");
+    if (seciliUrunId === urunId) {
+      setSeciliUrunId("");
     }
-  };
+  }, [urunler, seciliUrunId]);
 
   // Ürün satırına tıklandığında
-  const urunSec = (urunAdi, kategoriAdi) => {
-    setFiltreKategori(kategoriAdi);
-    setSeciliUrunAd(urunAdi);
-    setSeciliKategoriAd(kategoriAdi);
+  const urunSec = useCallback((urunId, kategoriId) => {
+    setFiltreKategoriId(kategoriId);
+    setSeciliUrunId(urunId);
+    setSeciliKategoriId(kategoriId);
     setKategoriGuncellemeModu(false);
     
-    // Güncelleme paneline scroll et
     setTimeout(() => {
       guncelleRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
-  };
+  }, []);
 
   // ---------- ÜRÜN LİSTE ----------
-  const kategoriAdlari = useMemo(
-    () => {
-      const sorted = (kategoriler || []).map((k) => k.name);
-      return sorted.sort((a, b) => a.localeCompare(b));
-    },
-    [kategoriler]
-  );
-
-  const urunMap = useMemo(
-    () => {
-      const mapped = (urunler || []).map((u) => ({
-        ...u,
-        name: u.name,
-        stock: Number(u.stock || 0),
-        critical: Number(u.critical || 0),
-      }));
-      
-      // Alfabetik sırala
-      return mapped.sort((a, b) => 
-        (a.name || "").localeCompare(b.name || "")
-      );
-    },
-    [urunler]
-  );
-
-  const filtreliUrunler = useMemo(
-    () => {
-      const filtered = urunMap.filter((u) =>
-        filtreKategori ? u.categoryName === filtreKategori : true
-      );
-      
-      // Alfabetik sırala
-      return filtered.sort((a, b) => 
-        (a.name || "").localeCompare(b.name || "")
-      );
-    },
-    [urunMap, filtreKategori]
-  );
+  const filtreliUrunler = useMemo(() => {
+    const filtered = urunler.filter((u) =>
+      filtreKategoriId ? u.kategoriId === filtreKategoriId : true
+    );
+    
+    return filtered.sort((a, b) => 
+      (a.name || "").localeCompare(b.name || "")
+    );
+  }, [urunler, filtreKategoriId]);
 
   const seciliUrun = useMemo(
-    () => urunMap.find((u) => u.name === seciliUrunAd) || null,
-    [urunMap, seciliUrunAd]
+    () => urunler.find((u) => u.id === seciliUrunId) || null,
+    [urunler, seciliUrunId]
   );
 
   // Ürün seçilince input doldur
@@ -424,7 +466,7 @@ export default function UrunStokYonetimi() {
       setGKritik("10");
       setGTakip(true);
       setGuncellenenUrunAd("");
-      setGuncellenenUrunKategori("");
+      setGuncellenenUrunKategoriId("");
       setUrunGuncellemeModu(false);
       return;
     }
@@ -435,21 +477,20 @@ export default function UrunStokYonetimi() {
     setGKritik(seciliUrun.critical);
     setGTakip(seciliUrun.stokTakibi === true);
     setGuncellenenUrunAd(seciliUrun.name);
-    setGuncellenenUrunKategori(seciliUrun.categoryName);
+    setGuncellenenUrunKategoriId(seciliUrun.kategoriId);
   }, [seciliUrun]);
 
   // ---------- UPDATE ----------
-  const temelGuncelle = (cb) => {
+  const temelGuncelle = useCallback((cb) => {
     if (!seciliUrun) return alert("Önce ürün seçin.");
     const list = read(URUN_KEY, []);
-    const idx = list.findIndex((u) => u.name === seciliUrun.name);
+    const idx = list.findIndex((u) => u.id === seciliUrun.id);
     if (idx === -1) return;
 
     const kopya = { ...list[idx] };
     cb(kopya);
     list[idx] = kopya;
 
-    // Güncelleme sonrası sırala ve kaydet
     const sortedList = [...list].sort((a, b) => 
       (a.name || "").localeCompare(b.name || "")
     );
@@ -457,36 +498,36 @@ export default function UrunStokYonetimi() {
     
     refresh();
     notify();
-  };
+  }, [seciliUrun]);
 
-  const stokGuncelle = () =>
-    temelGuncelle((x) => (x.stock = Number(gStok)));
+  const stokGuncelle = useCallback(() =>
+    temelGuncelle((x) => (x.stock = Number(gStok))), [temelGuncelle, gStok]);
 
-  const maliyetGuncelle = () =>
-    temelGuncelle((x) => (x.costPrice = Number(gMaliyet)));
+  const maliyetGuncelle = useCallback(() =>
+    temelGuncelle((x) => (x.costPrice = Number(gMaliyet))), [temelGuncelle, gMaliyet]);
 
-  const satisGuncelle = () =>
-    temelGuncelle((x) => (x.salePrice = Number(gSatis)));
+  const satisGuncelle = useCallback(() =>
+    temelGuncelle((x) => (x.salePrice = Number(gSatis))), [temelGuncelle, gSatis]);
 
-  const kritikGuncelle = () =>
-    temelGuncelle((x) => (x.critical = Number(gKritik)));
+  const kritikGuncelle = useCallback(() =>
+    temelGuncelle((x) => (x.critical = Number(gKritik))), [temelGuncelle, gKritik]);
 
-  const takipGuncelle = () =>
-    temelGuncelle((x) => (x.stokTakibi = gTakip));
+  const takipGuncelle = useCallback(() =>
+    temelGuncelle((x) => (x.stokTakibi = gTakip)), [temelGuncelle, gTakip]);
 
   // Ürün adı ve kategori güncelleme
-  const urunAdiVeKategoriGuncelle = () => {
+  const urunAdiVeKategoriGuncelle = useCallback(() => {
     if (!seciliUrun) return alert("Önce ürün seçin.");
     
     const yeniAd = guncellenenUrunAd.trim();
-    const yeniKategori = guncellenenUrunKategori.trim();
+    const yeniKategoriId = guncellenenUrunKategoriId.trim();
     
-    if (!yeniAd || !yeniKategori) {
+    if (!yeniAd || !yeniKategoriId) {
       return alert("Ürün adı ve kategori zorunludur.");
     }
     
     const list = read(URUN_KEY, []);
-    const idx = list.findIndex((u) => u.name === seciliUrun.name);
+    const idx = list.findIndex((u) => u.id === seciliUrun.id);
     if (idx === -1) return;
 
     // Yeni ad başka bir üründe kullanılıyor mu kontrol et
@@ -496,10 +537,9 @@ export default function UrunStokYonetimi() {
 
     const kopya = { ...list[idx] };
     kopya.name = yeniAd;
-    kopya.categoryName = yeniKategori;
+    kopya.kategoriId = yeniKategoriId;
     list[idx] = kopya;
 
-    // Güncelleme sonrası sırala ve kaydet
     const sortedList = [...list].sort((a, b) => 
       (a.name || "").localeCompare(b.name || "")
     );
@@ -507,46 +547,55 @@ export default function UrunStokYonetimi() {
     
     refresh();
     notify();
-    setSeciliUrunAd(yeniAd);
-    setFiltreKategori(yeniKategori);
-    setSeciliKategoriAd(yeniKategori);
+    setSeciliUrunId(seciliUrun.id); // ID değişmez
+    setFiltreKategoriId(yeniKategoriId);
+    setSeciliKategoriId(yeniKategoriId);
     setUrunGuncellemeModu(false);
-  };
+  }, [seciliUrun, guncellenenUrunAd, guncellenenUrunKategoriId]);
 
   // ---------- ENTER TUŞU HANDLER ----------
-  const handleKeyPress = (e, action) => {
+  const handleKeyPress = useCallback((e, action) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       action();
     }
-  };
+  }, []);
 
   // ---------- Alarm → İlk kritik ürüne git ----------
-  const kritikUrunGoster = () => {
-    const kritiks = urunMap.filter(
+  const kritikUrunGoster = useCallback(() => {
+    const kritiks = urunler.filter(
       (u) => u.stokTakibi === true && u.stock <= u.critical
     );
     if (kritiks.length === 0) return;
     const ilk = kritiks[0];
-    setFiltreKategori(ilk.categoryName);
-    setSeciliUrunAd(ilk.name);
-    setSeciliKategoriAd(ilk.categoryName);
+    setFiltreKategoriId(ilk.kategoriId);
+    setSeciliUrunId(ilk.id);
+    setSeciliKategoriId(ilk.kategoriId);
     setTimeout(
       () =>
         guncelleRef.current?.scrollIntoView({ behavior: "smooth" }),
       100
     );
-  };
+  }, [urunler]);
 
   // Kritik stok sayısı
-  const kritikStokSayisi = urunMap.filter(
+  const kritikStokSayisi = urunler.filter(
     u => u.stokTakibi === true && u.stock <= u.critical
   ).length;
 
   // Seçili kategoriye ait ürün sayısı
-  const seciliKategoriUrunSayisi = urunMap.filter(
-    u => u.categoryName === seciliKategoriAd
+  const seciliKategoriUrunSayisi = urunler.filter(
+    u => u.kategoriId === seciliKategoriId
   ).length;
+
+  // Kategori lookup fonksiyonu
+  const kategoriAdiniBul = useCallback((kategoriId) => {
+    const kategori = kategoriler.find(k => k.id === kategoriId);
+    return kategori ? kategori.ad : "-";
+  }, [kategoriler]);
+
+  // Seçili kategori bilgisi
+  const seciliKategori = seciliKategoriId ? kategoriler.find(k => k.id === seciliKategoriId) : null;
 
   return (
     <div
@@ -640,7 +689,7 @@ export default function UrunStokYonetimi() {
             <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexShrink: 0 }}>
                 <label style={{ fontWeight: "500", color: TEMA.text }}>
-                  Mevcut Kategoriler ({kategoriAdlari.length})
+                  Mevcut Kategoriler ({kategoriler.length})
                 </label>
                 <span style={{ fontSize: "0.9rem", color: TEMA.textLight }}>
                   Alfabetik Sıralı
@@ -653,18 +702,18 @@ export default function UrunStokYonetimi() {
                   paddingRight: "5px"
                 }}
               >
-                {kategoriAdlari.map((name, index) => (
+                {kategoriler.map((kategori, index) => (
                   <div
-                    key={name}
-                    onClick={() => kategoriSec(name)}
+                    key={kategori.id}
+                    onClick={() => kategoriSec(kategori.id)}
                     style={{
                       padding: "12px 15px",
-                      background: seciliKategoriAd === name ? TEMA.kategoriSelected : 
-                                 filtreKategori === name ? TEMA.selected : "white",
+                      background: seciliKategoriId === kategori.id ? TEMA.kategoriSelected : 
+                                 filtreKategoriId === kategori.id ? TEMA.selected : "white",
                       borderRadius: "10px",
                       marginBottom: "8px",
-                      border: `1px solid ${seciliKategoriAd === name ? TEMA.info : 
-                                           filtreKategori === name ? TEMA.success : TEMA.border}`,
+                      border: `1px solid ${seciliKategoriId === kategori.id ? TEMA.info : 
+                                           filtreKategoriId === kategori.id ? TEMA.success : TEMA.border}`,
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
@@ -672,7 +721,7 @@ export default function UrunStokYonetimi() {
                       cursor: "pointer",
                       position: "relative",
                       "&:hover": {
-                        background: seciliKategoriAd === name ? TEMA.kategoriSelected : TEMA.selected
+                        background: seciliKategoriId === kategori.id ? TEMA.kategoriSelected : TEMA.selected
                       }
                     }}
                   >
@@ -686,16 +735,16 @@ export default function UrunStokYonetimi() {
                         {index + 1}.
                       </span>
                       <div>
-                        <div style={{ fontWeight: "500" }}>{name}</div>
+                        <div style={{ fontWeight: "500" }}>{kategori.ad}</div>
                         <div style={{ fontSize: "0.8rem", color: TEMA.textLight }}>
-                          {urunMap.filter(u => u.categoryName === name).length} ürün
+                          {urunler.filter(u => u.kategoriId === kategori.id).length} ürün
                         </div>
                       </div>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        kategoriSil(name);
+                        kategoriSil(kategori.id);
                       }}
                       style={{
                         background: "transparent",
@@ -707,7 +756,7 @@ export default function UrunStokYonetimi() {
                         fontSize: "0.85rem",
                         fontWeight: "500"
                       }}
-                      onKeyPress={(e) => handleKeyPress(e, () => kategoriSil(name))}
+                      onKeyPress={(e) => handleKeyPress(e, () => kategoriSil(kategori.id))}
                     >
                       Sil
                     </button>
@@ -762,13 +811,13 @@ export default function UrunStokYonetimi() {
                 </label>
                 <select
                   style={stil.input}
-                  value={uKategori}
-                  onChange={(e) => setUKategori(e.target.value)}
+                  value={uKategoriId}
+                  onChange={(e) => setUKategoriId(e.target.value)}
                   onKeyPress={(e) => handleKeyPress(e, urunEkle)}
                 >
                   <option value="">Kategori seçin</option>
-                  {kategoriAdlari.map((k) => (
-                    <option key={k} value={k}>{k}</option>
+                  {kategoriler.map((k) => (
+                    <option key={k.id} value={k.id}>{k.ad}</option>
                   ))}
                 </select>
               </div>
@@ -862,7 +911,7 @@ export default function UrunStokYonetimi() {
             <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexShrink: 0 }}>
                 <h3 style={{ margin: 0, color: TEMA.text, fontSize: "1.1rem" }}>
-                  Mevcut Ürünler ({urunMap.length})
+                  Mevcut Ürünler ({urunler.length})
                 </h3>
                 <span style={{ fontSize: "0.9rem", color: TEMA.textLight }}>
                   Alfabetik Sıralı
@@ -876,26 +925,26 @@ export default function UrunStokYonetimi() {
                   border: `1px solid ${TEMA.border}`
                 }}
               >
-                {urunMap.map((u) => (
+                {urunler.map((u) => (
                   <div
-                    key={u.name}
-                    onClick={() => urunSec(u.name, u.categoryName)}
+                    key={u.id}
+                    onClick={() => urunSec(u.id, u.kategoriId)}
                     style={{
                       padding: "12px 15px",
-                      background: seciliUrunAd === u.name ? TEMA.selected : "white",
+                      background: seciliUrunId === u.id ? TEMA.selected : "white",
                       borderBottom: `1px solid ${TEMA.border}`,
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
                       transition: "all 0.2s ease",
                       cursor: "pointer",
-                      borderLeft: seciliUrunAd === u.name ? `4px solid ${TEMA.success}` : "none"
+                      borderLeft: seciliUrunId === u.id ? `4px solid ${TEMA.success}` : "none"
                     }}
                   >
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "5px" }}>
                         <span style={{ fontWeight: "600", color: TEMA.text }}>{u.name}</span>
-                        <span style={stil.badge}>{u.categoryName}</span>
+                        <span style={stil.badge}>{kategoriAdiniBul(u.kategoriId)}</span>
                         {!u.stokTakibi && (
                           <span style={stil.badgeDanger}>TAKİP YOK</span>
                         )}
@@ -912,7 +961,7 @@ export default function UrunStokYonetimi() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        urunSil(u.name);
+                        urunSil(u.id);
                       }}
                       style={{
                         background: "transparent",
@@ -925,7 +974,7 @@ export default function UrunStokYonetimi() {
                         fontWeight: "500",
                         minWidth: "60px"
                       }}
-                      onKeyPress={(e) => handleKeyPress(e, () => urunSil(u.name))}
+                      onKeyPress={(e) => handleKeyPress(e, () => urunSil(u.id))}
                     >
                       Sil
                     </button>
@@ -953,17 +1002,17 @@ export default function UrunStokYonetimi() {
                   </label>
                   <select
                     style={stil.input}
-                    value={filtreKategori}
+                    value={filtreKategoriId}
                     onChange={(e) => {
-                      setFiltreKategori(e.target.value);
-                      setSeciliUrunAd("");
-                      setSeciliKategoriAd(e.target.value || "");
+                      setFiltreKategoriId(e.target.value);
+                      setSeciliUrunId("");
+                      setSeciliKategoriId(e.target.value || "");
                     }}
                     onKeyPress={(e) => handleKeyPress(e, () => {})}
                   >
                     <option value="">Tüm Kategoriler</option>
-                    {kategoriAdlari.map((k) => (
-                      <option key={k} value={k}>{k}</option>
+                    {kategoriler.map((k) => (
+                      <option key={k.id} value={k.id}>{k.ad}</option>
                     ))}
                   </select>
                 </div>
@@ -973,14 +1022,14 @@ export default function UrunStokYonetimi() {
                   </label>
                   <select
                     style={stil.input}
-                    value={seciliUrunAd}
+                    value={seciliUrunId}
                     onChange={(e) => {
-                      setSeciliUrunAd(e.target.value);
+                      setSeciliUrunId(e.target.value);
                       if (e.target.value) {
-                        const urun = urunMap.find(u => u.name === e.target.value);
+                        const urun = urunler.find(u => u.id === e.target.value);
                         if (urun) {
-                          setSeciliKategoriAd(urun.categoryName);
-                          setFiltreKategori(urun.categoryName);
+                          setSeciliKategoriId(urun.kategoriId);
+                          setFiltreKategoriId(urun.kategoriId);
                         }
                       }
                     }}
@@ -988,7 +1037,7 @@ export default function UrunStokYonetimi() {
                   >
                     <option value="">Ürün seçin</option>
                     {filtreliUrunler.map((u) => (
-                      <option key={u.name} value={u.name}>{u.name}</option>
+                      <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
                   </select>
                 </div>
@@ -997,10 +1046,10 @@ export default function UrunStokYonetimi() {
 
             {/* Seçili Öğe Bilgileri ve Güncelleme Alanları */}
             <div style={{ flex: 1, overflowY: "auto", paddingRight: "5px" }}>
-              {seciliKategoriAd || seciliUrunAd ? (
+              {seciliKategoriId || seciliUrunId ? (
                 <>
                   {/* KATEGORİ GÜNCELLEME */}
-                  {seciliKategoriAd && (
+                  {seciliKategoriId && seciliKategori && (
                     <div
                       style={{
                         background: TEMA.kategoriSelected,
@@ -1014,7 +1063,7 @@ export default function UrunStokYonetimi() {
                         <div>
                           <h3 style={{ margin: "0 0 8px 0", color: TEMA.info }}>
                             <span style={{ marginRight: "8px" }}>📂</span>
-                            {seciliKategoriAd}
+                            {seciliKategori.ad}
                           </h3>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                             <span style={stil.badgeInfo}>
@@ -1066,7 +1115,7 @@ export default function UrunStokYonetimi() {
                             Kategoriyi Kaydet
                           </button>
                           <div style={{ fontSize: "0.85rem", color: TEMA.textLight, marginTop: "10px" }}>
-                            <b>Not:</b> Kategori adı değiştirildiğinde, bu kategoriye ait tüm ürünlerin kategorisi de otomatik güncellenir.
+                            <b>Not:</b> Kategori adı değiştirildiğinde, kategori ID'si aynı kalır.
                           </div>
                         </div>
                       ) : (
@@ -1092,7 +1141,7 @@ export default function UrunStokYonetimi() {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px" }}>
                           <div>
                             <h3 style={{ margin: "0 0 8px 0", color: TEMA.anaRenk }}>{seciliUrun.name}</h3>
-                            <span style={stil.badge}>{seciliUrun.categoryName}</span>
+                            <span style={stil.badge}>{kategoriAdiniBul(seciliUrun.kategoriId)}</span>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ 
@@ -1161,13 +1210,13 @@ export default function UrunStokYonetimi() {
                                 </label>
                                 <select
                                   style={stil.input}
-                                  value={guncellenenUrunKategori}
-                                  onChange={(e) => setGuncellenenUrunKategori(e.target.value)}
+                                  value={guncellenenUrunKategoriId}
+                                  onChange={(e) => setGuncellenenUrunKategoriId(e.target.value)}
                                   onKeyPress={(e) => handleKeyPress(e, urunAdiVeKategoriGuncelle)}
                                 >
                                   <option value="">Kategori seçin</option>
-                                  {kategoriAdlari.map((k) => (
-                                    <option key={k} value={k}>{k}</option>
+                                  {kategoriler.map((k) => (
+                                    <option key={k.id} value={k.id}>{k.ad}</option>
                                   ))}
                                 </select>
                               </div>

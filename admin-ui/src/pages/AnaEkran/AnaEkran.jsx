@@ -486,35 +486,13 @@ const AnaEkran = () => {
       });
 
       // ======================================================
-      // 9. KRİTİK STOKLAR
-      // ======================================================
-      const kritikStoklar = [];
-      
-      stoklar.forEach(urun => {
-        try {
-          const miktar = Number(urun.miktar || urun.stock || 0);
-          const kritikEsik = Number(urun.kritik || urun.critical || 5);
-          if (miktar <= kritikEsik) {
-            kritikStoklar.push({
-              id: urun.id,
-              ad: urun.ad || urun.name,
-              stok: miktar
-            });
-          }
-        } catch (error) {
-          console.warn('❌ Stok parse hatası:', error, urun);
-        }
-      });
-
-      // ======================================================
-      // 10. DASHBOARD'U GÜNCELLE
+      // 9. DASHBOARD'U GÜNCELLE (KRİTİK STOKLAR KALDIRILDI)
       // ======================================================
       const yeniDashboard = {
         gunlukGelir,
         gunlukGider,
         netKasa,
         acikAdisyonlar,
-        kritikStoklar,
         gunlukGiderler,
         sonYenileme: new Date(),
         aktifGunId,
@@ -555,7 +533,6 @@ const AnaEkran = () => {
         gunlukGider: 0,
         netKasa: 0,
         acikAdisyonlar: [],
-        kritikStoklar: [],
         gunlukGiderler: [],
         sonYenileme: new Date(),
         aktifGunId: gun?.gunId || bugunStr(),
@@ -657,51 +634,53 @@ const AnaEkran = () => {
         </div>
       </div>
 
-      {/* GÜN DURUMU BİLGİSİ */}
+      {/* GÜN DURUMU BİLGİSİ (SADELEŞTİRİLMİŞ) */}
       <div style={{
         marginBottom: "20px",
-        padding: "12px 18px",
-        borderRadius: "12px",
-        background: gunAktif ? "rgba(46, 204, 113, 0.1)" : "rgba(231, 76, 60, 0.1)",
-        border: `1px solid ${gunAktif ? "#27ae60" : "#e74c3c"}`,
+        padding: "15px 20px",
+        borderRadius: "16px",
+        background: gunAktif ? "rgba(46, 204, 113, 0.15)" : "rgba(231, 76, 60, 0.15)",
+        border: `2px solid ${gunAktif ? "#27ae60" : "#e74c3c"}`,
         display: "flex",
         alignItems: "center",
-        gap: "10px",
+        justifyContent: "space-between",
       }}>
-        <div style={{ fontSize: "24px", color: gunAktif ? "#27ae60" : "#e74c3c" }}>
-          {gunAktif ? "✅" : "⚠️"}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, color: gunAktif ? "#27ae60" : "#e74c3c" }}>
-            {gunAktif ? 'Gün Aktif' : 'Gün Başlatılmamış'}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ fontSize: "28px", color: gunAktif ? "#27ae60" : "#e74c3c" }}>
+            {gunAktif ? "✅" : "⚠️"}
           </div>
-          <div style={{ fontSize: "14px", color: "#636e72" }}>
-            Gün ID: <strong>{gun?.gunId || 'Yok'}</strong> • 
-            Açık Adisyon: <strong>{dashboard.acikAdisyonSayisi}</strong> • 
-            Kapalı Adisyon: <strong>{dashboard.kapaliAdisyonSayisi}</strong>
-            {gunAktif ? 
-              ' • Tüm işlemler bu güne kaydediliyor.' :
-              ' • Gün başlatılmadan işlem yapılamaz.'
-            }
+          <div>
+            <div style={{ fontWeight: 800, fontSize: "18px", color: gunAktif ? "#27ae60" : "#e74c3c" }}>
+              {gunAktif ? 'Gün Aktif' : 'Gün Başlatılmamış'}
+            </div>
+            <div style={{ fontSize: "14px", color: "#636e72", marginTop: "4px" }}>
+              Gün ID: <strong>{gun?.gunId || 'Yok'}</strong> • 
+              Açık Adisyon: <strong>{dashboard.acikAdisyonSayisi}</strong>
+            </div>
           </div>
         </div>
+        
         <button
           onClick={okuDashboard}
           style={{
-            padding: "8px 16px",
-            borderRadius: "999px",
+            padding: "10px 20px",
+            borderRadius: "12px",
             border: "none",
-            background: "#3498db",
+            background: "linear-gradient(135deg, #3498db, #2980b9)",
             color: "#ffffff",
-            fontWeight: 600,
-            fontSize: "14px",
+            fontWeight: 700,
+            fontSize: "15px",
             cursor: "pointer",
-            transition: "opacity 0.2s"
+            transition: "all 0.2s",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
           }}
           onMouseOver={(e) => e.currentTarget.style.opacity = "0.9"}
           onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
         >
-          🔄 Yenile
+          <span>🔄</span>
+          <span>Yenile</span>
         </button>
       </div>
 
@@ -727,7 +706,7 @@ const AnaEkran = () => {
           }}
         >
           <QuickMenuCard key="urun-yonetimi" label="Ürün Yönetimi" icon="📦" onClick={() => navigate("/urun-stok")} />
-          <QuickMenuCard key="raporlar" label="Raporlar" icon="📊" onClick={() => {}} />
+          <QuickMenuCard key="raporlar" label="Raporlar" icon="📊" onClick={() => navigate("/raporlar")} />
           <QuickMenuCard key="stok-yonetimi" label="Stok Yönetimi" icon="📈" onClick={() => navigate("/urun-stok")} />
           <QuickMenuCard key="masalar" label="Masalar" icon="🪑" onClick={() => navigate("/masalar")} />
           <QuickMenuCard key="bilardo" label="Bilardo" icon="🎱" onClick={() => navigate("/bilardo")} />
@@ -815,11 +794,11 @@ const AnaEkran = () => {
         </div>
       </div>
 
-      {/* ALT 3 PANEL */}
+      {/* ALT 2 PANEL (KRİTİK STOKLAR KALDIRILDI) */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateColumns: "2fr 1fr",
           gap: 26,
         }}
       >
@@ -830,7 +809,6 @@ const AnaEkran = () => {
             borderRadius: 26,
             padding: "28px",
             boxShadow: "0 14px 24px rgba(0,0,0,0.35)",
-            gridColumn: "span 2"
           }}
         >
           <div
@@ -845,9 +823,6 @@ const AnaEkran = () => {
             <span style={{ fontSize: 14, marginLeft: 8, color: RENK.griYazi }}>
               ({dashboard.acikAdisyonlar.length} adet)
             </span>
-            <div style={{ fontSize: 12, color: "#7f5539", fontWeight: 400, marginTop: 4 }}>
-              
-            </div>
           </div>
 
           <div
@@ -1038,168 +1013,115 @@ const AnaEkran = () => {
           )}
         </div>
 
-        {/* KRİTİK STOKLAR + GİDER LİSTESİ (Birleştirilmiş) */}
+        {/* GÜNLÜK GİDER LİSTESİ (KRİTİK STOKLAR KALDIRILDI) */}
         <div
           style={{
             backgroundColor: RENK.kart,
             borderRadius: 26,
             padding: "28px",
             boxShadow: "0 14px 24px rgba(0,0,0,0.35)",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px"
           }}
         >
-          {/* KRİTİK STOKLAR */}
-          <div>
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 900,
-                marginBottom: 12,
-                color: "#4a3016",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              <span style={{ color: RENK.kirmizi }}>⚠️</span>
-              KRİTİK STOKLAR
-              <span style={{ fontSize: 14, marginLeft: 8, color: RENK.griYazi }}>
-                ({dashboard.kritikStoklar.length} adet)
-              </span>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: "#f5e6cf",
-                borderRadius: 12,
-                padding: "12px",
-                maxHeight: 180,
-                overflowY: "auto",
-              }}
-            >
-              {dashboard.kritikStoklar.length === 0 ? (
-                <div
-                  key="no-kritik-stok"
-                  style={{
-                    textAlign: "center",
-                    padding: "12px",
-                    color: RENK.griYazi,
-                    fontSize: "14px"
-                  }}
-                >
-                  Kritik stok yok.
-                </div>
-              ) : (
-                dashboard.kritikStoklar.map((u) => (
-                  <div
-                    key={u.id}
-                    style={{
-                      padding: "8px 10px",
-                      marginBottom: 6,
-                      background: "#fdecea",
-                      borderRadius: 8,
-                      fontWeight: 700,
-                      color: RENK.kirmizi,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: "14px"
-                    }}
-                  >
-                    <span style={{ maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis" }}>{u.ad}</span>
-                    <span>{u.stok} adet</span>
-                  </div>
-                ))
-              )}
-            </div>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 900,
+              marginBottom: 18,
+              color: "#4a3016",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px"
+            }}
+          >
+            <span style={{ color: RENK.kirmizi }}>📉</span>
+            GÜNLÜK GİDERLER
+            <span style={{ fontSize: 14, marginLeft: 8, color: RENK.griYazi }}>
+              ({dashboard.gunlukGiderler.length} adet)
+            </span>
           </div>
 
-          {/* GÜNLÜK GİDER LİSTESİ */}
-          <div>
-            <div
-              style={{
-                fontSize: 20,
-                fontWeight: 900,
-                marginBottom: 12,
-                color: "#4a3016",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px"
-              }}
-            >
-              <span style={{ color: RENK.kirmizi }}>📉</span>
-              GÜNLÜK GİDERLER
-              <span style={{ fontSize: 14, marginLeft: 8, color: RENK.griYazi }}>
-                ({dashboard.gunlukGiderler.length} adet)
-              </span>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: "#f5e6cf",
-                borderRadius: 12,
-                padding: "12px",
-                maxHeight: 180,
-                overflowY: "auto",
-              }}
-            >
-              {dashboard.gunlukGiderler.length === 0 ? (
-                <div
-                  key="no-gider"
-                  style={{
-                    textAlign: "center",
-                    padding: "12px",
-                    color: RENK.griYazi,
-                    fontSize: "14px"
-                  }}
-                >
-                  Bugün gider yok.
-                </div>
-              ) : (
-                dashboard.gunlukGiderler.map((g) => (
+          <div
+            style={{
+              backgroundColor: "#f5e6cf",
+              borderRadius: 18,
+              padding: "16px",
+              height: "380px",
+              overflowY: "auto",
+            }}
+          >
+            {dashboard.gunlukGiderler.length === 0 ? (
+              <div
+                key="no-gider"
+                style={{
+                  textAlign: "center",
+                  padding: "20px",
+                  color: RENK.griYazi,
+                  fontSize: "16px",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                Bugün gider kaydı bulunmamaktadır.
+              </div>
+            ) : (
+              <>
+                {dashboard.gunlukGiderler.map((g) => (
                   <div
                     key={g.id}
                     style={{
-                      padding: "8px 10px",
-                      marginBottom: 6,
+                      padding: "12px 14px",
+                      marginBottom: 10,
                       background: "#fdecea",
-                      borderRadius: 8,
+                      borderRadius: 12,
                       fontWeight: 700,
                       color: RENK.kirmizi,
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      fontSize: "14px"
+                      fontSize: "15px",
+                      transition: "all 0.2s"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = "translateX(4px)";
+                      e.currentTarget.style.boxShadow = "0 4px 8px rgba(192, 57, 43, 0.2)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = "translateX(0)";
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   >
-                    <span style={{ maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <span style={{ 
+                      maxWidth: "65%", 
+                      overflow: "hidden", 
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }}>
                       {g.aciklama}
                     </span>
-                    <span>{formatTL(g.tutar)}</span>
+                    <span style={{ fontWeight: 800 }}>{formatTL(g.tutar)}</span>
                   </div>
-                ))
-              )}
-              
-              {dashboard.gunlukGiderler.length > 0 && (
+                ))}
+                
                 <div
                   key="gider-total"
                   style={{
-                    padding: "10px",
-                    marginTop: 8,
-                    background: "#e74c3c",
-                    borderRadius: 8,
+                    padding: "14px",
+                    marginTop: 15,
+                    background: "linear-gradient(135deg, #e74c3c, #c0392b)",
+                    borderRadius: 12,
                     fontWeight: 900,
                     color: "white",
                     textAlign: "center",
-                    fontSize: "14px"
+                    fontSize: "16px",
+                    boxShadow: "0 4px 12px rgba(192, 57, 43, 0.3)"
                   }}
                 >
                   TOPLAM GİDER: {formatTL(dashboard.gunlukGider)}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>
