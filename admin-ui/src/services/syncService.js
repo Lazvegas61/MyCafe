@@ -15,6 +15,16 @@ const GUN_SONU_KASA_KEY = "mc_gun_sonu_kasa";
 const BILARDO_ADISYON_KEY = "bilardo_adisyonlar";  // DÜZELTİLDİ: ADISYON -> ADISYON
 const BILARDO_MASALAR_KEY = "bilardo";
 
+/**
+ * SYNC MODE
+ * ----------------------------------
+ * LOCAL : Otomatik senkron / kontrol KAPALI
+ * FULL  : Backend + otomatik tutarlılık AÇIK
+ *
+ * DEMO BİTTİ -> FULL yapılacak
+ */
+export const SYNC_MODE = "LOCAL"; // ⚠️ ŞU AN LOCAL
+
 // SYNC EVENTS - STANDARTLAŞTIRILDI
 const SYNC_EVENTS = {
   // Masa ve Adisyon Event'leri
@@ -216,7 +226,7 @@ const syncService = {
     // Event yayınla
     syncService.emitEvent(SYNC_EVENTS.ODEME_ALINDI, yeniHareket);
     syncService.emitEvent(SYNC_EVENTS.KASA_HAREKETI_EKLENDI, yeniHareket);
-    syncService.emitEvent(SYNC_EVENTS.BORC_TAHSILATI_YAPILDI, yeniHareket);
+    syncService.emitEvent(SYNC_EVENTS.BORC_TAHSILATI_YAPILDI, tahsilatData);
     
     console.log('✅ SYNC: Borç tahsilatı kaydedildi', yeniHareket.id);
     return yeniHareket;
@@ -870,6 +880,12 @@ const syncService = {
   // SENKRONİZASYON İŞLEMLERİ
   // --------------------------------------------------
   senkronizeMasalar: () => {
+    // 🔒 LOCAL MODE: otomatik kontrol kapalı
+    if (SYNC_MODE === "LOCAL") {
+      console.log('🔒 SYNC: LOCAL modda - otomatik senkronizasyon pasif');
+      return;
+    }
+
     console.log('🔄 SYNC: Tüm masalar senkronize ediliyor...');
     
     try {
@@ -1018,7 +1034,7 @@ const syncService = {
       localStorageService = window.localStorageService;
       console.log('✅ SYNC: localStorageService bağlandı:', !!localStorageService);
     } else {
-console.log('ℹ️ SYNC: localStorageService henüz hazır değil (ilk yükleme)');
+      console.log('ℹ️ SYNC: localStorageService henüz hazır değil (ilk yükleme)');
     }
     
     // LocalStorage key'lerini kontrol et, yoksa oluştur
@@ -1038,8 +1054,8 @@ console.log('ℹ️ SYNC: localStorageService henüz hazır değil (ilk yükleme
       }
     });
     
-    // Global event listener'ları kur
-    if (typeof window !== 'undefined') {
+    // Global event listener'ları kur (SADECE FULL modda)
+    if (typeof window !== 'undefined' && SYNC_MODE === "FULL") {
       window.addEventListener('storage', (event) => {
         if (event.key && event.key.startsWith('mc_')) {
           console.log('💾 SYNC: Storage değişti:', event.key);
@@ -1048,7 +1064,6 @@ console.log('ℹ️ SYNC: localStorageService henüz hazır değil (ilk yükleme
           clearTimeout(window.syncDebounce);
           window.syncDebounce = setTimeout(() => {
             syncService.senkronizeMasalar();
-            console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (init)");
           }, 500);
         }
       });
@@ -1057,7 +1072,6 @@ console.log('ℹ️ SYNC: localStorageService henüz hazır değil (ilk yükleme
     // İlk senkronizasyonu yap (1 saniye sonra)
     setTimeout(() => {
       syncService.senkronizeMasalar();
-      console.warn("[DEPRECATED] dashboardGuncelle çağrısı kilitli (init)");
       console.log('✅ SYNC: İlk senkronizasyon tamamlandı');
     }, 1000);
     

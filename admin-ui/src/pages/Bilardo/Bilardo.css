@@ -1,175 +1,442 @@
-/* ------------------------------------------------------------
-   📌 Bilardo.css — MODERN V13 (Premium Design)
-   - Görseldeki tasarıma göre modernleştirildi
-   - Masaya Aktar butonu güncellendi
-   - Çift tıklama efekti eklendi
-   - Toplam tutar gösterimi eklendi
-   - Responsive iyileştirmeler
-------------------------------------------------------------- */
+/* admin-ui/src/pages/Bilardo/Bilardo.css - GÖRSELE UYGUN TASARIM */
 
 /* ------------------------------------------------------------
-   📌 ANA CONTAINER
+   📌 GENEL STİLLER
 ------------------------------------------------------------- */
 .bilardo-container {
-  padding: 25px;
-  background: linear-gradient(135deg, #f9f3e9 0%, #f3e4d6 100%);
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f5f0 0%, #f0ebe4 100%);
   min-height: 100vh;
-  font-family: 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* ------------------------------------------------------------
-   📌 MODERN BAŞLIK ALANI
+   📌 HEADER ALANI
 ------------------------------------------------------------- */
 .bilardo-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 3px solid rgba(210, 178, 149, 0.3);
+  border-bottom: 2px solid #e0d6c8;
 }
 
 .bilardo-title-section {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
 }
 
 .bilardo-title {
-  font-size: 38px;
-  font-weight: 900;
+  font-size: 32px;
+  font-weight: 700;
   color: #5a3921;
-  letter-spacing: -0.5px;
   margin: 0;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-  background: linear-gradient(135deg, #8B4513 0%, #D4AF37 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-/* BİLARDO İKONU STİLİ */
 .bilardo-main-icon {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   background: linear-gradient(135deg, #4A3722, #8B4513);
-  border-radius: 15px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 20px rgba(74, 55, 34, 0.3);
+  box-shadow: 0 4px 12px rgba(74, 55, 34, 0.2);
   border: 2px solid #D4AF37;
 }
 
-/* ------------------------------------------------------------
-   📌 AKTİON BUTONLARI
-------------------------------------------------------------- */
+/* AKTİON BUTONLARI */
 .bilardo-actions {
   display: flex;
   align-items: center;
   gap: 15px;
-  flex-wrap: wrap;
 }
 
 .bilardo-silme-alani {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 10px 18px;
-  border-radius: 15px;
+  gap: 8px;
+  background: white;
+  padding: 8px 15px;
+  border-radius: 10px;
   border: 2px solid #d2b295;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .bilardo-silme-alani label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #5d4037;
 }
 
 .bilardo-silme-input {
-  width: 65px;
-  padding: 8px 12px;
-  border-radius: 10px;
+  width: 60px;
+  padding: 6px 10px;
+  border-radius: 8px;
   border: 2px solid #c79a63;
   outline: none;
-  font-size: 15px;
+  font-size: 14px;
   text-align: center;
   font-weight: 700;
-  background: white;
-  transition: all 0.3s;
-}
-
-.bilardo-silme-input:focus {
-  border-color: #8B4513;
-  box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
 }
 
 .bilardo-silme-btn {
-  padding: 8px 18px;
-  border-radius: 10px;
+  padding: 6px 15px;
+  border-radius: 8px;
   border: none;
-  cursor: pointer;
   background: linear-gradient(135deg, #e74c3c, #c0392b);
   color: white;
-  font-weight: 800;
-  font-size: 14px;
-  transition: all 0.3s;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-
-.bilardo-silme-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(231, 76, 60, 0.3);
-}
-
-.bilardo-ayarlar-btn, .masa-btn-ekle {
-  padding: 12px 24px;
-  border-radius: 12px;
-  border: none;
-  font-weight: 800;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 13px;
   cursor: pointer;
-  transition: all 0.3s;
+}
+
+.bilardo-ayarlar-btn,
+.masa-btn-ekle {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
-  letter-spacing: 0.5px;
+  gap: 8px;
 }
 
 .bilardo-ayarlar-btn {
   background: linear-gradient(135deg, #8B7355, #6a543c);
   color: white;
-  border: 2px solid #A89070;
-}
-
-.bilardo-ayarlar-btn:hover {
-  background: linear-gradient(135deg, #6a543c, #5a452f);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(139, 115, 85, 0.3);
 }
 
 .masa-btn-ekle {
   background: linear-gradient(135deg, #c79a63, #b18452);
   color: white;
-  border: 2px solid #d4af37;
-}
-
-.masa-btn-ekle:hover {
-  background: linear-gradient(135deg, #b18452, #9e713f);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(199, 154, 99, 0.3);
 }
 
 /* ------------------------------------------------------------
-   📌 ÜCRET BİLGİSİ BANNER (MODERN)
+   📌 MASA KARTLARI - GÖRSELE UYGUN
 ------------------------------------------------------------- */
+.bilardo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.bilardo-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  border: 2px solid #e8d8c3;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bilardo-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.12);
+  border-color: #c79a63;
+}
+
+.bilardo-card.acik {
+  border-color: #4CAF50;
+  background: linear-gradient(145deg, #ffffff, #f8fdf8);
+}
+
+.bilardo-card.kapali {
+  opacity: 0.9;
+  border-color: #ddd;
+}
+
+/* KART ÜST BÖLÜMÜ */
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.masa-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.masa-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #4A3722, #8B4513);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #D4AF37;
+}
+
+.masa-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: #5a3921;
+  margin: 0;
+}
+
+.masa-status {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4CAF50;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.masa-status.kapali {
+  color: #c62828;
+}
+
+.masa-status.acik::before {
+  content: '●';
+  color: #4CAF50;
+  font-size: 16px;
+}
+
+.masa-status.kapali::before {
+  content: '○';
+  color: #c62828;
+  font-size: 16px;
+}
+
+.detay-btn {
+  background: linear-gradient(135deg, #4a6fa5, #3a5a8c);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.detay-btn:hover {
+  background: linear-gradient(135deg, #3a5a8c, #2b497a);
+  transform: translateY(-2px);
+}
+
+/* SÜRE GÖSTERİMİ - Görseldeki gibi */
+.sure-display {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.sure-value {
+  font-size: 28px;
+  font-weight: 900;
+  color: #704a25;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 5px;
+}
+
+.dakika-ucret {
+  font-size: 14px;
+  color: #8B7355;
+  font-weight: 600;
+}
+
+/* EK BİLGİLER */
+.masa-details {
+  margin-top: 10px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #5d4037;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f0e6d6;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.detail-label {
+  font-weight: 600;
+}
+
+.detail-value {
+  font-weight: 700;
+}
+
+/* UZATMA ETİKETİ */
+.uzatma-label {
+  font-size: 12px;
+  text-align: center;
+  padding: 6px;
+  border-radius: 6px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.uzatma-label.aktif {
+  color: #ef6c00;
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+}
+
+.uzatma-label.tamamlandi {
+  color: #2e7d32;
+  background: #e8f5e9;
+  border: 1px solid #81c784;
+}
+
+/* BUTON GRUBU */
+.button-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.button-group-full {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* BUTON STİLLERİ */
+.btn-30dk {
+  background: linear-gradient(135deg, #4CAF50, #2E7D32);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.btn-30dk:hover {
+  background: linear-gradient(135deg, #2E7D32, #1B5E20);
+  transform: translateY(-2px);
+}
+
+.btn-1saat {
+  background: linear-gradient(135deg, #2196F3, #0D47A1);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.btn-1saat:hover {
+  background: linear-gradient(135deg, #0D47A1, #0A3A7A);
+  transform: translateY(-2px);
+}
+
+.btn-uzat {
+  background: linear-gradient(135deg, #FF9800, #EF6C00);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-uzat:hover {
+  background: linear-gradient(135deg, #EF6C00, #E65100);
+  transform: translateY(-2px);
+}
+
+.btn-uzat-aktif {
+  background: linear-gradient(135deg, #FF9800, #EF6C00);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0.8;
+  cursor: default;
+}
+
+.btn-odeme {
+  background: linear-gradient(135deg, #4CAF50, #2E7D32);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-odeme:hover {
+  background: linear-gradient(135deg, #2E7D32, #1B5E20);
+  transform: translateY(-2px);
+}
+
+.btn-aktar {
+  background: linear-gradient(135deg, #2196F3, #0D47A1);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  grid-column: 1 / span 2;
+}
+
+.btn-aktar:hover {
+  background: linear-gradient(135deg, #0D47A1, #0A3A7A);
+  transform: translateY(-2px);
+}
+
+/* ------------------------------------------------------------
+   📌 DASHBOARD VE ÜCRET BANNER
+------------------------------------------------------------- */
+.bilardo-mini-dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin: 25px 0;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(255, 248, 240, 0.95), rgba(255, 243, 230, 0.95));
+  border-radius: 18px;
+  border: 2px solid #d2b295;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
 .bilardo-ucret-banner {
-  margin: 25px 0 35px;
+  margin: 25px 0;
   padding: 20px;
   background: linear-gradient(135deg, rgba(255, 248, 240, 0.95), rgba(255, 243, 230, 0.95));
   border-radius: 18px;
@@ -181,7 +448,6 @@
   font-size: 16px;
   color: #5d4037;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
 }
 
 .bilardo-ucret-item {
@@ -194,385 +460,17 @@
   border-radius: 12px;
   border: 1px solid #e8d8c3;
   min-width: 180px;
-  transition: all 0.3s;
-}
-
-.bilardo-ucret-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-}
-
-.bilardo-ucret-item span {
-  font-size: 15px;
-  color: #8B7355;
-  font-weight: 600;
 }
 
 .bilardo-ucret-item strong {
   font-size: 24px;
   color: #704a25;
   font-weight: 900;
-  letter-spacing: -0.5px;
-}
-
-.bilardo-ucret-item small {
-  font-size: 13px;
-  color: #a0866b;
-  text-align: center;
-}
-
-/* ------------------------------------------------------------
-   📌 MODERN MASA GRID
-------------------------------------------------------------- */
-.bilardo-grid {
-  margin-top: 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 25px;
-}
-
-/* ------------------------------------------------------------
-   📌 MODERN BİLARDO KARTI (Görseldeki gibi)
-------------------------------------------------------------- */
-.bilardo-card {
-  background: linear-gradient(145deg, #ffffff, #f8f3e9);
-  border-radius: 22px;
-  padding: 25px;
-  border: 3px solid #e8d8c3;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.bilardo-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background: linear-gradient(90deg, #D4AF37, #8B4513);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.bilardo-card.acik::before {
-  opacity: 1;
-}
-
-.bilardo-card:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  border-color: #c79a63;
-}
-
-.bilardo-card.acik {
-  border-color: #2ecc71;
-  background: linear-gradient(145deg, #ffffff, #f0f8f0);
-  box-shadow: 0 15px 35px rgba(46, 204, 113, 0.15);
-}
-
-.bilardo-card.kapali {
-  opacity: 0.85;
-  border-color: #ddd;
-  background: linear-gradient(145deg, #f8f8f8, #f0f0f0);
-}
-
-/* ÇİFT TIKLAMA HİNT */
-.bilardo-card::after {
-  content: 'Çift tıkla → Adisyona git';
-  position: absolute;
-  top: 10px;
-  right: -100px;
-  background: rgba(139, 69, 19, 0.9);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0;
-  transition: all 0.3s;
-  white-space: nowrap;
-}
-
-.bilardo-card:hover::after {
-  right: 10px;
-  opacity: 1;
-}
-
-/* KART BAŞLIĞI */
-.bilardo-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid rgba(210, 178, 149, 0.3);
-}
-
-.bilardo-card-icon-title {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.bilardo-card-icon {
-  width: 50px;
-  height: 50px;
-  background: linear-gradient(135deg, #4A3722, #8B4513);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 15px rgba(74, 55, 34, 0.2);
-  border: 2px solid #D4AF37;
-}
-
-.bilardo-card-name {
-  font-size: 28px;
-  font-weight: 900;
-  color: #5a3921;
-  letter-spacing: -0.5px;
-}
-
-.bilardo-card-durum {
-  padding: 8px 18px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border: 2px solid;
-}
-
-.bilardo-card-durum.acik {
-  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
-  color: #2e7d32;
-  border-color: #4caf50;
-}
-
-.bilardo-card-durum.kapali {
-  background: linear-gradient(135deg, #ffebee, #ffcdd2);
-  color: #c62828;
-  border-color: #ef5350;
-}
-
-/* TAHMİNİ ÜCRET ALANI (Görseldeki gibi) */
-.bilardo-card-ucret {
-  text-align: center;
-  margin: 20px 0;
-  padding: 20px;
-  background: linear-gradient(135deg, #f5e8d0, #f0dfc2);
-  border-radius: 16px;
-  border: 2px dashed #c89d72;
-  position: relative;
-  overflow: hidden;
-}
-
-.bilardo-card-ucret::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.3) 50%, transparent 60%);
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.bilardo-card-ucret .aciklama {
-  font-size: 15px;
-  color: #8B7355;
-  margin-bottom: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.bilardo-card-ucret .tutar {
-  font-size: 36px;
-  font-weight: 900;
-  color: #704a25;
-  letter-spacing: -1px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* TOPLAM TUTAR (Ek ürünlerle birlikte) */
-.bilardo-toplam-tutar {
-  margin: 15px 0;
-  padding: 12px;
-  background: linear-gradient(135deg, #e8f5e9, #d4edda);
-  border-radius: 12px;
-  border: 2px solid #4caf50;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 700;
-  color: #2e7d32;
-}
-
-.bilardo-toplam-tutar span:first-child {
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.bilardo-toplam-tutar span:last-child {
-  font-size: 20px;
-  font-weight: 900;
-}
-
-/* SÜRE SEÇİM BUTONLARI */
-.bilardo-sure-secim {
-  margin: 25px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.bilardo-sure-btn {
-  padding: 18px;
-  border-radius: 14px;
-  border: none;
-  background: linear-gradient(135deg, #c89d72, #b6895f);
-  color: white;
-  font-weight: 800;
-  font-size: 17px;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: 0 6px 15px rgba(200, 157, 114, 0.3);
-}
-
-.bilardo-sure-btn:hover {
-  background: linear-gradient(135deg, #b6895f, #a5784e);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 20px rgba(200, 157, 114, 0.4);
-}
-
-.bilardo-sure-btn span:last-child {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 900;
-}
-
-/* AÇIK MASA BİLGİLERİ (Görseldeki gibi düzen) */
-.bilardo-acik-masa-bilgi {
-  margin: 25px 0;
-  padding: 20px;
-  background: linear-gradient(135deg, #f8f3e9, #f0e6d6);
-  border-radius: 16px;
-  border: 2px solid #e0d5c3;
-}
-
-.bilardo-bilgi-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 15px;
-  font-size: 16px;
-  color: #5d4037;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(210, 178, 149, 0.2);
-}
-
-.bilardo-bilgi-item:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-}
-
-.bilardo-bilgi-item span:first-child {
-  font-weight: 600;
-  color: #8B7355;
-  text-transform: uppercase;
-  font-size: 14px;
-  letter-spacing: 0.5px;
-}
-
-.bilardo-bilgi-item strong {
-  color: #704a25;
-  font-weight: 800;
-  font-size: 17px;
-}
-
-/* ÜCRET AÇIKLAMASI */
-.bilardo-ucret-aciklama {
-  margin-top: 15px;
-  padding: 15px;
-  background: rgba(139, 115, 85, 0.1);
-  border-radius: 12px;
-  font-size: 14px;
-  color: #8B7355;
-  line-height: 1.6;
-  border-left: 4px solid #c79a63;
-}
-
-/* AKTARIM BUTONLARI (GUNCELLENDI: Masaya Aktar) */
-.bilardo-aktarim-buttons {
-  display: flex;
-  gap: 12px;
-  margin-top: 25px;
-}
-
-.bilardo-oyun-bitir-btn,
-.bilardo-masa-aktar-btn {
-  flex: 1;
-  padding: 16px;
-  border-radius: 14px;
-  border: none;
-  font-weight: 800;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.3s;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.bilardo-oyun-bitir-btn {
-  background: linear-gradient(135deg, #9a3e3e, #7f3131);
-  color: white;
-  box-shadow: 0 6px 15px rgba(154, 62, 62, 0.3);
-}
-
-.bilardo-oyun-bitir-btn:hover {
-  background: linear-gradient(135deg, #7f3131, #6a2828);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 20px rgba(154, 62, 62, 0.4);
-}
-
-.bilardo-masa-aktar-btn {
-  background: linear-gradient(135deg, #4a6fa5, #3a5a8c);
-  color: white;
-  box-shadow: 0 6px 15px rgba(74, 111, 165, 0.3);
-}
-
-.bilardo-masa-aktar-btn:hover {
-  background: linear-gradient(135deg, #3a5a8c, #2b497a);
-  transform: translateY(-3px);
-  box-shadow: 0 10px 20px rgba(74, 111, 165, 0.4);
 }
 
 /* ------------------------------------------------------------
    📌 POPUP ve MODAL STİLLERİ
 ------------------------------------------------------------- */
-/* (Önceki popup stilleri korundu, modernleştirildi) */
 .bilardo-popup-overlay {
   position: fixed;
   top: 0;
@@ -584,183 +482,24 @@
   justify-content: center;
   align-items: center;
   z-index: 9999;
-  backdrop-filter: blur(5px);
 }
 
 .bilardo-popup {
-  background: linear-gradient(145deg, #ffffff, #f8f3e9);
-  padding: 35px;
-  border-radius: 24px;
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
   width: 90%;
   max-width: 550px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-  animation: popupSlide 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  border: 3px solid #d2b295;
-}
-
-@keyframes popupSlide {
-  from {
-    opacity: 0;
-    transform: translateY(-30px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  border: 2px solid #d2b295;
 }
 
 .bilardo-popup-title {
   color: #5a3921;
-  margin-bottom: 25px;
+  margin-bottom: 20px;
   text-align: center;
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #8B4513 0%, #D4AF37 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.bilardo-masa-listesi {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-  margin: 25px 0;
-  max-height: 350px;
-  overflow-y: auto;
-  padding: 15px;
-  background: rgba(210, 178, 149, 0.1);
-  border-radius: 16px;
-  border: 2px solid #e8d8c3;
-}
-
-.bilardo-masa-secim-btn {
-  padding: 18px;
-  border: 3px solid #d2b295;
-  background: white;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s;
+  font-size: 24px;
   font-weight: 800;
-  color: #5d4037;
-  font-size: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.bilardo-masa-secim-btn:hover {
-  background: #f5e8d0;
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-}
-
-.bilardo-masa-secim-btn.secili {
-  background: linear-gradient(135deg, #c79a63, #b18452);
-  color: white;
-  border-color: #c79a63;
-  box-shadow: 0 8px 20px rgba(199, 154, 99, 0.3);
-}
-
-.bilardo-modal-actions {
-  display: flex;
-  gap: 15px;
-  margin-top: 30px;
-}
-
-.bilardo-modal-btn {
-  flex: 1;
-  padding: 16px;
-  border: none;
-  border-radius: 14px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.bilardo-modal-btn.iptal {
-  background: linear-gradient(135deg, #f0f0f0, #e0e0e0);
-  color: #5d4037;
-  border: 2px solid #d2b295;
-}
-
-.bilardo-modal-btn.iptal:hover {
-  background: linear-gradient(135deg, #e0e0e0, #d0d0d0);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-}
-
-.bilardo-modal-btn.onay {
-  background: linear-gradient(135deg, #4a6fa5, #3a5a8c);
-  color: white;
-  border: 2px solid #5a7fb5;
-}
-
-.bilardo-modal-btn.onay:hover {
-  background: linear-gradient(135deg, #3a5a8c, #2b497a);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(74, 111, 165, 0.3);
-}
-
-/* ------------------------------------------------------------
-   📌 SÜRE BİTTİ POPUP (MODERN)
-------------------------------------------------------------- */
-.bilardo-sure-bitti-popup {
-  position: fixed;
-  top: 25px;
-  right: 25px;
-  background: linear-gradient(135deg, #c62828, #b71c1c);
-  color: white;
-  padding: 22px 28px;
-  border-radius: 16px;
-  z-index: 10000;
-  cursor: pointer;
-  box-shadow: 0 15px 35px rgba(198, 40, 40, 0.4);
-  animation: popupPulse 1.5s infinite, slideIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  max-width: 380px;
-  transition: all 0.3s;
-  border: 2px solid #ff5252;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(100px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.bilardo-sure-bitti-popup:hover {
-  transform: translateX(-5px) scale(1.05);
-  box-shadow: 0 20px 40px rgba(198, 40, 40, 0.5);
-}
-
-.bilardo-popup-baslik {
-  font-weight: 900;
-  font-size: 20px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  letter-spacing: 0.5px;
-}
-
-.bilardo-popup-mesaj {
-  font-size: 15px;
-  margin-bottom: 8px;
-  line-height: 1.5;
-}
-
-.bilardo-popup-not {
-  font-size: 13px;
-  opacity: 0.9;
-  margin-top: 10px;
-  font-style: italic;
 }
 
 /* ------------------------------------------------------------
@@ -768,24 +507,37 @@
 ------------------------------------------------------------- */
 @media (max-width: 1200px) {
   .bilardo-grid {
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  
+  .bilardo-mini-dashboard {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 992px) {
+@media (max-width: 768px) {
   .bilardo-header {
     flex-direction: column;
     align-items: stretch;
-    gap: 25px;
+    gap: 15px;
   }
   
   .bilardo-actions {
     justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .bilardo-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .bilardo-mini-dashboard {
+    grid-template-columns: 1fr;
   }
   
   .bilardo-ucret-banner {
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
   }
   
   .bilardo-ucret-item {
@@ -793,312 +545,75 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 480px) {
   .bilardo-container {
     padding: 15px;
   }
   
   .bilardo-title {
-    font-size: 32px;
-  }
-  
-  .bilardo-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  
-  .bilardo-card {
-    padding: 20px;
-  }
-  
-  .bilardo-card-name {
     font-size: 24px;
   }
   
-  .bilardo-aktarim-buttons {
-    flex-direction: column;
-  }
-  
-  .bilardo-popup {
-    padding: 25px;
-    margin: 15px;
-  }
-}
-
-@media (max-width: 480px) {
-  .bilardo-title {
-    font-size: 28px;
-  }
-  
-  .bilardo-main-icon {
-    width: 50px;
-    height: 50px;
-  }
-  
-  .bilardo-card-ucret .tutar {
-    font-size: 30px;
-  }
-  
-  .bilardo-sure-btn {
-    padding: 15px;
-    font-size: 15px;
-  }
-  
-  .bilardo-masa-listesi {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* Ürün tablosu için ek stil */
-.bilardo-urun-tablosu {
-  margin-top: 20px;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-.bilardo-urun-baslik {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  background: #f5e8d0;
-  padding: 12px 15px;
-  font-weight: 800;
-  color: #5a3921;
-  border-bottom: 2px solid #d2b295;
-}
-
-.bilardo-urun-liste {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-/* Responsive düzenleme */
-@media (max-width: 1200px) {
-  .bilardo-adisyon-container > div:first-child {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .bilardo-adisyon-container > div:first-child {
+  .button-group {
     grid-template-columns: 1fr;
   }
-}
-
-/* Bilardo.css dosyasının sonuna ekleyin: */
-
-/* Ürün tablosu için ek stil */
-.bilardo-urun-tablosu {
-  margin-top: 20px;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-.bilardo-urun-baslik {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  background: #f5e8d0;
-  padding: 12px 15px;
-  font-weight: 800;
-  color: #5a3921;
-  border-bottom: 2px solid #d2b295;
-}
-
-.bilardo-urun-liste {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-/* Responsive düzenleme */
-@media (max-width: 1200px) {
-  .bilardo-adisyon-container > div:first-child {
-    grid-template-columns: repeat(2, 1fr);
+  
+  .btn-aktar {
+    grid-column: 1;
   }
 }
+/* Bilardo.css dosyasına ekleyin */
 
-@media (max-width: 768px) {
-  .bilardo-adisyon-container > div:first-child {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* BUTON TIKLAMA DAVRANIŞI İYİLEŞTİRMESİ */
-.bilardo-aktarim-buttons button,
-.bilardo-sure-btn {
-  position: relative;
-  z-index: 10;
-}
-
-/* Butonlara tıklanabilir görünüm */
-.bilardo-aktarim-buttons button:active {
-  transform: translateY(1px) !important;
-}
-
-/* Kart içindeki butonların tıklama alanını genişlet */
-.bilardo-sure-secim,
-.bilardo-aktarim-buttons {
-  position: relative;
-  z-index: 5;
-}
-
-/* ------------------------------------------------------------
-   📌 BİLARDO MINI DASHBOARD
-------------------------------------------------------------- */
-.bilardo-mini-dashboard {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin: 25px 0 35px;
-  padding: 20px;
-  background: linear-gradient(135deg, rgba(255, 248, 240, 0.95), rgba(255, 243, 230, 0.95));
-  border-radius: 18px;
-  border: 2px solid #d2b295;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-}
-
-.dashboard-card {
-  background: white;
-  border-radius: 16px;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  border: 2px solid #e8d8c3;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  cursor: default;
-  position: relative;
-  overflow: hidden;
-}
-
-.dashboard-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.ciro-card::before {
-  background: linear-gradient(90deg, #4CAF50, #8BC34A);
-}
-.masa-card::before {
-  background: linear-gradient(90deg, #2196F3, #03A9F4);
-}
-.sure-card::before {
-  background: linear-gradient(90deg, #FF9800, #FFB74D);
-}
-.ortalama-card::before {
-  background: linear-gradient(90deg, #9C27B0, #BA68C8);
-}
-
-.dashboard-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
-}
-
-.dashboard-card:hover::before {
-  opacity: 1;
-}
-
-.dashboard-card-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f5e8d0, #f0dfc2);
-  border-radius: 12px;
-  border: 2px solid #d2b295;
-  flex-shrink: 0;
-}
-
-.dashboard-card-content {
-  flex: 1;
-}
-
-.dashboard-card-value {
-  font-size: 28px;
-  font-weight: 900;
-  color: #5a3921;
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dashboard-card-value.digital-clock {
-  font-family: 'Courier New', monospace;
-  font-size: 24px;
-  color: #FF9800;
-  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: inline-block;
-  border: 1px solid #ffcc80;
-}
-
-.dashboard-card-label {
-  font-size: 14px;
+/* Süresiz butonu */
+.btn-suresiz {
+  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
   font-weight: 700;
-  color: #8B7355;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 2px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  line-height: 1.3;
 }
 
-.dashboard-card-subtext {
-  font-size: 12px;
-  color: #a0866b;
-  opacity: 0.9;
+.btn-suresiz:hover {
+  background: linear-gradient(135deg, #7B1FA2, #6A1B9A);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
 }
 
-/* Responsive tasarım */
-@media (max-width: 1200px) {
-  .bilardo-mini-dashboard {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* Uzatma aktif butonu */
+.btn-uzat-aktif {
+  background: linear-gradient(135deg, #FF9800, #EF6C00);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0.8;
+  cursor: default;
 }
 
-@media (max-width: 768px) {
-  .bilardo-mini-dashboard {
-    grid-template-columns: 1fr;
-    gap: 15px;
-    padding: 15px;
-  }
-  
-  .dashboard-card {
-    padding: 15px;
-  }
-  
-  .dashboard-card-value {
-    font-size: 24px;
-  }
-  
-  .dashboard-card-value.digital-clock {
-    font-size: 20px;
-  }
+/* 3 butonlu grid */
+.button-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 15px;
 }
 
-@media (max-width: 480px) {
-  .dashboard-card {
-    flex-direction: column;
-    text-align: center;
-    gap: 12px;
-  }
-  
-  .dashboard-card-icon {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .dashboard-card-icon svg {
-    width: 20px;
-    height: 20px;
-  }
+.button-group[style*="gridTemplateColumns: repeat(3, 1fr)"] {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+
+/* Tam genişlik buton grubu */
+.button-group-full {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 15px;
 }

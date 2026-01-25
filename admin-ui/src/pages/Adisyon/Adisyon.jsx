@@ -1789,14 +1789,114 @@ const adisyonKapat = () => {
     );
     const toplamTutarMevcut = yeniToplam + eskiToplam;
 
-    // Eğer adisyonda hiç ürün yoksa ve toplam tutar 0 ise, kalan kontrolünü atla
-    const toplamKalemSayisi = (adisyon?.kalemler || []).length + 
-        splitAdisyonlar.reduce((sum, split) => sum + (split?.kalemler || []).length, 0);
-    
+    // Eğer adisyonda hiç ürün yoksa ve toplam tutar 0 ise
+    // kalan kontrolünü ve finans akışını tamamen atla
+    const toplamKalemSayisi =
+        (adisyon?.kalemler || []).length +
+        splitAdisyonlar.reduce(
+            (sum, split) => sum + (split?.kalemler || []).length,
+            0
+        );
+
     if (toplamKalemSayisi === 0 && toplamTutarMevcut === 0) {
-        console.log('ℹ️ Adisyonda ürün yok, toplam tutar 0 TL - Boş masa kapatılıyor');
-        // Boş masa kapatma işlemi
-    } else if (kalan > 0.01) {
+        console.log("ℹ️ Adisyonda ürün yok, toplam tutar 0 TL - Boş masa kapatılıyor");
+
+        // 🔑 BOŞ MASA KAPATMA İŞLEMLERİ - Direkt burada yap
+        // 1. Adisyonu kapat
+        const updatedAdisyonlar = okuJSON(ADISYON_KEY, []);
+        const adisyonIndex = updatedAdisyonlar.findIndex(a => a.id === adisyon.id);
+        
+        if (adisyonIndex !== -1) {
+            updatedAdisyonlar[adisyonIndex] = {
+                ...adisyon,
+                kapali: true,
+                status: "CLOSED",
+                durum: "KAPALI",
+                kapanisZamani: new Date().toISOString(),
+                toplamTutar: "0.00",
+                kapatmaPersoneli: user?.adSoyad || user?.username,
+                finansKayitlariOlusturuldu: false // Finans kaydı oluşturulmadı
+            };
+            yazJSON(ADISYON_KEY, updatedAdisyonlar);
+            setAdisyon(updatedAdisyonlar[adisyonIndex]);
+        }
+        
+        // Split adisyonları da kapat
+        splitAdisyonlar.forEach(split => {
+            const splitIndex = updatedAdisyonlar.findIndex(a => a.id === split.id);
+            if (splitIndex !== -1) {
+                updatedAdisyonlar[splitIndex] = {
+                    ...split,
+                    kapali: true,
+                    kapanisZamani: new Date().toISOString(),
+                    durum: "KAPALI",
+                    kapatmaPersoneli: user?.adSoyad || user?.username
+                };
+            }
+        });
+        yazJSON(ADISYON_KEY, updatedAdisyonlar);
+
+        // 2. Masayı boşalt
+        const masalar = okuJSON(MASA_KEY, []);
+        let masaIdx = -1;
+
+        if (isBilardo) {
+            masaIdx = masalar.findIndex(m =>
+                m.no === gercekMasaNo ||
+                m.masaNo?.toUpperCase().includes("BİLARDO") ||
+                m.masaNo?.toUpperCase().startsWith("B") ||
+                m.masaNum?.toUpperCase().includes("B")
+            );
+        } else {
+            const masaNoNum = Number(gercekMasaNo);
+            masaIdx = masalar.findIndex(m => Number(m.no) === masaNoNum);
+        }
+
+        if (masaIdx !== -1) {
+            const masaAdi = isBilardo ? `BİLARDO ${gercekMasaNo}` : `MASA ${gercekMasaNo}`;
+
+            masalar[masaIdx] = {
+                ...masalar[masaIdx],
+                masaNo: masaAdi,
+                masaNum: gercekMasaNo,
+                adisyonId: null,
+                splitAdisyonIds: null,
+                splitAdisyonSayisi: 0,
+                toplamTutar: "0.00",
+                acilisZamani: null,
+                kapanisZamani: new Date().toISOString(),
+                durum: "BOŞ",
+                renk: "gri",
+                musteriAdi: null,
+                kisiSayisi: null,
+                guncellemeZamani: new Date().toISOString(),
+                isBilardo: isBilardo
+            };
+            yazJSON(MASA_KEY, masalar);
+        }
+
+        // 3. Önbellek temizliği
+        if (adisyon?.id) localStorage.removeItem(`mc_adisyon_toplam_${adisyon.id}`);
+        splitAdisyonlar.forEach(split => {
+            if (split?.id) localStorage.removeItem(`mc_adisyon_toplam_${split.id}`);
+        });
+        if (gercekMasaNo) localStorage.removeItem(`mc_masa_toplam_${gercekMasaNo}`);
+
+        // 4. Başarı mesajı
+        const masaAdi = isBilardo ? `Bilardo ${gercekMasaNo}` : `Masa ${gercekMasaNo}`;
+        setKapanisMesaji(`✅ ${masaAdi} (Boş masa) başarıyla kapatıldı!\nAnaEkran'a yönlendiriliyorsunuz...`);
+
+        // 5. Yönlendirme
+        setTimeout(() => {
+            window.dispatchEvent(new Event('adisyonGuncellendi'));
+            navigate(isBilardo ? "/bilardo" : "/ana");
+        }, 1000);
+
+        return; // ❗ ÇOK ÖNEMLİ: finans ve kalan kontrolüne GİRME
+    }
+
+    // Normal adisyonlar için kalan kontrolü
+    if (kalan > 0.01) {
         alert("Kalan tutar ödenmeden adisyon kapatılamaz.");
         return;
     }
@@ -1848,104 +1948,118 @@ const adisyonKapat = () => {
                 'odemeler:', odemeler);
 
     // ============================================================
-// 1️⃣ FİNANS HAVUZUNA KAYDET - HESABA_YAZ EKLENDİ
-// ============================================================
+    // 1️⃣ FİNANS HAVUZUNA KAYDET - HESABA_YAZ EKLENDİ (BOŞ ADİSYON KONTROLLÜ)
+    // ============================================================
 
-// FİNANS KAYITLARI OLUŞTUR (normalize edilmiş)
-const finansKayitlari = [];
+    // FİNANS KAYITLARI OLUŞTUR (normalize edilmiş)
+    const finansKayitlari = [];
 
-try {
-    // ✅ HER ÖDEME TÜRÜ İÇİN AYRI FİNANS KAYDI (HESABA_YAZ DAHİL)
-    Object.entries(odemeGruplari).forEach(([tip, grup]) => {
-        if (grup.toplam > 0) {
-            // HESABA_YAZ ÖZEL KONTROLÜ - ARTIK FİNANS HAVUZUNA KAYDEDİLECEK
-            if (tip === "HESABA_YAZ") {
-                console.log('💰 HESABA_YAZ ödemesi finans havuzuna kaydediliyor (borç takibi için)', {
-                    tip: tip,
-                    tutar: grup.toplam,
-                    masaNo: gercekMasaNo,
-                    adisyonId: adisyon.id
-                });
-                
-                // HESABA_YAZ için özel finans kaydı
-                const hesabaYazKaydi = {
-                    id: `finans_${Date.now()}_HESABA_YAZ_${Math.random().toString(36).substr(2, 9)}`,
-                    tur: "GELIR", // ✅ GELIR olarak kaydedilecek
-                    odemeTuru: "HESABA_YAZ", // ✅ Ödeme türü HESABA_YAZ
-                    tutar: grup.toplam,
-                    aciklama: `Müşteri hesabına yazıldı - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
-                    kaynak: "HESABA_YAZ", // ✅ Özel kaynak
+    // ✅ BOŞ ADİSYON KONTROLÜ: Adisyonda ürün yoksa ve toplam 0 TL ise finans kaydı oluşturma
+    const isBosAdisyon = toplamKalemSayisi === 0 && gercekToplamTutar === 0;
+
+    // Eğer adisyonda hiç ürün yoksa ve toplam tutar 0 ise finans kaydı oluşturma
+    if (isBosAdisyon) {
+        console.log('ℹ️ [FINANS][ADISYON_KAPAT] Boş adisyon (0 TL) - finans kaydı atlanıyor');
+    } else {
+        // NORMAL ADİSYON İÇİN FİNANS KAYITLARI OLUŞTUR
+        try {
+            // ✅ HER ÖDEME TÜRÜ İÇİN AYRI FİNANS KAYDI (HESABA_YAZ DAHİL)
+            Object.entries(odemeGruplari).forEach(([tip, grup]) => {
+                if (grup.toplam > 0) {
+                    // HESABA_YAZ ÖZEL KONTROLÜ - ARTIK FİNANS HAVUZUNA KAYDEDİLECEK
+                    if (tip === "HESABA_YAZ") {
+                        console.log('💰 HESABA_YAZ ödemesi finans havuzuna kaydediliyor (borç takibi için)', {
+                            tip: tip,
+                            tutar: grup.toplam,
+                            masaNo: gercekMasaNo,
+                            adisyonId: adisyon.id
+                        });
+                        
+                        // HESABA_YAZ için özel finans kaydı
+                        const hesabaYazKaydi = {
+                            id: `finans_${Date.now()}_HESABA_YAZ_${Math.random().toString(36).substr(2, 9)}`,
+                            tur: "GELIR",
+                            odemeTuru: "HESABA_YAZ",
+                            tutar: grup.toplam,
+                            aciklama: `Müşteri hesabına yazıldı - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
+                            kaynak: "HESABA_YAZ",
+                            adisyonId: adisyon.id,
+                            referansId: adisyon.id,
+                            masaId: gercekMasaNo,
+                            masaNo: gercekMasaNo,
+                            isBilardo: isBilardo,
+                            turDetay: isBilardo ? "BİLARDO" : "NORMAL",
+                            kullanici: user?.username || "ADMIN",
+                            kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
+                            musteriId: adisyon.musteriId || null,
+                            musteriAdi: adisyon.musteriAdi || null,
+                            tarih: new Date().toISOString(),
+                            gunId: new Date().toISOString().split('T')[0],
+                            borcIslemi: true,
+                            aciklamaDetay: "Bu tutar kasaya girmez, müşteri borcu olarak kaydedildi."
+                        };
+                        
+                        finansKayitlari.push(hesabaYazKaydi);
+                        console.log(`✅ HESABA_YAZ finans kaydı oluşturuldu: ${grup.toplam.toFixed(2)} TL`);
+                        return;
+                    }
+                    
+                    // DİĞER ÖDEME TÜRLERİ (NAKIT, KART, HAVALE, INDIRIM)
+                    const finansKaydi = {
+                        id: `finans_${Date.now()}_${tip}_${Math.random().toString(36).substr(2, 9)}`,
+                        tur: "GELIR",
+                        odemeTuru: tip,
+                        tutar: grup.toplam,
+                        aciklama: `${grup.aciklama} - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
+                        kaynak: "ADISYON",
+                        adisyonId: adisyon.id,
+                        masaNo: gercekMasaNo,
+                        isBilardo: isBilardo,
+                        turDetay: isBilardo ? "BİLARDO" : "NORMAL",
+                        kullanici: user?.username || "ADMIN",
+                        kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
+                        musteriId: adisyon.musteriId || null,
+                        musteriAdi: adisyon.musteriAdi || null,
+                        tarih: new Date().toISOString(),
+                        gunId: new Date().toISOString().split('T')[0]
+                    };
+                    
+                    finansKayitlari.push(finansKaydi);
+                    console.log(`✅ Finans kaydı oluşturuldu: ${tip} - ${grup.toplam.toFixed(2)} TL`);
+                }
+            });
+
+            // ✅ İNDİRİM VARSA AYRI FİNANS KAYDI
+            if (adisyon.indirim && adisyon.indirim > 0) {
+                const indirimKaydi = {
+                    id: `finans_${Date.now()}_INDIRIM_${Math.random().toString(36).substr(2, 9)}`,
+                    tur: "INDIRIM",
+                    odemeTuru: "INDIRIM",
+                    tutar: adisyon.indirim,
+                    aciklama: `İndirim - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
+                    kaynak: "ADISYON",
                     adisyonId: adisyon.id,
-                    referansId: adisyon.id,
-                    masaId: gercekMasaNo,
                     masaNo: gercekMasaNo,
                     isBilardo: isBilardo,
                     turDetay: isBilardo ? "BİLARDO" : "NORMAL",
                     kullanici: user?.username || "ADMIN",
                     kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
-                    musteriId: adisyon.musteriId || null,
-                    musteriAdi: adisyon.musteriAdi || null,
                     tarih: new Date().toISOString(),
-                    gunId: new Date().toISOString().split('T')[0],
-                    borcIslemi: true, // ✅ Borç işlemi olduğunu belirt
-                    aciklamaDetay: "Bu tutar kasaya girmez, müşteri borcu olarak kaydedildi."
+                    gunId: new Date().toISOString().split('T')[0]
                 };
                 
-                finansKayitlari.push(hesabaYazKaydi);
-                console.log(`✅ HESABA_YAZ finans kaydı oluşturuldu: ${grup.toplam.toFixed(2)} TL`);
-                return;
+                finansKayitlari.push(indirimKaydi);
+                console.log(`✅ İndirim finans kaydı oluşturuldu: ${adisyon.indirim.toFixed(2)} TL`);
             }
-            
-            // DİĞER ÖDEME TÜRLERİ (NAKIT, KART, HAVALE, INDIRIM)
-            const finansKaydi = {
-                id: `finans_${Date.now()}_${tip}_${Math.random().toString(36).substr(2, 9)}`,
-                tur: "GELIR",
-                odemeTuru: tip,
-                tutar: grup.toplam,
-                aciklama: `${grup.aciklama} - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
-                kaynak: "ADISYON",
-                adisyonId: adisyon.id,
-                masaNo: gercekMasaNo,
-                isBilardo: isBilardo,
-                turDetay: isBilardo ? "BİLARDO" : "NORMAL",
-                kullanici: user?.username || "ADMIN",
-                kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
-                musteriId: adisyon.musteriId || null,
-                musteriAdi: adisyon.musteriAdi || null,
-                tarih: new Date().toISOString(),
-                gunId: new Date().toISOString().split('T')[0]
-            };
-            
-            finansKayitlari.push(finansKaydi);
-            console.log(`✅ Finans kaydı oluşturuldu: ${tip} - ${grup.toplam.toFixed(2)} TL`);
+        } catch (error) {
+            console.error('❌ [FINANS][ADISYON_KAPAT] Finans kayıtları oluşturulurken hata:', error);
+            alert("Finans kayıtları oluşturulurken bir hata oluştu! İşlem iptal edildi.");
+            return; // HATA DURUMUNDA İŞLEMİ DURDUR
         }
-    });
-
-    // ✅ İNDİRİM VARSA AYRI FİNANS KAYDI
-    if (adisyon.indirim && adisyon.indirim > 0) {
-        const indirimKaydi = {
-            id: `finans_${Date.now()}_INDIRIM_${Math.random().toString(36).substr(2, 9)}`,
-            tur: "INDIRIM",
-            odemeTuru: "INDIRIM",
-            tutar: adisyon.indirim,
-            aciklama: `İndirim - ${isBilardo ? 'Bilardo' : 'Masa'} ${gercekMasaNo} (Adisyon: ${adisyon.id})`,
-            kaynak: "ADISYON",
-            adisyonId: adisyon.id,
-            masaNo: gercekMasaNo,
-            isBilardo: isBilardo,
-            turDetay: isBilardo ? "BİLARDO" : "NORMAL",
-            kullanici: user?.username || "ADMIN",
-            kapatmaPersoneli: user?.adSoyad || user?.username || "Bilinmiyor",
-            tarih: new Date().toISOString(),
-            gunId: new Date().toISOString().split('T')[0]
-        };
-        
-        finansKayitlari.push(indirimKaydi);
-        console.log(`✅ İndirim finans kaydı oluşturuldu: ${adisyon.indirim.toFixed(2)} TL`);
     }
 
-    // ✅ FİNANS KAYITLARINI mc_finans_havuzu'NA GÖNDER
-    if (mcFinansHavuzu && mcFinansHavuzu.finansKayitlariEkle) {
+    // ✅ FİNANS KAYITLARINI mc_finans_havuzu'NA GÖNDER (SADECE DOLU İSE)
+    if (!isBosAdisyon && finansKayitlari.length > 0 && mcFinansHavuzu && mcFinansHavuzu.finansKayitlariEkle) {
         console.log('💰 [FINANS][ADISYON_KAPAT] Finans kayıtları mc_finans_havuzu\'ya gönderiliyor:', {
             kayitSayisi: finansKayitlari.length,
             toplamTutar: gercekToplamTutar.toFixed(2),
@@ -1980,96 +2094,88 @@ try {
             
             if (hesabaYazHatasi) {
                 console.warn('⚠️ HESABA_YAZ kaydı eklenemedi, ancak diğer işlemlere devam ediliyor');
-                // İşleme devam et, sadece uyarı ver
             } else {
                 throw new Error('Finans kayıtları kaydedilemedi');
             }
         }
-    } else {
+    } else if (isBosAdisyon) {
+        console.log('ℹ️ [FINANS][ADISYON_KAPAT] Boş adisyon için finans kaydı gerekmiyor');
+    } else if (!mcFinansHavuzu || !mcFinansHavuzu.finansKayitlariEkle) {
         console.error('❌ [FINANS][ADISYON_KAPAT] mcFinansHavuzu.finansKayitlariEkle fonksiyonu bulunamadı');
-        throw new Error('Finans havuzu fonksiyonu bulunamadı');
-    }
-} catch (error) {
-    console.error('❌ [FINANS][ADISYON_KAPAT] Finans kayıtları oluşturulurken hata:', error);
-    
-    // HESABA_YAZ hatası mı kontrol et
-    if (error.message.includes('HESABA_YAZ') || error.message.includes('Reddedilen ödeme türü')) {
-        alert("HESABA_YAZ işlemi finans sistemine kaydedilemedi, ancak adisyon kapatıldı. Lütfen yöneticiye bildirin.");
-        // İşleme devam et, sadece uyarı göster
-    } else {
-        alert("Finans kayıtları oluşturulurken bir hata oluştu! İşlem iptal edildi.");
-        return; // HATA DURUMUNDA İŞLEMİ DURDUR
-    }
-}
-
-// ============================================================
-// 2️⃣ ADİSYONLARI KAPAT (Yeni ve Split Adisyonlar) - GÜNCELLENDİ
-// ============================================================
-const updatedAdisyonlar = okuJSON(ADISYON_KEY, []);
-
-// HESABA_YAZ durumunu kontrol et
-const hasHesabaYaz = Object.keys(odemeGruplari).includes("HESABA_YAZ") && 
-                     odemeGruplari["HESABA_YAZ"]?.toplam > 0;
-
-// YENİ adisyonu kapat
-let guncelYeniAdisyon = null;
-if (adisyon) {
-    const yeniIdx = updatedAdisyonlar.findIndex((a) => a.id === adisyon.id);
-    if (yeniIdx !== -1) {
-        guncelYeniAdisyon = {
-            ...adisyon,
-            kapali: true,
-            status: "CLOSED",
-            durum: "KAPALI",
-            kapanisZamani: new Date().toISOString(),
-            toplamTutar: gercekToplamTutar.toFixed(2),
-            kapatmaPersoneli: user?.adSoyad || user?.username,
-            finansKayitlariOlusturuldu: true,
-            finansKayitlari: finansKayitlari.map(k => k.id),
-            // HESABA_YAZ için özel alanlar
-            hesabaYazildi: hasHesabaYaz,
-            hesabaYazTutari: hasHesabaYaz ? odemeGruplari["HESABA_YAZ"].toplam : 0,
-            borcDurumu: hasHesabaYaz ? "BEKLEYEN" : "YOK"
-        };
-        updatedAdisyonlar[yeniIdx] = guncelYeniAdisyon;
-        setAdisyon(guncelYeniAdisyon);
-        
-        if (hasHesabaYaz) {
-            console.log(`📝 Adisyon HESABA_YAZ ile kapatıldı: ${gercekToplamTutar.toFixed(2)} TL borç kaydı oluşturuldu`);
+        // Boş adisyon için bu hata tolere edilebilir
+        if (gercekToplamTutar > 0) {
+            throw new Error('Finans havuzu fonksiyonu bulunamadı');
         }
     }
-}
 
-// ⚠️ SPLIT ADİSYONLARI FİNANS HAVUZUNA KAYDETME - ÇİFT KAYIT ÖNLENDİ
-// Split adisyonlar finans üretmez, sadece ana adisyon finans kaydı oluşturur
-splitAdisyonlar.forEach((split) => {
-    const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === split.id);
-    if (eskiIdx !== -1) {
-        const guncelEskiAdisyon = {
-            ...split,
-            kapali: true,
-            kapanisZamani: new Date().toISOString(),
-            durum: "KAPALI",
-            kapatmaPersoneli: user?.adSoyad || user?.username,
-            finansKayitlariOlusturuldu: true, // Ana adisyon tarafından oluşturuldu
-            parentFinansKayitlari: finansKayitlari.map(k => k.id) // Ana adisyonun finans kayıtlarını referans al
-        };
-        updatedAdisyonlar[eskiIdx] = guncelEskiAdisyon;
-        
-        console.log(`✅ Split adisyon kapatıldı (finans üretilmedi): ${split.id} - ${split.splitAciklama || 'Ayrılmış Hesap'}`);
+    // ============================================================
+    // 2️⃣ ADİSYONLARI KAPAT (Yeni ve Split Adisyonlar) - GÜNCELLENDİ
+    // ============================================================
+    const updatedAdisyonlar = okuJSON(ADISYON_KEY, []);
+
+    // HESABA_YAZ durumunu kontrol et
+    const hasHesabaYaz = Object.keys(odemeGruplari).includes("HESABA_YAZ") && 
+                         odemeGruplari["HESABA_YAZ"]?.toplam > 0;
+
+    // YENİ adisyonu kapat
+    let guncelYeniAdisyon = null;
+    if (adisyon) {
+        const yeniIdx = updatedAdisyonlar.findIndex((a) => a.id === adisyon.id);
+        if (yeniIdx !== -1) {
+            guncelYeniAdisyon = {
+                ...adisyon,
+                kapali: true,
+                status: "CLOSED",
+                durum: "KAPALI",
+                kapanisZamani: new Date().toISOString(),
+                toplamTutar: gercekToplamTutar.toFixed(2),
+                kapatmaPersoneli: user?.adSoyad || user?.username,
+                finansKayitlariOlusturuldu: true,
+                finansKayitlari: finansKayitlari.map(k => k.id),
+                // HESABA_YAZ için özel alanlar
+                hesabaYazildi: hasHesabaYaz,
+                hesabaYazTutari: hasHesabaYaz ? odemeGruplari["HESABA_YAZ"].toplam : 0,
+                borcDurumu: hasHesabaYaz ? "BEKLEYEN" : "YOK"
+            };
+            updatedAdisyonlar[yeniIdx] = guncelYeniAdisyon;
+            setAdisyon(guncelYeniAdisyon);
+            
+            if (hasHesabaYaz) {
+                console.log(`📝 Adisyon HESABA_YAZ ile kapatıldı: ${gercekToplamTutar.toFixed(2)} TL borç kaydı oluşturuldu`);
+            }
+        }
     }
-});
 
-// Adisyonları kaydet
-yazJSON(ADISYON_KEY, updatedAdisyonlar);
-console.log('✅ Adisyonlar kapatıldı', {
-    anaAdisyonId: adisyon?.id,
-    splitAdisyonSayisi: splitAdisyonlar.length,
-    finansKayitSayisi: finansKayitlari.length,
-    finansToplam: finansKayitlari.reduce((sum, k) => sum + k.tutar, 0).toFixed(2),
-    hesabaYazVar: hasHesabaYaz,
-    hesabaYazTutari: hasHesabaYaz ? odemeGruplari["HESABA_YAZ"].toplam.toFixed(2) : '0'
-});
+    // ⚠️ SPLIT ADİSYONLARI FİNANS HAVUZUNA KAYDETME - ÇİFT KAYIT ÖNLENDİ
+    // Split adisyonlar finans üretmez, sadece ana adisyon finans kaydı oluşturur
+    splitAdisyonlar.forEach((split) => {
+        const eskiIdx = updatedAdisyonlar.findIndex((a) => a.id === split.id);
+        if (eskiIdx !== -1) {
+            const guncelEskiAdisyon = {
+                ...split,
+                kapali: true,
+                kapanisZamani: new Date().toISOString(),
+                durum: "KAPALI",
+                kapatmaPersoneli: user?.adSoyad || user?.username,
+                finansKayitlariOlusturuldu: true, // Ana adisyon tarafından oluşturuldu
+                parentFinansKayitlari: finansKayitlari.map(k => k.id) // Ana adisyonun finans kayıtlarını referans al
+            };
+            updatedAdisyonlar[eskiIdx] = guncelEskiAdisyon;
+            
+            console.log(`✅ Split adisyon kapatıldı (finans üretilmedi): ${split.id} - ${split.splitAciklama || 'Ayrılmış Hesap'}`);
+        }
+    });
+
+    // Adisyonları kaydet
+    yazJSON(ADISYON_KEY, updatedAdisyonlar);
+    console.log('✅ Adisyonlar kapatıldı', {
+        anaAdisyonId: adisyon?.id,
+        splitAdisyonSayisi: splitAdisyonlar.length,
+        finansKayitSayisi: finansKayitlari.length,
+        finansToplam: finansKayitlari.reduce((sum, k) => sum + k.tutar, 0).toFixed(2),
+        hesabaYazVar: hasHesabaYaz,
+        hesabaYazTutari: hasHesabaYaz ? odemeGruplari["HESABA_YAZ"].toplam.toFixed(2) : '0'
+    });
 
     // ============================================================
     // 3️⃣ MASALARI BOŞALT (Sync Service ile veya Manuel)

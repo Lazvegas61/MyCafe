@@ -1,10 +1,5 @@
 /* ============================================================
-   📄 DOSYA: MusteriIslemleri.css (SON GÜNCELLEME - KDV ÇIKARILDI + SEÇİM STİLLERİ)
-   📌 AMAÇ:
-   MyCafe Premium Müşteri İşlemleri Tasarımı
-   - KDV hesaplamaları ve görünümleri tamamen çıkarıldı
-   - Sağ kolon dikey 2 bölmeli
-   - Seçili müşteri ve borç kaydı stilleri eklendi
+   📄 DOSYA: MusteriIslemleri.css (GÜNCELLENDİ - MODAL ORTALAMA DÜZELTMESİ)
 ============================================================ */
 
 .musteri-islemleri-v2 {
@@ -34,13 +29,20 @@
 /* BAŞLIK - PREMIUM */
 .page-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 20px;
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 2px solid rgba(139, 69, 19, 0.1);
   position: relative;
   z-index: 1;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 
 .page-header h1 {
@@ -60,6 +62,12 @@
   content: '👥';
   font-size: 28px;
   opacity: 0.8;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
 .role-badge {
@@ -89,17 +97,78 @@
   opacity: 0.6;
 }
 
-/* 3 KOLONLU YAPI - PREMIUM */
+.system-info {
+  width: 100%;
+  text-align: center;
+  padding-top: 10px;
+}
+
+.info-badge {
+  background: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(25, 118, 210, 0.2);
+}
+
+/* İSTATİSTİKLER PANELİ */
+.statistics-container {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 15px;
+  margin-top: 15px;
+  padding: 15px;
+  background: linear-gradient(180deg, #ffffff, #fefbf7);
+  border-radius: 12px;
+  border: 1px solid #e6d6c1;
+  box-shadow: 0 4px 12px rgba(90, 57, 33, 0.08);
+}
+
+.statistic-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f8f3e9;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.statistic-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(90, 57, 33, 0.12);
+}
+
+.statistic-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: #5a3921;
+  margin-bottom: 4px;
+}
+
+.statistic-label {
+  font-size: 11px;
+  color: #8b7d70;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 3 KOLONLU YAPI */
 .three-column-layout {
   display: grid;
-  grid-template-columns: 320px 380px 1fr;
+  grid-template-columns: 320px 350px minmax(600px, 1fr);
   gap: 24px;
-  height: calc(100vh - 140px);
+  height: calc(100vh - 240px);
   position: relative;
   z-index: 1;
 }
 
-/* ORTAK KOLON STİLLERİ - LÜKS */
+/* ORTAK KOLON STİLLERİ */
 .column {
   background: linear-gradient(180deg, #ffffff 0%, #fefbf7 100%);
   border-radius: 16px;
@@ -161,23 +230,94 @@
 }
 
 /* MÜŞTERİ LİSTESİ - SOL KOLON */
-.musteri-listesi {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.musteri-listesi .column-header {
+.customers-column .column-header {
   background: linear-gradient(180deg, #e8f5e9, #c8e6c9);
   border-bottom-color: #a5d6a7;
 }
 
-.musteri-listesi .column-header h2 {
+.customers-column .column-header h2 {
   color: #2e7d32;
 }
 
-.musteri-listesi .column-header h2::before {
+.customers-column .column-header h2::before {
   background: linear-gradient(180deg, #4caf50, #2e7d32);
+}
+
+/* MÜŞTERİ KONTROLLERİ */
+.customer-controls {
+  margin-top: 12px;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-box input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #c8e6c9;
+  font-size: 14px;
+  background: white;
+  color: #5a3921;
+  transition: all 0.3s ease;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.search-box button {
+  background: #f5f5f5;
+  border: 1px solid #d4b996;
+  color: #5a3921;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.search-box button:hover {
+  background: #e0e0e0;
+}
+
+/* FİLTRE BUTONLARI */
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #c8e6c9;
+  background: white;
+  color: #5a3921;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+  background: #e8f5e9;
+  border-color: #4caf50;
+}
+
+.filter-btn.active {
+  background: #4caf50;
+  color: white;
+  border-color: #2e7d32;
 }
 
 .customer-list {
@@ -187,7 +327,7 @@
   background: linear-gradient(180deg, #f8fbf8, #f4f9f4);
 }
 
-/* MÜŞTERİ KARTI - SEÇİLİ DURUM */
+/* MÜŞTERİ KARTI */
 .customer-card {
   background: linear-gradient(180deg, #ffffff, #fefcf7);
   border-radius: 12px;
@@ -205,6 +345,23 @@
   transform: translateX(4px);
   box-shadow: 0 6px 16px rgba(46, 125, 50, 0.15);
   border-color: #4caf50;
+}
+
+/* PASİF MÜŞTERİ */
+.customer-card.inactive {
+  background: linear-gradient(180deg, #f5f5f5, #eeeeee);
+  border-color: #bdbdbd;
+  opacity: 0.8;
+}
+
+.customer-card.inactive:hover {
+  border-color: #9e9e9e;
+}
+
+.customer-card.inactive .customer-name,
+.customer-card.inactive .customer-phone,
+.customer-card.inactive .customer-note {
+  color: #757575;
 }
 
 /* SEÇİLİ MÜŞTERİ */
@@ -245,20 +402,100 @@
   font-weight: 600;
 }
 
+/* MÜŞTERİ BİLGİLERİ */
+.customer-info {
+  margin-bottom: 8px;
+}
+
+.customer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
 .customer-name {
   font-size: 16px;
   font-weight: 700;
   color: #2e7d32;
-  margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
 }
 
 .customer-name::before {
   content: '👤';
   font-size: 14px;
   opacity: 0.8;
+}
+
+.inactive-badge {
+  background: #ff5252;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.customer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-edit, .btn-delete, .btn-status {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-edit {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #f57c00;
+  transform: scale(1.1);
+}
+
+.btn-delete {
+  background: #ff5252;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #ff0000;
+  transform: scale(1.1);
+}
+
+.btn-status {
+  background: #f5f5f5;
+  color: #5a3921;
+  font-size: 14px;
+}
+
+.btn-status:hover {
+  background: #e0e0e0;
+  transform: scale(1.1);
+}
+
+.btn-status.active {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-status.active:hover {
+  background: #388e3c;
 }
 
 .customer-phone {
@@ -277,6 +514,44 @@
   opacity: 0.8;
 }
 
+.customer-note {
+  font-size: 12px;
+  color: #8b7d70;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  border-left: 3px solid #ff9800;
+}
+
+.note-label {
+  font-weight: 600;
+  color: #5a3921;
+}
+
+.customer-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.stat-item {
+  font-size: 11px;
+  color: #5a3921;
+  background: #f5f5f5;
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-item.discount {
+  background: #fff3e0;
+  color: #d2691e;
+}
+
 .customer-balance {
   display: flex;
   justify-content: space-between;
@@ -286,41 +561,164 @@
   margin-top: 8px;
 }
 
-.balance-label {
-  font-size: 12px;
-  color: #8b7d70;
-  font-weight: 600;
+.balance-negative {
+  font-size: 18px;
+  font-weight: 900;
+  color: #d32f2f;
+  text-shadow: 0 1px 2px rgba(211, 47, 47, 0.1);
 }
 
-.balance-amount {
+.balance-zero {
   font-size: 18px;
   font-weight: 900;
   color: #2e7d32;
-  text-shadow: 0 1px 2px rgba(46, 125, 50, 0.1);
 }
 
-.balance-amount.negative {
-  color: #d32f2f;
+/* SAYFA BİLGİSİ */
+.page-info {
+  padding: 12px 20px;
+  background: linear-gradient(180deg, #f8f3e9, #f5e8d0);
+  border-top: 1px solid #e6d6c1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #8b7d70;
+}
+
+.btn-clear-filter {
+  padding: 4px 12px;
+  border-radius: 16px;
+  border: 1px solid #ff9800;
+  background: white;
+  color: #ff9800;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-clear-filter:hover {
+  background: #fff3e0;
 }
 
 /* BORÇ KAYITLARI - ORTA KOLON */
-.borc-kayitlari {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.borc-kayitlari .column-header {
+.debts-column .column-header {
   background: linear-gradient(180deg, #fff3e0, #ffecb3);
   border-bottom-color: #ffcc80;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.borc-kayitlari .column-header h2 {
+.debts-column .column-header h2 {
   color: #d2691e;
 }
 
-.borc-kayitlari .column-header h2::before {
+.debts-column .column-header h2::before {
   background: linear-gradient(180deg, #ff9800, #d2691e);
+}
+
+.customer-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.customer-detail-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.customer-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #5a3921;
+}
+
+.customer-phone-summary {
+  font-size: 12px;
+  color: #4caf50;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.total-debt-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.total-debt {
+  font-size: 16px;
+  font-weight: 900;
+  color: #d2691e;
+}
+
+.total-original {
+  font-size: 12px;
+  color: #8b7d70;
+  text-decoration: line-through;
+}
+
+/* TRANSFER BUTTONU */
+.transfer-button-container {
+  padding: 14px 20px;
+  background: linear-gradient(180deg, #f8f3e9, #f5e8d0);
+  border-bottom: 2px solid #e6d6c1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-transfer-open {
+  background: linear-gradient(135deg, #5a3921, #8b4513);
+  color: #f8f3e9;
+  border: 1px solid #5a3921;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(90, 57, 33, 0.2);
+  letter-spacing: 0.3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-transfer-open::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-transfer-open:hover {
+  background: linear-gradient(135deg, #8b4513, #5a3921);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(90, 57, 33, 0.3);
+}
+
+.btn-transfer-open:hover::before {
+  left: 100%;
+}
+
+.btn-transfer-open:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(90, 57, 33, 0.2);
 }
 
 .debt-records {
@@ -330,7 +728,7 @@
   background: linear-gradient(180deg, #fffaf0, #fff8e1);
 }
 
-/* BORÇ KAYDI - SEÇİLİ DURUM */
+/* BORÇ KAYDI */
 .debt-record {
   background: linear-gradient(180deg, #ffffff, #fefcf7);
   border-radius: 12px;
@@ -383,60 +781,70 @@
   font-weight: 900;
 }
 
-.debt-record.selected .debt-description {
-  color: #d2691e;
-  font-weight: 700;
-}
-
-.debt-date {
-  font-size: 15px;
-  font-weight: 800;
-  color: #d2691e;
-  margin-bottom: 8px;
+.debt-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
 }
 
-.debt-date::before {
-  content: '📅';
-  font-size: 14px;
-  opacity: 0.8;
-}
-
-.debt-description {
+.table-info {
   font-size: 14px;
   color: #5a3921;
-  margin-bottom: 12px;
-  line-height: 1.4;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .debt-amount {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 10px;
-  border-top: 1px dashed #ffcc80;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
-.debt-amount-label {
-  font-size: 12px;
-  color: #8b7d70;
-  font-weight: 600;
-}
-
-.debt-amount-value {
-  font-size: 20px;
+.original-amount {
+  font-size: 18px;
   font-weight: 900;
   color: #d2691e;
   text-shadow: 0 1px 2px rgba(210, 105, 30, 0.1);
 }
 
+.remaining-amount {
+  font-size: 12px;
+  color: #8b7d70;
+  font-weight: 600;
+}
+
+.debt-date {
+  font-size: 13px;
+  color: #8b7d70;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debt-date::before {
+  content: '📅';
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.debt-status {
+  font-size: 12px;
+  color: #5a3921;
+  font-weight: 600;
+  padding-top: 8px;
+  border-top: 1px dashed #ffcc80;
+  margin-top: 8px;
+}
+
 /* SAĞ KOLON - DİKEY 2 BÖLMELİ */
 .details-column {
   display: grid;
-  grid-template-columns: 1fr 1fr;  /* DİKEY BÖLÜNME */
-  grid-template-rows: auto;
+  grid-template-columns: 1.8fr 1.2fr;
   gap: 24px;
   height: 100%;
 }
@@ -459,6 +867,9 @@
 .adisyon-details-section .column-header {
   background: linear-gradient(180deg, #e8f5e9, #c8e6c9);
   border-bottom-color: #a5d6a7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .adisyon-details-section .column-header h2 {
@@ -467,6 +878,16 @@
 
 .adisyon-details-section .column-header h2::before {
   background: linear-gradient(180deg, #4caf50, #2e7d32);
+}
+
+.remaining-debt-badge {
+  background: #fff3e0;
+  color: #d2691e;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid #ffcc80;
 }
 
 .adisyon-content {
@@ -498,18 +919,17 @@
 
 .adisyon-table-info {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .table-number {
   font-size: 24px;
   font-weight: 900;
   color: #2e7d32;
-  background: #e8f5e9;
-  padding: 8px 16px;
-  border-radius: 8px;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .table-type {
@@ -523,10 +943,10 @@
 }
 
 .adisyon-amount {
-  font-size: 28px;
-  font-weight: 900;
-  color: #2e7d32;
-  text-shadow: 0 2px 4px rgba(46, 125, 50, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .adisyon-info-grid {
@@ -639,7 +1059,7 @@
   text-align: right;
 }
 
-/* TOPLAM BİLGİSİ - KDV ÇIKARILDI */
+/* TOPLAM BİLGİSİ */
 .adisyon-total {
   background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
   border-radius: 12px;
@@ -647,7 +1067,7 @@
   margin-top: 20px;
   border: 2px solid #a5d6a7;
   display: grid;
-  grid-template-columns: 1fr; /* Tek sütun */
+  grid-template-columns: 1fr;
   gap: 12px;
   text-align: center;
 }
@@ -665,7 +1085,7 @@
 }
 
 .total-value {
-  font-size: 24px; /* Büyütüldü */
+  font-size: 24px;
   font-weight: 900;
   color: #d32f2f;
 }
@@ -685,134 +1105,159 @@
   height: 100%;
 }
 
+.islem-details-section .column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.customer-status-badge {
+  background: #4caf50;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.customer-status-badge:not(:has(+ *)) {
+  background: #ff5252;
+}
+
 .islem-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 20px;
   background: linear-gradient(180deg, #fefbf7, #fcf9f4);
   height: calc(100% - 60px);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 /* TAHSILAT BÖLÜMÜ */
 .payment-section {
   background: linear-gradient(180deg, #ffffff, #fefcf7);
   border-radius: 14px;
-  padding: 22px;
+  padding: 16px;
   border: 1px solid #f0e4cc;
   box-shadow: 0 4px 12px rgba(90, 57, 33, 0.06);
 }
 
 .payment-section h3 {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
   color: #5a3921;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 2px solid #f0e4cc;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .payment-section h3::before {
   content: '💰';
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* İNDİRİM BÖLÜMÜ */
 .discount-section {
   background: linear-gradient(180deg, #ffffff, #fefcf7);
   border-radius: 14px;
-  padding: 22px;
+  padding: 16px;
   border: 1px solid #ffe4b5;
   box-shadow: 0 4px 12px rgba(139, 69, 19, 0.06);
 }
 
 .discount-section h3 {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
   color: #d2691e;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 2px solid #ffe4b5;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .discount-section h3::before {
   content: '🎁';
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* BORÇ HAREKETLERİ */
 .transactions-section {
   background: linear-gradient(180deg, #ffffff, #fefcf7);
   border-radius: 14px;
-  padding: 22px;
+  padding: 16px;
   border: 1px solid #f0e4cc;
   box-shadow: 0 4px 12px rgba(90, 57, 33, 0.06);
   flex: 1;
   overflow-y: auto;
-  min-height: 200px;
+  min-height: 150px;
 }
 
 .transactions-section h3 {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
   color: #5a3921;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
   border-bottom: 2px solid #f0e4cc;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .transactions-section h3::before {
   content: '📊';
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .transactions-list {
-  max-height: 200px;
+  max-height: 150px;
   overflow-y: auto;
 }
 
 /* FORM STİLLERİ */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .form-group label {
   display: block;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: #5a3921;
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.3px;
 }
 
 .form-group input[type="number"],
-.form-group input[type="text"] {
+.form-group input[type="text"],
+.form-group textarea {
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid #d4b996;
-  font-size: 16px;
+  font-size: 14px;
   box-sizing: border-box;
   background: #ffffff;
   color: #5a3921;
   font-weight: 500;
   transition: all 0.3s ease;
   box-shadow: inset 0 2px 4px rgba(90, 57, 33, 0.05);
+  resize: vertical;
 }
 
 .form-group input[type="number"]:focus,
-.form-group input[type="text"]:focus {
+.form-group input[type="text"]:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: #8b4513;
   box-shadow: 
@@ -821,7 +1266,8 @@
 }
 
 .form-group input[type="number"]:disabled,
-.form-group input[type="text"]:disabled {
+.form-group input[type="text"]:disabled,
+.form-group textarea:disabled {
   background: #f9f9f9;
   border-color: #d4b996;
   color: #a0845e;
@@ -830,19 +1276,20 @@
 
 .radio-options {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .radio-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 8px;
   transition: all 0.3s ease;
   position: relative;
+  font-size: 13px;
 }
 
 .radio-label:hover {
@@ -854,8 +1301,8 @@
 }
 
 .radio-custom {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 2px solid #d4b996;
   display: flex;
@@ -873,8 +1320,8 @@
 
 .radio-label input[type="radio"]:checked + .radio-custom::after {
   content: '';
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: white;
   position: absolute;
@@ -883,18 +1330,33 @@
   transform: translate(-50%, -50%);
 }
 
-/* BUTON STİLLERİ */
+/* UYARI MESAJLARI */
+.warning-message {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #d2691e;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* BUTON STİLLERİ - TAHSİLAT */
 .btn-tahsilat {
   width: 100%;
-  padding: 16px;
+  padding: 14px;
   border-radius: 12px;
   border: none;
   background: linear-gradient(135deg, #4caf50, #2e7d32);
   color: white;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
-  margin-top: 12px;
+  margin-top: 10px;
   transition: all 0.3s ease;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -914,17 +1376,17 @@
   transition: left 0.5s ease;
 }
 
-.btn-tahsilat:hover {
+.btn-tahsilat:hover:not(:disabled) {
   background: linear-gradient(135deg, #388e3c, #1b5e20);
   transform: translateY(-2px);
   box-shadow: 0 8px 16px rgba(76, 175, 80, 0.3);
 }
 
-.btn-tahsilat:hover::before {
+.btn-tahsilat:hover:not(:disabled)::before {
   left: 100%;
 }
 
-.btn-tahsilat:active {
+.btn-tahsilat:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
 }
@@ -941,11 +1403,11 @@
   background: linear-gradient(135deg, #d2691e, #cd853f);
   color: white;
   border: 1px solid #a0522d;
-  padding: 16px;
+  padding: 14px;
   border-radius: 12px;
   cursor: pointer;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 14px;
   width: 100%;
   transition: all 0.3s;
   font-family: 'Segoe UI', sans-serif;
@@ -991,36 +1453,27 @@
   transform: none;
 }
 
-/* TRANSFER BUTTONU */
-.transfer-button-container {
-  padding: 16px 24px;
-  background: linear-gradient(180deg, #f8f3e9, #f5e8d0);
-  border-bottom: 2px solid #e6d6c1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-transfer-open {
-  background: linear-gradient(135deg, #5a3921, #8b4513);
-  color: #f8f3e9;
-  border: 1px solid #5a3921;
-  padding: 12px 24px;
+/* MANUEL KAYIT BUTON STİLLERİ */
+.btn-manuel-kayit {
+  background: linear-gradient(135deg, #1976d2, #0d47a1);
+  color: white;
+  border: 1px solid #1565c0;
+  padding: 10px 18px;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(90, 57, 33, 0.2);
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.2);
   letter-spacing: 0.3px;
   position: relative;
   overflow: hidden;
 }
 
-.btn-transfer-open::before {
+.btn-manuel-kayit::before {
   content: '';
   position: absolute;
   top: 0;
@@ -1031,47 +1484,65 @@
   transition: left 0.5s ease;
 }
 
-.btn-transfer-open:hover {
-  background: linear-gradient(135deg, #8b4513, #5a3921);
+.btn-manuel-kayit:hover {
+  background: linear-gradient(135deg, #0d47a1, #1976d2);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(90, 57, 33, 0.3);
+  box-shadow: 0 6px 16px rgba(25, 118, 210, 0.3);
 }
 
-.btn-transfer-open:hover::before {
+.btn-manuel-kayit:hover::before {
   left: 100%;
 }
 
-.btn-transfer-open:active {
+.btn-manuel-kayit:active {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(90, 57, 33, 0.2);
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+}
+
+.btn-manuel-kayit-small {
+  background: linear-gradient(135deg, #1976d2, #0d47a1);
+  color: white;
+  border: 1px solid #1565c0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-manuel-kayit-small:hover {
+  background: linear-gradient(135deg, #0d47a1, #1976d2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
 }
 
 /* BOŞ DURUM MESAJLARI */
 .empty-adisyon {
-  padding: 60px 20px;
+  padding: 40px 20px;
   text-align: center;
   color: #a1887f;
   font-style: italic;
   background: linear-gradient(180deg, #fcf9f4, #f7f0e4);
   border-radius: 12px;
   border: 2px dashed #e6d6c1;
-  font-size: 15px;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   height: 100%;
   justify-content: center;
 }
 
 .empty-adisyon::before {
   content: '📋';
-  font-size: 48px;
+  font-size: 36px;
   opacity: 0.5;
 }
 
 .empty-list {
-  padding: 60px 20px;
+  padding: 40px 20px;
   text-align: center;
   color: #a1887f;
   font-style: italic;
@@ -1079,26 +1550,26 @@
   border-radius: 12px;
   border: 2px dashed #e6d6c1;
   margin: 20px;
-  font-size: 15px;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .empty-list::before {
   content: '📭';
-  font-size: 32px;
+  font-size: 28px;
   opacity: 0.5;
 }
 
 /* İŞLEM GEÇMİŞİ */
 .transaction-item {
-  padding: 12px 0;
+  padding: 10px 0;
   border-bottom: 1px solid #f5e8d0;
   display: grid;
   grid-template-columns: 2fr 1fr 1.5fr;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -1109,14 +1580,14 @@
 .transaction-type {
   font-weight: 600;
   color: #5a3921;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .transaction-amount {
   font-weight: 700;
   color: #8b4513;
   text-align: right;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .transaction-amount.amount-negative {
@@ -1128,7 +1599,7 @@
 }
 
 .transaction-date {
-  font-size: 11px;
+  font-size: 10px;
   color: #8b7d70;
   text-align: right;
   font-family: 'Courier New', monospace;
@@ -1142,6 +1613,11 @@
 
 .transaction-item .type-payment {
   color: #2e7d32;
+  font-weight: 700;
+}
+
+.transaction-item .type-transfer {
+  color: #1976d2;
   font-weight: 700;
 }
 
@@ -1192,70 +1668,398 @@
   border-radius: 4px;
 }
 
-/* RESPONSIVE TASARIM */
-@media (max-width: 1400px) {
-  .three-column-layout {
-    grid-template-columns: 300px 350px 1fr;
-    gap: 20px;
+/* MANUEL KAYIT MODAL - ORTALANMIŞ */
+.manuel-kayit-modal {
+  background: linear-gradient(to bottom, #ffffff, #fefbf7);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 
+    0 20px 40px rgba(90, 57, 33, 0.4),
+    0 8px 16px rgba(90, 57, 33, 0.2);
+  border: 2px solid #1976d2;
+  animation: modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  backdrop-filter: none;
+  opacity: 1;
+  margin: auto;
+}
+
+.manuel-kayit-modal .modal-header {
+  background: linear-gradient(180deg, #1976d2, #0d47a1);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 16px 16px 0 0;
+  border-bottom: 2px solid #1565c0;
+}
+
+.manuel-kayit-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manuel-kayit-modal .modal-content {
+  padding: 24px;
+  background: linear-gradient(180deg, #fefbf7, #fcf9f4);
+}
+
+.manuel-kayit-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.manuel-kayit-modal .urun-ekle-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid #c8e6c9;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);
+}
+
+.manuel-kayit-modal .urun-ekle-section h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2e7d32;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manuel-kayit-modal .btn-urun-ekle {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  width: 100%;
+  height: 100%;
+  margin-top: 8px;
+}
+
+.manuel-kayit-modal .btn-urun-ekle:hover {
+  background: linear-gradient(135deg, #388e3c, #1b5e20);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.manuel-kayit-modal .form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e6d6c1;
+}
+
+.manuel-kayit-modal .btn-iptal {
+  background: #f5f5f5;
+  color: #5a3921;
+  border: 1px solid #d4b996;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  transition: all 0.3s ease;
+}
+
+.manuel-kayit-modal .btn-iptal:hover {
+  background: #e0e0e0;
+  border-color: #c4a985;
+}
+
+.manuel-kayit-modal .btn-kaydet {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+  border: 1px solid #2e7d32;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  flex: 1;
+  transition: all 0.3s ease;
+}
+
+.manuel-kayit-modal .btn-kaydet:hover {
+  background: linear-gradient(135deg, #388e3c, #1b5e20);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* MÜŞTERİ DÜZENLEME MODAL */
+.musteri-duzenle-modal {
+  background: linear-gradient(to bottom, #ffffff, #fefbf7);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 
+    0 20px 40px rgba(90, 57, 33, 0.4),
+    0 8px 16px rgba(90, 57, 33, 0.2);
+  border: 2px solid #ff9800;
+  animation: modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  backdrop-filter: none;
+  opacity: 1;
+  margin: auto;
+}
+
+.musteri-duzenle-modal .modal-header {
+  background: linear-gradient(180deg, #ff9800, #f57c00);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 16px 16px 0 0;
+  border-bottom: 2px solid #ef6c00;
+}
+
+.musteri-duzenle-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.musteri-duzenle-modal .modal-content {
+  padding: 24px;
+}
+
+/* MÜŞTERİ SİLME ONAY MODAL */
+.silme-onay-modal {
+  background: linear-gradient(to bottom, #ffffff, #fefbf7);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 
+    0 20px 40px rgba(90, 57, 33, 0.4),
+    0 8px 16px rgba(90, 57, 33, 0.2);
+  border: 2px solid #ff5252;
+  animation: modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  backdrop-filter: none;
+  opacity: 1;
+  margin: auto;
+}
+
+.silme-onay-modal .modal-header.danger {
+  background: linear-gradient(180deg, #ff5252, #d32f2f);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 16px 16px 0 0;
+  border-bottom: 2px solid #c62828;
+}
+
+.silme-onay-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.silme-onay-modal .modal-content {
+  padding: 24px;
+}
+
+.warning-text {
+  color: #d32f2f;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 10px 0;
+  padding: 10px;
+  background: #ffebee;
+  border-radius: 8px;
+  border-left: 4px solid #d32f2f;
+}
+
+.musteri-bilgileri {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 20px 0;
+  border: 1px solid #e0e0e0;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #5a3921;
+}
+
+.info-value {
+  font-weight: 700;
+  color: #d32f2f;
+}
+
+/* MODAL OVERLAY - ORTALAMA */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(90, 57, 33, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+  animation: modalOverlayFade 0.3s ease-out;
+  padding: 20px;
+}
+
+@keyframes modalOverlayFade {
+  from { 
+    opacity: 0;
+    background: rgba(90, 57, 33, 0);
+  }
+  to { 
+    opacity: 1;
+    background: rgba(90, 57, 33, 0.8);
   }
 }
 
-@media (max-width: 1200px) {
-  .three-column-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: 400px 400px 400px;
-    height: auto;
-    max-height: none;
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.95);
   }
-  
-  .details-column {
-    grid-template-columns: 1fr;
-    grid-template-rows: 400px 400px;
-    height: 800px;
-  }
-  
-  .column {
-    min-height: 400px;
-  }
-  
-  .musteri-islemleri-v2 {
-    padding: 20px;
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
-@media (max-width: 768px) {
-  .three-column-layout {
-    grid-template-rows: 350px 350px 700px;
-    gap: 16px;
-  }
-  
-  .details-column {
-    grid-template-rows: 350px 350px;
-    height: 700px;
-  }
-  
-  .page-header {
-    flex-direction: column;
-    gap: 15px;
-    align-items: flex-start;
-  }
-  
-  .radio-options {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .transaction-item {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
-    gap: 8px;
-  }
-  
-  .transaction-date {
-    grid-column: 1 / 3;
-    text-align: left;
-    font-size: 10px;
-  }
+/* MODAL CONTENT ORTAK STİLLER */
+.modal-content {
+  padding: 24px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e6d6c1;
+}
+
+.form-actions .btn-iptal {
+  background: #f5f5f5;
+  color: #5a3921;
+  border: 1px solid #d4b996;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  transition: all 0.3s ease;
+}
+
+.form-actions .btn-iptal:hover {
+  background: #e0e0e0;
+}
+
+.form-actions .btn-kaydet {
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  color: white;
+  border: 1px solid #2e7d32;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  flex: 1;
+  transition: all 0.3s ease;
+}
+
+.form-actions .btn-kaydet:hover {
+  background: linear-gradient(135deg, #388e3c, #1b5e20);
+}
+
+.form-actions .btn-sil {
+  background: linear-gradient(135deg, #ff5252, #d32f2f);
+  color: white;
+  border: 1px solid #d32f2f;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  flex: 1;
+  transition: all 0.3s ease;
+}
+
+.form-actions .btn-sil:hover {
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+}
+
+.urun-listesi {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 12px;
+  border: 1px solid #e8f5e9;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.urun-item {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #e8f5e9;
+  align-items: center;
+  background: #ffffff;
+}
+
+.urun-item:last-child {
+  border-bottom: none;
+}
+
+.btn-urun-sil {
+  background: #ff5252;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.btn-urun-sil:hover {
+  background: #ff0000;
 }
 
 /* ANİMASYONLAR */
@@ -1277,51 +2081,153 @@
   animation: fadeIn 0.3s ease-out;
 }
 
-/* MODAL STİLLERİ (Korundu) */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(90, 57, 33, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  backdrop-filter: blur(4px);
-  animation: modalOverlayFade 0.3s ease-out;
-}
-
-@keyframes modalOverlayFade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.transfer-modal {
-  background: linear-gradient(to bottom, #f8f3e9, #fffaf0);
-  border-radius: 16px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow: 
-    0 20px 40px rgba(90, 57, 33, 0.4),
-    0 8px 16px rgba(90, 57, 33, 0.2);
-  border: 2px solid #8b4513;
-  animation: modalSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  position: relative;
-}
-
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-40px) scale(0.95);
+/* RESPONSIVE TASARIM */
+@media (max-width: 1400px) {
+  .three-column-layout {
+    grid-template-columns: 300px 320px minmax(500px, 1fr);
+    gap: 20px;
+    height: calc(100vh - 260px);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+  
+  .statistics-container {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
   }
 }
 
-/* Diğer modal stilleri korundu... */
+@media (max-width: 1200px) {
+  .three-column-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 400px 400px auto;
+    height: auto;
+  }
+  
+  .details-column {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 400px 350px;
+    height: 750px;
+  }
+  
+  .column {
+    min-height: 400px;
+  }
+  
+  .musteri-islemleri-v2 {
+    padding: 20px;
+  }
+  
+  .statistics-container {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 992px) {
+  .three-column-layout {
+    grid-template-rows: 350px 350px auto;
+  }
+  
+  .details-column {
+    grid-template-columns: 1fr;
+    grid-template-rows: 350px 300px;
+    height: 650px;
+    gap: 20px;
+  }
+  
+  .statistics-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  
+  .header-actions {
+    justify-content: space-between;
+  }
+  
+  .radio-options {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .transaction-item {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 6px;
+  }
+  
+  .transaction-date {
+    grid-column: 1 / 3;
+    text-align: left;
+    font-size: 9px;
+  }
+  
+  .three-column-layout {
+    gap: 16px;
+  }
+  
+  .details-column {
+    height: 600px;
+  }
+  
+  .statistics-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .filter-buttons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .customer-actions {
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  /* MODAL RESPONSIVE */
+  .manuel-kayit-modal,
+  .musteri-duzenle-modal,
+  .silme-onay-modal {
+    width: 95%;
+    max-width: 95%;
+    max-height: 90vh;
+  }
+  
+  .manuel-kayit-modal .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .statistics-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .customer-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .customer-actions {
+    flex-direction: row;
+    align-self: flex-end;
+  }
+  
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .manuel-kayit-modal,
+  .musteri-duzenle-modal,
+  .silme-onay-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh;
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { checkForUpdates, applyUpdates } from "@/services/updateManager";
+import { checkForUpdates, applyUpdates } from "@/services/updateService";
 import "./Ayarlar.css";
 
 export default function Ayarlar() {

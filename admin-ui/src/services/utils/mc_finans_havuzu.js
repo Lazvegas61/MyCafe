@@ -460,6 +460,101 @@ const kayitEkle = (kayit) => {
 };
 
 // ============================================================
+// ÖZEL FONKSİYONLAR - YENİ EKLENDİ
+// ============================================================
+
+/**
+ * Tahsilat için özel finans kaydı ekler
+ * @param {Object} tahsilatData - Tahsilat verisi
+ * @returns {Object} Sonuç
+ */
+const finansTahsilatKaydiEkle = (tahsilatData) => {
+    console.log('💰 [FINANS-HAVUZU] finansTahsilatKaydiEkle çağrıldı');
+    
+    const finansKaydi = {
+        tur: "GELIR",
+        odemeTuru: tahsilatData.tip || "NAKIT",
+        tutar: Number(tahsilatData.tutar || 0),
+        kaynak: "TAHSILAT",
+        tarih: new Date().toISOString(),
+        aciklama: tahsilatData.aciklama || "Müşteri tahsilatı",
+        musteriId: tahsilatData.musteriId,
+        referansId: tahsilatData.referansId || `tah_${Date.now()}`
+    };
+    
+    return kayitEkle(finansKaydi);
+};
+
+/**
+ * İndirim için özel finans kaydı ekler
+ * @param {Object} indirimData - İndirim verisi
+ * @returns {Object} Sonuç
+ */
+const finansIndirimKaydiEkle = (indirimData) => {
+    console.log('💰 [FINANS-HAVUZU] finansIndirimKaydiEkle çağrıldı');
+    
+    const finansKaydi = {
+        tur: "INDIRIM",
+        odemeTuru: "INDIRIM",
+        tutar: Number(indirimData.tutar || 0),
+        kaynak: "INDIRIM",
+        tarih: new Date().toISOString(),
+        aciklama: indirimData.aciklama || "Müşteri indirimi",
+        musteriId: indirimData.musteriId,
+        referansId: indirimData.referansId || `ind_${Date.now()}`
+    };
+    
+    return kayitEkle(finansKaydi);
+};
+
+/**
+ * Bilardo adisyonu kapanışında finans kaydı ekler
+ * @param {Object} bilardoData - Bilardo verisi
+ * @returns {Object} Sonuç
+ */
+const bilardoAdisyonuKapandigindaKaydet = (bilardoData) => {
+    console.log('💰 [FINANS-HAVUZU] bilardoAdisyonuKapandigindaKaydet çağrıldı');
+    
+    const toplamTutar = Number(bilardoData.toplamTutar || 0);
+    const bilardoUcret = Number(bilardoData.bilardoUcret || 0);
+    const ekUrunToplam = Number(bilardoData.ekUrunToplam || 0);
+    
+    const kayitlar = [];
+    
+    // Bilardo ücreti kaydı
+    if (bilardoUcret > 0) {
+        kayitlar.push({
+            tur: "GELIR",
+            odemeTuru: "NAKIT",
+            tutar: bilardoUcret,
+            kaynak: "BILARDO",
+            tarih: new Date().toISOString(),
+            aciklama: `Bilardo Ücreti - ${bilardoData.bilardoMasaNo || "BİLARDO"} - ${bilardoData.gecenSure || 0}dk`,
+            adisyonId: bilardoData.adisyonId,
+            masaNo: bilardoData.bilardoMasaNo || "BİLARDO",
+            sureTipi: bilardoData.sureTipi,
+            gecenSure: bilardoData.gecenSure
+        });
+    }
+    
+    // Ek ürünler kaydı
+    if (ekUrunToplam > 0) {
+        kayitlar.push({
+            tur: "GELIR",
+            odemeTuru: "NAKIT",
+            tutar: ekUrunToplam,
+            kaynak: "BILARDO_EK_URUN",
+            tarih: new Date().toISOString(),
+            aciklama: `Bilardo Ek Ürünler - ${bilardoData.bilardoMasaNo || "BİLARDO"}`,
+            adisyonId: bilardoData.adisyonId,
+            masaNo: bilardoData.bilardoMasaNo || "BİLARDO"
+        });
+    }
+    
+    return finansKayitlariEkle(kayitlar);
+};
+
+// ============================================================
 // RAPORLAMA FONKSİYONLARI
 // ============================================================
 
@@ -696,6 +791,11 @@ const mcFinansHavuzu = {
     // ANA FONKSİYONLAR
     finansKayitlariEkle,
     kayitEkle,
+    
+    // ÖZEL FONKSİYONLAR - YENİ EKLENDİ
+    finansTahsilatKaydiEkle,
+    finansIndirimKaydiEkle,
+    bilardoAdisyonuKapandigindaKaydet,
     
     // RAPORLAMA
     gunlukFinansRaporuAl,

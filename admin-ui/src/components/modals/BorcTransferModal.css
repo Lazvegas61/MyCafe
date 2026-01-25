@@ -1,0 +1,157 @@
+.mc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 40, 20, 0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.mc-modal {
+  width: 620px;
+  background: linear-gradient(180deg, #fffaf2, #f4e6cf);
+  border-radius: 16px;
+  border: 1px solid #d8c1a3;
+  box-shadow: 0 20px 40px rgba(60, 40, 20, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* HEADER */
+.mc-modal-header {
+  background: linear-gradient(135deg, #8b4513, #5a3921);
+  color: #fff8ee;
+  padding: 18px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mc-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.mc-close-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* BODY */
+.mc-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* MÜŞTERİ TRANSFER */
+.mc-transfer-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.mc-transfer-box {
+  background: #fff;
+  border: 1px solid #d6c2a5;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mc-transfer-box .label {
+  font-size: 12px;
+  color: #8b6b4a;
+  font-weight: 600;
+}
+
+.mc-transfer-box strong {
+  font-size: 15px;
+  color: #5a3921;
+}
+
+.mc-transfer-box .amount {
+  font-size: 13px;
+  color: #b63b2e;
+  font-weight: 700;
+}
+
+.mc-transfer-box select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #c9b08c;
+  font-size: 14px;
+}
+
+.mc-transfer-arrow {
+  font-size: 26px;
+  color: #8b4513;
+  font-weight: 900;
+}
+
+/* FORM */
+.mc-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mc-form-group label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a3921;
+}
+
+.mc-form-group input,
+.mc-form-group textarea {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #c9b08c;
+  font-size: 15px;
+}
+
+.mc-form-group textarea {
+  resize: none;
+  min-height: 80px;
+}
+
+/* FOOTER */
+.mc-modal-footer {
+  padding: 18px 22px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: #f3e4cd;
+  border-top: 1px solid #d8c1a3;
+}
+
+.btn-cancel {
+  padding: 12px 22px;
+  background: #b8a48a;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-confirm {
+  padding: 12px 22px;
+  background: linear-gradient(135deg, #4caf50, #2e7d32);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}

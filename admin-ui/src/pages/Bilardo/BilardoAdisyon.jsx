@@ -1,17 +1,15 @@
 // admin-ui/src/pages/Bilardo/BilardoAdisyon.jsx - GUNCELLENDI
 /* ------------------------------------------------------------
-   📌 BilardoAdisyon.jsx — BİLARDO ÜCRETİ GÖSTERİMİ DÜZELTİLDİ
-   - Bilardo ücreti otomatik gösteriliyor
-   - Özet panelinde bilardo ücreti ve ek ürünler gözüküyor
-   - Tüm tutarlar doğru hesaplanıyor
-   - GUNCELLENDI: Bilardo ücreti ve ek ürünler normal adisyonda gösteriliyor
-   - GUNCELLENDI: Finans havuzu entegrasyonu eklendi
+   📌 BilardoAdisyon.jsx — TÜM HATALAR DÜZELTİLDİ
+   - Finans havuzu API uyumsuzluğu düzeltildi
+   - mcFinansHavuzu.bilardoAdisyonuKapandigindaKaydet kullanılıyor
+   - Tüm tutar gösterimleri Number(value || 0).toFixed(2) şeklinde
 ------------------------------------------------------------- */
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Bilardo.css";
-import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu"; // YENİ IMPORT EKLENDİ
+import mcFinansHavuzu from "../../services/utils/mc_finans_havuzu";
 
 export default function BilardoAdisyon() {
   const navigate = useNavigate();
@@ -79,7 +77,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 2. DATA LOADING - GUNCELLENDI
+     📌 2. DATA LOADING
   ============================================================ */
   
   useEffect(() => {
@@ -118,13 +116,11 @@ export default function BilardoAdisyon() {
         
         const dakika = dakikaHesapla();
         
-        // 6. Ücret hesapla - GUNCELLENDI: Adisyondan bilardoUcret varsa onu kullan
+        // 6. Ücret hesapla
         let ucret = 0;
         if (bulunanAdisyon.bilardoUcret !== undefined) {
-          // Adisyonda kayıtlı bilardo ücreti varsa onu kullan
           ucret = parseFloat(bulunanAdisyon.bilardoUcret) || 0;
         } else {
-          // Yoksa hesapla
           ucret = ucretHesapla(bulunanAdisyon.sureTipi, dakika);
         }
         
@@ -137,16 +133,15 @@ export default function BilardoAdisyon() {
         // 8. Kalan tutarı hesapla
         updateKalanTutar(ucret, bulunanAdisyon.ekUrunler || [], bulunanAdisyon.odemeler || []);
         
-        // 9. Adisyonu güncelle - BİLARDO ÜCRETİ KAYDEDİLDİ
+        // 9. Adisyonu güncelle
         const adisyonIndex = bilardoAdisyonlar.findIndex(a => a.id === adisyonId);
         if (adisyonIndex !== -1) {
           bilardoAdisyonlar[adisyonIndex].gecenDakika = dakika;
           bilardoAdisyonlar[adisyonIndex].hesaplananUcret = ucret;
-          bilardoAdisyonlar[adisyonIndex].bilardoUcret = ucret; // BİLARDO ÜCRETİ KAYDEDİLDİ
+          bilardoAdisyonlar[adisyonIndex].bilardoUcret = ucret;
           
-          // Toplam tutarı hesapla ve kaydet
           const ekUrunToplam = (bulunanAdisyon.ekUrunler || []).reduce((sum, u) => 
-            sum + (u.fiyat * u.adet), 0);
+            sum + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
           bilardoAdisyonlar[adisyonIndex].toplamTutar = ucret + ekUrunToplam;
           
           localStorage.setItem("bilardo_adisyonlar", JSON.stringify(bilardoAdisyonlar));
@@ -166,12 +161,13 @@ export default function BilardoAdisyon() {
   }, [adisyonId, navigate]);
 
   /* ============================================================
-     📌 3. KALAN TUTAR HESAPLAMA - GUNCELLENDI
+     📌 3. KALAN TUTAR HESAPLAMA
   ============================================================ */
   
   const updateKalanTutar = (ucret, ekUrunlerData, odemelerData) => {
-    const ekUrunToplam = ekUrunlerData.reduce((sum, u) => sum + (u.fiyat * u.adet), 0);
-    const odenenToplam = odemelerData.reduce((sum, o) => sum + o.tutar, 0);
+    const ekUrunToplam = ekUrunlerData.reduce((sum, u) => 
+      sum + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
+    const odenenToplam = odemelerData.reduce((sum, o) => sum + Number(o.tutar || 0), 0);
     const toplam = ucret + ekUrunToplam;
     setKalanTutar(Math.max(0, toplam - odenenToplam));
     
@@ -181,10 +177,8 @@ export default function BilardoAdisyon() {
     }
   };
   
-  // ANA EKRANI GÜNCELLE FONKSİYONU
   const updateAnaEkran = (toplamTutar, ekUrunToplam, bilardoUcret) => {
     try {
-      // Açık adisyonları güncelle
       const acikAdisyonlar = JSON.parse(localStorage.getItem("mc_acik_adisyonlar") || "[]");
       const adisyonIndex = acikAdisyonlar.findIndex(a => a.id === adisyonId);
       
@@ -195,7 +189,6 @@ export default function BilardoAdisyon() {
         acikAdisyonlar[adisyonIndex].updatedAt = Date.now();
         localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(acikAdisyonlar));
         
-        // Ana ekran event'i tetikle
         window.dispatchEvent(new CustomEvent('bilardoAdisyonGuncellendi', {
           detail: acikAdisyonlar[adisyonIndex]
         }));
@@ -206,7 +199,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 4. MYCAFE ÜRÜN EKLEME - GUNCELLENDI
+     📌 4. MYCAFE ÜRÜN EKLEME
   ============================================================ */
   
   const myCafeUrunEkle = (urun) => {
@@ -228,13 +221,9 @@ export default function BilardoAdisyon() {
     const yeniEkUrunler = [...ekUrunler, yeniEkUrun];
     setEkUrunler(yeniEkUrunler);
     
-    // Adisyonu güncelle
     updateAdisyonWithEkUrunler(yeniEkUrunler);
-    
-    // Stok güncelle
     stokGuncelle(urun.id, -1);
     
-    // Modalı kapat
     setUrunEkleModal({ acik: false, kategoriId: null, urunler: [] });
   };
   
@@ -245,18 +234,16 @@ export default function BilardoAdisyon() {
     if (index !== -1) {
       adisyonlar[index].ekUrunler = yeniEkUrunler;
       
-      // Toplam tutarı güncelle
-      const ekUrunToplam = yeniEkUrunler.reduce((sum, u) => sum + (u.fiyat * u.adet), 0);
+      const ekUrunToplam = yeniEkUrunler.reduce((sum, u) => 
+        sum + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
       const toplamTutar = hesaplananUcret + ekUrunToplam;
       adisyonlar[index].toplamTutar = toplamTutar;
       
       localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
       
-      // Kalan tutarı güncelle
-      const odenenToplam = odemeler.reduce((sum, o) => sum + o.tutar, 0);
+      const odenenToplam = odemeler.reduce((sum, o) => sum + Number(o.tutar || 0), 0);
       setKalanTutar(Math.max(0, toplamTutar - odenenToplam));
       
-      // Ana ekranı güncelle
       updateAnaEkran(toplamTutar, ekUrunToplam, hesaplananUcret);
     }
   };
@@ -288,7 +275,7 @@ export default function BilardoAdisyon() {
         ? { 
             ...urun, 
             adet: yeniAdet,
-            toplam: urun.fiyat * yeniAdet
+            toplam: Number(urun.fiyat || 0) * yeniAdet
           }
         : urun
     );
@@ -296,7 +283,6 @@ export default function BilardoAdisyon() {
     setEkUrunler(yeniEkUrunler);
     updateAdisyonWithEkUrunler(yeniEkUrunler);
     
-    // Stok güncelle
     if (eskiUrun.mcUrunId) {
       stokGuncelle(eskiUrun.mcUrunId, -adetDegisimi);
     }
@@ -312,14 +298,13 @@ export default function BilardoAdisyon() {
     setEkUrunler(yeniEkUrunler);
     updateAdisyonWithEkUrunler(yeniEkUrunler);
     
-    // Stok geri al
     if (silinecekUrun.mcUrunId) {
-      stokGuncelle(silinecekUrun.mcUrunId, silinecekUrun.adet);
+      stokGuncelle(silinecekUrun.mcUrunId, Number(silinecekUrun.adet || 0));
     }
   };
 
   /* ============================================================
-     📌 6. ÖDEME YÖNETİMİ - GUNCELLENDI
+     📌 6. ÖDEME YÖNETİMİ
   ============================================================ */
   
   const odemeModalAc = (tip) => {
@@ -332,7 +317,8 @@ export default function BilardoAdisyon() {
   };
   
   const odemeEkle = () => {
-    if (!odemeModal.tutar || parseFloat(odemeModal.tutar) <= 0) {
+    const tutar = parseFloat(odemeModal.tutar || 0);
+    if (!tutar || tutar <= 0) {
       alert("Geçerli bir tutar girin!");
       return;
     }
@@ -340,7 +326,7 @@ export default function BilardoAdisyon() {
     const yeniOdeme = {
       id: Date.now(),
       tip: odemeModal.tip,
-      tutar: parseFloat(odemeModal.tutar),
+      tutar: tutar,
       aciklama: odemeModal.aciklama || "",
       tarih: new Date().toISOString(),
       personel: JSON.parse(localStorage.getItem("mc_user") || "{}").adSoyad || "Bilinmiyor"
@@ -349,7 +335,6 @@ export default function BilardoAdisyon() {
     const yeniOdemeler = [...odemeler, yeniOdeme];
     setOdemeler(yeniOdemeler);
     
-    // Adisyonu güncelle
     const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
     const index = adisyonlar.findIndex(a => a.id === adisyonId);
     if (index !== -1) {
@@ -357,11 +342,32 @@ export default function BilardoAdisyon() {
       localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
     }
     
-    // Kalan tutarı güncelle
-    const ekUrunToplam = ekUrunler.reduce((sum, u) => sum + (u.fiyat * u.adet), 0);
-    const odenenToplam = yeniOdemeler.reduce((sum, o) => sum + o.tutar, 0);
+    const ekUrunToplam = ekUrunler.reduce((sum, u) => 
+      sum + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
+    const odenenToplam = yeniOdemeler.reduce((sum, o) => sum + Number(o.tutar || 0), 0);
     const toplam = hesaplananUcret + ekUrunToplam;
     setKalanTutar(Math.max(0, toplam - odenenToplam));
+    
+    // Finans havuzuna ödeme kaydı
+    try {
+      const finansKaydi = {
+        tur: "GELIR",
+        odemeTuru: odemeModal.tip,
+        tutar: tutar,
+        kaynak: "BİLARDO",
+        aciklama: `Bilardo Ödeme - ${adisyon?.bilardoMasaNo || "BİLARDO"} - ${odemeModal.tip}`,
+        tarih: new Date().toISOString(),
+        adisyonId: adisyonId,
+        masaNo: adisyon?.bilardoMasaNo || "BİLARDO"
+      };
+      
+      const sonuc = mcFinansHavuzu.kayitEkle(finansKaydi);
+      if (!sonuc.success) {
+        console.warn("Finans kaydı eklenirken hata:", sonuc.hatalar);
+      }
+    } catch (error) {
+      console.error("Finans havuzuna kaydetme hatası:", error);
+    }
     
     // Kasa hareketi kaydet
     const kasalar = JSON.parse(localStorage.getItem("mc_kasalar") || "[]");
@@ -371,7 +377,7 @@ export default function BilardoAdisyon() {
       masaNo: adisyon?.bilardoMasaNo || "BİLARDO",
       adisyonId: adisyonId,
       aciklama: `Bilardo Ödeme - ${odemeModal.tip}`,
-      giren: parseFloat(odemeModal.tutar),
+      giren: tutar,
       cikan: 0,
       bakiye: 0,
       tip: "BİLARDO_ODEME",
@@ -380,7 +386,6 @@ export default function BilardoAdisyon() {
     kasalar.push(kasaHareketi);
     localStorage.setItem("mc_kasalar", JSON.stringify(kasalar));
     
-    // Ana ekranı güncelle
     updateAnaEkran(toplam, ekUrunToplam, hesaplananUcret);
     
     setOdemeModal({ acik: false, tip: "NAKIT", tutar: 0, aciklama: "" });
@@ -392,7 +397,6 @@ export default function BilardoAdisyon() {
     const yeniOdemeler = odemeler.filter(o => o.id !== odemeId);
     setOdemeler(yeniOdemeler);
     
-    // Adisyonu güncelle
     const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
     const index = adisyonlar.findIndex(a => a.id === adisyonId);
     if (index !== -1) {
@@ -400,30 +404,31 @@ export default function BilardoAdisyon() {
       localStorage.setItem("bilardo_adisyonlar", JSON.stringify(adisyonlar));
     }
     
-    // Kalan tutarı güncelle
-    const ekUrunToplam = ekUrunler.reduce((sum, u) => sum + (u.fiyat * u.adet), 0);
-    const odenenToplam = yeniOdemeler.reduce((sum, o) => sum + o.tutar, 0);
+    const ekUrunToplam = ekUrunler.reduce((sum, u) => 
+      sum + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
+    const odenenToplam = yeniOdemeler.reduce((sum, o) => sum + Number(o.tutar || 0), 0);
     const toplam = hesaplananUcret + ekUrunToplam;
     setKalanTutar(Math.max(0, toplam - odenenToplam));
     
-    // Ana ekranı güncelle
     updateAnaEkran(toplam, ekUrunToplam, hesaplananUcret);
   };
 
   /* ============================================================
-     📌 7. ADISYON KAPATMA - GUNCELLENDI (Finans Havuzu Entegrasyonu)
+     📌 7. ADISYON KAPATMA - DÜZELTİLDİ
   ============================================================ */
   
   const adisyonuKapat = () => {
     if (kalanTutar > 0.01) {
-      alert(`Ödenmemiş tutar var! Kalan: ${kalanTutar.toFixed(2)}₺`);
+      alert(`Ödenmemiş tutar var! Kalan: ${Number(kalanTutar || 0).toFixed(2)}₺`);
       return;
     }
     
     if (!window.confirm("Adisyonu kapatmak istediğinize emin misiniz?")) return;
     
-    // Toplam tutarı hesapla
-    const toplamTutar = hesaplananUcret + ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0);
+    const ekUrunToplam = ekUrunler.reduce((s, u) => 
+      s + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
+    const toplamTutar = hesaplananUcret + ekUrunToplam;
+    const odenenToplam = odemeler.reduce((s, o) => s + Number(o.tutar || 0), 0);
     
     // 1. Bilardo adisyonunu kapat
     const adisyonlar = JSON.parse(localStorage.getItem("bilardo_adisyonlar") || "[]");
@@ -463,7 +468,35 @@ export default function BilardoAdisyon() {
     const filteredAcikAdisyonlar = acikAdisyonlar.filter(a => a.id !== adisyonId);
     localStorage.setItem("mc_acik_adisyonlar", JSON.stringify(filteredAcikAdisyonlar));
     
-    // 4. Kasa hareketi kaydet
+    // 4. Finans havuzuna kaydet - DÜZELTİLDİ
+    try {
+      const finansHavuzuData = {
+        adisyonId: adisyonId,
+        bilardoMasaNo: adisyon?.bilardoMasaNo || "BİLARDO",
+        sureTipi: adisyon?.sureTipi || "",
+        gecenSure: gecenSure,
+        bilardoUcret: hesaplananUcret,
+        ekUrunToplam: ekUrunToplam,
+        toplamTutar: toplamTutar,
+        odemeTipi: odemeler.length > 0 ? odemeler.map(o => o.tip).join(', ') : "BELİRTİLMEDİ",
+        kapanisZamani: new Date().toISOString(),
+        personel: JSON.parse(localStorage.getItem("mc_user") || "{}").adSoyad || "Bilinmiyor",
+        ekUrunler: ekUrunler,
+        odemeler: odemeler
+      };
+      
+      const sonuc = mcFinansHavuzu.bilardoAdisyonuKapandigindaKaydet(finansHavuzuData);
+      
+      if (!sonuc.success) {
+        console.warn("Finans havuzuna kaydederken hatalar:", sonuc.hatalar);
+      }
+      
+      console.log("Bilardo adisyonu finans havuzuna kaydedildi:", finansHavuzuData);
+    } catch (error) {
+      console.error("Finans havuzuna kaydetme hatası:", error);
+    }
+    
+    // 5. Kasa hareketi kaydet
     const kasalar = JSON.parse(localStorage.getItem("mc_kasalar") || "[]");
     const kasaHareketi = {
       id: Date.now(),
@@ -480,38 +513,8 @@ export default function BilardoAdisyon() {
     kasalar.push(kasaHareketi);
     localStorage.setItem("mc_kasalar", JSON.stringify(kasalar));
     
-    // 5. Finans havuzuna kaydet - YENİ EKLENDİ
-    if (guncellenmisAdisyon) {
-      try {
-        // Finans havuzu verisini hazırla
-        const finansHavuzuData = {
-          adisyonId: adisyonId,
-          bilardoMasaNo: adisyon?.bilardoMasaNo || "BİLARDO",
-          sureTipi: adisyon?.sureTipi || "",
-          gecenSure: gecenSure,
-          bilardoUcret: hesaplananUcret,
-          ekUrunToplam: ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0),
-          toplamTutar: toplamTutar,
-          odemeTipi: odemeler.length > 0 ? odemeler.map(o => o.tip).join(', ') : "BELİRTİLMEDİ",
-          kapanisZamani: new Date().toISOString(),
-          personel: JSON.parse(localStorage.getItem("mc_user") || "{}").adSoyad || "Bilinmiyor",
-          ekUrunler: ekUrunler,
-          odemeler: odemeler
-        };
-        
-        // Finans havuzuna kaydet
-        mcFinansHavuzu.bilardoAdisyonuKapandigindaKaydet(finansHavuzuData);
-        
-        console.log("Bilardo adisyonu finans havuzuna kaydedildi:", finansHavuzuData);
-      } catch (error) {
-        console.error("Finans havuzuna kaydetme hatası:", error);
-        // Hata olsa bile işleme devam et
-      }
-    }
+    alert(`Bilardo adisyonu kapatıldı!\nToplam: ${Number(toplamTutar || 0).toFixed(2)}₺\nFinans havuzuna kaydedildi.`);
     
-    alert(`Bilardo adisyonu kapatıldı!\nToplam: ${toplamTutar.toFixed(2)}₺\nFinans havuzuna kaydedildi.`);
-    
-    // Bilardo sayfasına dön
     setTimeout(() => navigate("/bilardo"), 1500);
   };
 
@@ -522,7 +525,6 @@ export default function BilardoAdisyon() {
   const kategoriyeGoreUrunler = (kategoriId) => {
     let urunListesi = mcUrunler;
     
-    // Kategori filtresi
     if (kategoriId) {
       const altKategoriIds = mcKategoriler
         .filter(k => k.parentId === kategoriId)
@@ -534,7 +536,6 @@ export default function BilardoAdisyon() {
       );
     }
     
-    // Arama filtresi
     if (urunArama.trim()) {
       const arama = urunArama.toLowerCase();
       urunListesi = urunListesi.filter(urun => 
@@ -619,11 +620,11 @@ export default function BilardoAdisyon() {
               </div>
               
               <div style={{ fontWeight: '600', color: '#704a25' }}>
-                {urun.fiyat.toFixed(2)}₺
+                {Number(urun.fiyat || 0).toFixed(2)}₺
               </div>
               
               <div style={{ fontWeight: '800', color: '#704a25' }}>
-                {(urun.fiyat * urun.adet).toFixed(2)}₺
+                {Number((urun.fiyat || 0) * (urun.adet || 0)).toFixed(2)}₺
               </div>
             </div>
           ))}
@@ -795,7 +796,7 @@ export default function BilardoAdisyon() {
                       fontSize: '18px',
                       marginBottom: '5px'
                     }}>
-                      {parseFloat(urun.salePrice || 0).toFixed(2)}₺
+                      {Number(urun.salePrice || 0).toFixed(2)}₺
                     </div>
                     {urun.stock !== undefined && (
                       <div style={{
@@ -829,7 +830,7 @@ export default function BilardoAdisyon() {
   };
 
   /* ============================================================
-     📌 10. ANA RENDER - GUNCELLENDI (BİLARDO ÜCRETİ GÖSTERİMİ)
+     📌 10. ANA RENDER
   ============================================================ */
   
   if (!adisyon) {
@@ -862,9 +863,10 @@ export default function BilardoAdisyon() {
     );
   }
 
-  const toplamTutar = hesaplananUcret + ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0);
-  const odenenToplam = odemeler.reduce((s, o) => s + o.tutar, 0);
-  const ekUrunToplam = ekUrunler.reduce((s, u) => s + (u.fiyat * u.adet), 0);
+  const ekUrunToplam = ekUrunler.reduce((s, u) => 
+    s + (Number(u.fiyat || 0) * Number(u.adet || 0)), 0);
+  const toplamTutar = hesaplananUcret + ekUrunToplam;
+  const odenenToplam = odemeler.reduce((s, o) => s + Number(o.tutar || 0), 0);
 
   return (
     <div className="bilardo-adisyon-container" style={{
@@ -973,7 +975,7 @@ export default function BilardoAdisyon() {
         marginBottom: '30px'
       }}>
         
-        {/* SÜTUN 1: BİLARDO BİLGİLERİ - BİLARDO ÜCRETİ GÖSTERİMİ */}
+        {/* SÜTUN 1: BİLARDO BİLGİLERİ */}
         <div style={{
           background: 'white',
           borderRadius: '18px',
@@ -1013,7 +1015,7 @@ export default function BilardoAdisyon() {
               </span>
             </div>
             
-            {/* BİLARDO ÜCRETİ GÖSTERİMİ - DÜZELTİLDİ */}
+            {/* BİLARDO ÜCRETİ */}
             <div style={{
               marginTop: '10px',
               padding: '15px',
@@ -1023,7 +1025,7 @@ export default function BilardoAdisyon() {
             }}>
               <div style={{ fontSize: '14px', color: '#8B7355', marginBottom: '5px' }}>BİLARDO ÜCRETİ</div>
               <div style={{ fontSize: '28px', fontWeight: '900', color: '#704a25' }}>
-                {hesaplananUcret.toFixed(2)}₺
+                {Number(hesaplananUcret || 0).toFixed(2)}₺
               </div>
               <div style={{ fontSize: '12px', color: '#8B7355', marginTop: '5px', fontStyle: 'italic' }}>
                 {adisyon.sureTipi === "30dk" && "30 dakika ücreti"}
@@ -1100,10 +1102,8 @@ export default function BilardoAdisyon() {
             </div>
           </div>
           
-          {/* 4 sütunlu ürün tablosu */}
           {renderUrunTablosu()}
           
-          {/* Toplam ek ürün tutarı */}
           {ekUrunler.length > 0 && (
             <div style={{
               marginTop: '15px',
@@ -1115,7 +1115,7 @@ export default function BilardoAdisyon() {
               color: '#704a25',
               border: '1px solid #e8d8c3'
             }}>
-              Ek Ürünler Toplamı: {ekUrunToplam.toFixed(2)}₺
+              Ek Ürünler Toplamı: {Number(ekUrunToplam || 0).toFixed(2)}₺
             </div>
           )}
         </div>
@@ -1248,7 +1248,7 @@ export default function BilardoAdisyon() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                       <span style={{ fontWeight: '700', color: '#704a25' }}>
-                        {odeme.tutar.toFixed(2)}₺
+                        {Number(odeme.tutar || 0).toFixed(2)}₺
                       </span>
                       <button
                         onClick={() => odemeSil(odeme.id)}
@@ -1282,11 +1282,11 @@ export default function BilardoAdisyon() {
             marginTop: '10px',
             border: '1px solid #c8e6c9'
           }}>
-            ÖDENEN TOPLAM: {odenenToplam.toFixed(2)}₺
+            ÖDENEN TOPLAM: {Number(odenenToplam || 0).toFixed(2)}₺
           </div>
         </div>
         
-        {/* SÜTUN 4: ÖZET ve AKSİYONLAR - GUNCELLENDI (BİLARDO ÜCRETİ GÖSTERİMİ) */}
+        {/* SÜTUN 4: ÖZET ve AKSİYONLAR */}
         <div style={{
           background: 'white',
           borderRadius: '18px',
@@ -1306,7 +1306,7 @@ export default function BilardoAdisyon() {
           }}>📊 Özet</h2>
           
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {/* BİLARDO ÜCRETİ - ÖZEL GÖSTERİM */}
+            {/* BİLARDO ÜCRETİ */}
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between',
@@ -1317,14 +1317,14 @@ export default function BilardoAdisyon() {
             }}>
               <span style={{ color: '#1565c0', fontWeight: '700' }}>🎱 BİLARDO ÜCRETİ:</span>
               <span style={{ fontWeight: '800', color: '#0d47a1', fontSize: '18px' }}>
-                {hesaplananUcret.toFixed(2)}₺
+                {Number(hesaplananUcret || 0).toFixed(2)}₺
               </span>
             </div>
             
             {/* EK ÜRÜNLER */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#8B7355', fontWeight: '600' }}>📦 Ek Ürünler:</span>
-              <span style={{ fontWeight: '700', color: '#5a3921' }}>{ekUrunToplam.toFixed(2)}₺</span>
+              <span style={{ fontWeight: '700', color: '#5a3921' }}>{Number(ekUrunToplam || 0).toFixed(2)}₺</span>
             </div>
             
             {/* GENEL TOPLAM */}
@@ -1338,13 +1338,13 @@ export default function BilardoAdisyon() {
               fontWeight: '800'
             }}>
               <span style={{ color: '#5a3921' }}>GENEL TOPLAM:</span>
-              <span style={{ color: '#704a25', fontSize: '22px' }}>{toplamTutar.toFixed(2)}₺</span>
+              <span style={{ color: '#704a25', fontSize: '22px' }}>{Number(toplamTutar || 0).toFixed(2)}₺</span>
             </div>
             
             {/* ÖDENEN */}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#8B7355', fontWeight: '600' }}>💳 Ödenen:</span>
-              <span style={{ fontWeight: '700', color: '#27ae60' }}>{odenenToplam.toFixed(2)}₺</span>
+              <span style={{ fontWeight: '700', color: '#27ae60' }}>{Number(odenenToplam || 0).toFixed(2)}₺</span>
             </div>
             
             {/* KALAN TUTAR */}
@@ -1361,7 +1361,7 @@ export default function BilardoAdisyon() {
             }}>
               <span style={{ color: kalanTutar > 0 ? '#c62828' : '#2e7d32' }}>KALAN TUTAR:</span>
               <span style={{ color: kalanTutar > 0 ? '#c62828' : '#2e7d32', fontSize: '22px' }}>
-                {kalanTutar.toFixed(2)}₺
+                {Number(kalanTutar || 0).toFixed(2)}₺
               </span>
             </div>
           </div>
@@ -1510,7 +1510,7 @@ export default function BilardoAdisyon() {
               
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ marginBottom: '8px', fontWeight: '600', color: '#666' }}>
-                  Tutar (Kalan: {kalanTutar.toFixed(2)}₺)
+                  Tutar (Kalan: {Number(kalanTutar || 0).toFixed(2)}₺)
                 </div>
                 <input
                   type="number"

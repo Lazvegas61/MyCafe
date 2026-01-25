@@ -151,67 +151,94 @@ export default function UrunStokYonetimi() {
   };
 
   // ---------- MIGRATION (Eski verileri dönüştür) ----------
-useEffect(() => {
-  const migrateOldData = () => {
-    const eskiUrunler = read(URUN_KEY, []);
-    if (eskiUrunler.length === 0) return;
-    
-    // Eski veride kategoriId var mı kontrol et (yeni format)
-    const ilkUrun = eskiUrunler[0];
-    if (ilkUrun.kategoriId && ilkUrun.name) return; // Zaten yeni formatta
-    
-    // Migration yap - hem eski hem yeni formatları destekle
-    const migratedUrunler = eskiUrunler.map(urun => {
-      // Kategori ID'sini belirle
-      let kategoriId;
-      if (urun.kategoriId) {
-        kategoriId = urun.kategoriId.toString(); // Var olan kategoriId'yi string yap
-      } else if (urun.categoryId) {
-        kategoriId = urun.categoryId.toString(); // categoryId'den al
-      } else {
-        kategoriId = "1"; // Varsayılan kategori
+  useEffect(() => {
+    const migrateOldData = () => {
+      const eskiUrunler = read(URUN_KEY, []);
+      if (eskiUrunler.length === 0) return;
+      
+      // Eski veride kategoriId var mı kontrol et (yeni format)
+      const ilkUrun = eskiUrunler[0];
+      if (ilkUrun.kategoriId && ilkUrun.name) {
+        // Zaten yeni formatta, sadece stokTakibi değerini düzelt
+        const migratedUrunler = eskiUrunler.map(urun => {
+          let stokTakibiValue = true;
+          if (urun.stokTakibi !== undefined) {
+            // Boolean değerine dönüştür
+            stokTakibiValue = urun.stokTakibi === true || urun.stokTakibi === "true";
+          }
+          
+          return {
+            ...urun,
+            stokTakibi: stokTakibiValue,
+            kategoriId: urun.kategoriId.toString(),
+          };
+        });
+        
+        write(URUN_KEY, migratedUrunler);
+        console.log(`${migratedUrunler.length} ürün stokTakibi değerleri düzeltildi`);
+        return;
       }
       
-      return {
-        id: urun.id || generateId(),
-        name: urun.name || "",
-        kategoriId: kategoriId,
-        barkod: urun.barkod || "",
-        costPrice: Number(urun.costPrice || urun.maliyet || 0),
-        salePrice: Number(urun.salePrice || urun.satis || 0),
-        stock: Number(urun.stock || urun.stok || 0),
-        critical: Number(urun.critical || urun.kritik || 10),
-        stokTakibi: urun.stokTakibi !== undefined ? urun.stokTakibi : true,
-      };
-    });
+      // Eski format için migration yap
+      const migratedUrunler = eskiUrunler.map(urun => {
+        // Kategori ID'sini belirle
+        let kategoriId;
+        if (urun.kategoriId) {
+          kategoriId = urun.kategoriId.toString();
+        } else if (urun.categoryId) {
+          kategoriId = urun.categoryId.toString();
+        } else {
+          kategoriId = "1";
+        }
+        
+        // stokTakibi değerini güvenli şekilde işle
+        let stokTakibiValue = true;
+        if (urun.stokTakibi !== undefined) {
+          stokTakibiValue = urun.stokTakibi === true || urun.stokTakibi === "true";
+        } else if (urun.takip !== undefined) {
+          stokTakibiValue = urun.takip === true || urun.takip === "true";
+        }
+        
+        return {
+          id: urun.id || generateId(),
+          name: urun.name || "",
+          kategoriId: kategoriId,
+          barkod: urun.barkod || "",
+          costPrice: Number(urun.costPrice || urun.maliyet || 0),
+          salePrice: Number(urun.salePrice || urun.satis || 0),
+          stock: Number(urun.stock || urun.stok || 0),
+          critical: Number(urun.critical || urun.kritik || 10),
+          stokTakibi: stokTakibiValue,
+        };
+      });
+      
+      write(URUN_KEY, migratedUrunler);
+      console.log(`${migratedUrunler.length} ürün migrate edildi`);
+    };
     
-    write(URUN_KEY, migratedUrunler);
-    console.log(`${migratedUrunler.length} ürün migrate edildi`);
-  };
-  
-  const migrateOldCategories = () => {
-    const eskiKategoriler = read(KATEGORI_KEY, []);
-    if (eskiKategoriler.length === 0) return;
+    const migrateOldCategories = () => {
+      const eskiKategoriler = read(KATEGORI_KEY, []);
+      if (eskiKategoriler.length === 0) return;
+      
+      const ilkKategori = eskiKategoriler[0];
+      if (ilkKategori.ad) return; // Zaten yeni formatta
+      
+      const migratedKategoriler = eskiKategoriler.map(kat => ({
+        id: (kat.id || kat.categoryId || generateId()).toString(),
+        ad: kat.ad || kat.name || kat.categoryName || ""
+      }));
+      
+      write(KATEGORI_KEY, migratedKategoriler);
+      console.log(`${migratedKategoriler.length} kategori migrate edildi`);
+    };
     
-    const ilkKategori = eskiKategoriler[0];
-    if (ilkKategori.ad) return; // Zaten yeni formatta
-    
-    const migratedKategoriler = eskiKategoriler.map(kat => ({
-      id: (kat.id || kat.categoryId || generateId()).toString(),
-      ad: kat.ad || kat.name || kat.categoryName || ""
-    }));
-    
-    write(KATEGORI_KEY, migratedKategoriler);
-    console.log(`${migratedKategoriler.length} kategori migrate edildi`);
-  };
-  
-  try {
-    migrateOldCategories();
-    migrateOldData();
-  } catch (error) {
-    console.error("Migration hatası:", error);
-  }
-}, []);
+    try {
+      migrateOldCategories();
+      migrateOldData();
+    } catch (error) {
+      console.error("Migration hatası:", error);
+    }
+  }, []);
 
   // ---------- REFRESH ----------
   const refresh = () => {
@@ -240,11 +267,21 @@ useEffect(() => {
 
   // ---------- ALARM HESAPLAMA ----------
   useEffect(() => {
-    const kritiks = urunler.filter(
-      (u) =>
-        u.stokTakibi === true &&
-        Number(u.stock || 0) <= Number(u.critical || 0)
-    );
+    // SADECE stokTakibi === true OLAN ve kritik seviyenin altındaki ürünleri kontrol et
+    const kritiks = urunler.filter((u) => {
+      // stokTakibi değerini güvenli şekilde kontrol et
+      const takipEdiliyor = u.stokTakibi === true;
+      
+      // Eğer takip edilmiyorsa, kritik listeye alma
+      if (!takipEdiliyor) return false;
+      
+      // Takip ediliyorsa, stok miktarını kontrol et
+      const mevcutStok = Number(u.stock) || 0;
+      const kritikSeviye = Number(u.critical) || 10;
+      
+      return mevcutStok <= kritikSeviye;
+    });
+    
     setKritikAlarm(kritiks.length > 0);
   }, [urunler]);
 
@@ -380,7 +417,7 @@ useEffect(() => {
       salePrice: Number(uSatis || 0),
       stock: Number(uStok || 0),
       critical: Number(uKritik || 10),
-      stokTakibi: uTakip,
+      stokTakibi: Boolean(uTakip),
     };
 
     list.push(yeniUrun);
@@ -513,7 +550,7 @@ useEffect(() => {
     temelGuncelle((x) => (x.critical = Number(gKritik))), [temelGuncelle, gKritik]);
 
   const takipGuncelle = useCallback(() =>
-    temelGuncelle((x) => (x.stokTakibi = gTakip)), [temelGuncelle, gTakip]);
+    temelGuncelle((x) => (x.stokTakibi = Boolean(gTakip))), [temelGuncelle, gTakip]);
 
   // Ürün adı ve kategori güncelleme
   const urunAdiVeKategoriGuncelle = useCallback(() => {
@@ -607,33 +644,8 @@ useEffect(() => {
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
       }}
     >
-      {/* KRITIK STOK ALARM BUTTON */}
-      {kritikAlarm && (
-        <div
-          onClick={kritikUrunGoster}
-          style={{
-            position: "fixed",
-            top: "20px",
-            right: "20px",
-            background: TEMA.danger,
-            color: "white",
-            padding: "12px 20px",
-            borderRadius: "12px",
-            cursor: "pointer",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontWeight: "600",
-            boxShadow: "0 4px 12px rgba(198, 40, 40, 0.3)",
-            animation: "pulse 2s infinite"
-          }}
-        >
-          <span style={{ fontSize: "1.2rem" }}>⚠️</span>
-          KRITIK STOK ({kritikStokSayisi})
-        </div>
-      )}
-
+      {/* KRITIK STOK ALARM BUTONU KALDIRILDI - geçici olarak */}
+      
       {/* HEADER */}
       <div style={{ marginBottom: "30px" }}>
         <h1 style={{ color: TEMA.anaRenk, margin: "0 0 10px 0", fontSize: "2rem" }}>
